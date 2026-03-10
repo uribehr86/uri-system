@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>סורק URI SYSTEM</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        body { background-color: #0f172a; color: white; overscroll-behavior-y: none; font-family: sans-serif; }
+        #reader video { object-fit: cover !important; border-radius: 1.5rem; }
+        .glass-panel { background: rgba(30, 41, 59, 0.98); backdrop-filter: blur(20px); border-top: 3px solid #3b82f6; }
+        .bottom-sheet { transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .bottom-sheet.show { transform: translateY(0); }
+        select, input { background-color: #1e293b !important; color: white !important; border: 1px solid #334155 !important; }
+        .flashlight-btn { position: absolute; bottom: 20px; left: 20px; z-index: 60; background: rgba(0,0,0,0.6); width: 50px; height: 50px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); display: flex; items-center: center; justify-content: center; font-size: 20px; }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+    <div id="counter_ui" class="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/95 px-6 py-2 rounded-full z-50 flex items-center gap-4 border border-slate-700 shadow-2xl">
+        <span id="display_cage_top" class="text-sm font-black text-blue-400">--</span>
+        <div class="w-px h-6 bg-slate-700"></div>
+        <span id="count_val" class="text-xl font-black text-white">0</span>
+    </div>
+
+    <div class="relative w-full h-[40vh] bg-black rounded-b-[2.5rem] overflow-hidden shadow-2xl" id="reader-container">
+        <div id="reader" class="w-full h-full"></div>
+        
+        <button id="torch-btn" onclick="toggleTorch()" class="flashlight-btn">🔦</button>
+
+        <button onclick="location.href='/index'" class="absolute top-4 right-4 z-50 bg-black/50 text-white w-9 h-9 rounded-full flex items-center justify-center border border-white/10">✕</button>
+    </div>
+
+    <div class="flex-1 flex flex-col p-6 items-center justify-center">
+        <div class="text-slate-500 font-bold mb-2 uppercase text-[10px] tracking-widest">ממתין לסריקת מחשב...</div>
+        <div class="w-12 h-12 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+    </div>
+
+    <div id="editModal" class="hidden fixed inset-0 z-[100] flex flex-col justify-end">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeModals()"></div>
+        <div class="glass-panel w-full p-8 rounded-t-[3rem] bottom-sheet relative z-[101] shadow-2xl">
+            <div class="w-12 h-1 bg-slate-700 rounded-full mx-auto mb-6"></div>
+            <h3 class="text-center text-3xl font-black mb-8 text-white">מחשב: <span id="modal_pc_num" class="text-blue-400"></span></h3>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="text-[11px] font-bold text-slate-500 mb-1 block mr-1 uppercase">סטטוס</label>
+                    <select id="modal_status" class="w-full p-4 rounded-2xl font-bold text-xl outline-none">
+                        <option value="Fine">✅ תקין</option>
+                        <option value="Fix Needed">❌ לא תקין (תקול)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-[11px] font-bold text-slate-500 mb-1 block mr-1 uppercase">מיקום</label>
+                    <select id="modal_loc" class="w-full p-4 rounded-2xl font-bold text-xl outline-none" onchange="toggleOther(this.value)">
+                        <option value="מחסן">מחסן</option>
+                        <option value="אפעל 6">אפעל 6</option>
+                        <option value="אקספו">אקספו</option>
+                        <option value="בנייני האומה">בנייני האומה</option>
+                        <option value="שיבא">שיבא</option>
+                        <option value="other">-- אחר --</option>
+                    </select>
+                    <input type="text" id="modal_loc_other" class="hidden w-full mt-3 p-4 rounded-2xl outline-none border-2 border-blue-500" placeholder="כתוב מיקום/טכנאי...">
+                </div>
+
+                <div>
+                    <label class="text-[11px] font-bold text-slate-500 mb-1 block mr-1 uppercase">מספר כלוב</label>
+                    <input type="text" id="modal_cage" class="w-full p-4 rounded-2xl font-black text-2xl text-center outline-none" placeholder="00">
+                </div>
+
+                <div>
+                    <label class="text-[11px] font-bold text-slate-500 mb-1 block mr-1 uppercase">הערות</label>
+                    <input type="text" id="modal_notes" class="w-full p-4 rounded-2xl outline-none text-lg" placeholder="...">
+                </div>
+            </div>
+
+            <div class="flex gap-4 mt-10">
+                <button onclick="closeModals()" class="flex-1 bg-slate-800 py-5 rounded-2xl font-bold text-slate-400">ביטול</button>
+                <button onclick="saveAndNext()" class="flex-[2] bg-blue-600 py-5 rounded-2xl font-black text-white text-xl shadow-lg">שמור וסרוק הבא</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let html5QrCode;
+        let lastPC = "";
+        let isTorchOn = false;
+
+        window.onload = () => {
+            document.getElementById('modal_cage').value = localStorage.getItem('uri_last_cage') || '';
+            document.getElementById('modal_loc').value = localStorage.getItem('uri_last_loc') || 'מחסן';
+            document.getElementById('display_cage_top').innerText = localStorage.getItem('uri_last_cage') || '--';
+            startCamera();
+        };
+
+        async function startCamera() {
+            html5QrCode = new Html5Qrcode("reader");
+            await html5QrCode.start({ facingMode: "environment" }, { fps: 25, qrbox: { width: 250, height: 180 } }, onScanSuccess);
+        }
+
+        async function toggleTorch() {
+            isTorchOn = !isTorchOn;
+            try {
+                await html5QrCode.applyVideoConstraints({ focusMode: "continuous", advanced: [{ torch: isTorchOn }] });
+                document.getElementById('torch-btn').style.background = isTorchOn ? "#3b82f6" : "rgba(0,0,0,0.6)";
+            } catch (e) { console.log("Torch not supported"); }
+        }
+
+        function onScanSuccess(decodedText) {
+            const cleanPC = decodedText.trim().replace(/^0+/, '');
+            if(cleanPC === lastPC) return;
+            lastPC = cleanPC;
+            if(navigator.vibrate) navigator.vibrate(100);
+            html5QrCode.pause();
+            
+            document.getElementById('modal_pc_num').innerText = cleanPC;
+            const modal = document.getElementById('editModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.querySelector('.bottom-sheet').classList.add('show'), 10);
+        }
+
+        function toggleOther(val) {
+            const otherInput = document.getElementById('modal_loc_other');
+            otherInput.classList.toggle('hidden', val !== 'other');
+            if(val === 'other') otherInput.focus();
+        }
+
+        function closeModals() {
+            const sheet = document.querySelector('.bottom-sheet');
+            sheet.classList.remove('show');
+            setTimeout(() => {
+                document.getElementById('editModal').classList.add('hidden');
+                lastPC = "";
+                html5QrCode.resume();
+            }, 300);
+        }
+
+        function saveAndNext() {
+            const cage = document.getElementById('modal_cage').value;
+            const locSelect = document.getElementById('modal_loc').value;
+            const locFinal = locSelect === 'other' ? document.getElementById('modal_loc_other').value : locSelect;
+            const status = document.getElementById('modal_status').value;
+            const notes = document.getElementById('modal_notes').value;
+
+            if(!cage) return alert("נא להזין מספר כלוב");
+
+            localStorage.setItem('uri_last_cage', cage);
+            localStorage.setItem('uri_last_loc', locSelect);
+            document.getElementById('display_cage_top').innerText = cage;
+
+            fetch('/api/save_scan_full', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ barcode: lastPC, status: status, location: locFinal, cage: cage, notes: notes })
+            }).then(r => r.json()).then(data => {
+                document.getElementById('count_val').innerText = data.cage_count;
+                if(data.cage_count === 50) confetti();
+                closeModals();
+                document.getElementById('modal_notes').value = "";
+            });
+        }
+    </script>
+</body>
+</html>
