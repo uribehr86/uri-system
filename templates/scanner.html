@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}סריקת ברקוד - URI System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>סריקת ברקוד</h1>
+</div>
+
+<div id="scanner-container" class="card" style="text-align: center; max-width: 600px; margin: 40px auto; animation: fadeIn 1s ease-out; border: 1px solid var(--accent2);">
+    <div id="reader" style="width: 100%; border-radius: 12px; overflow: hidden; background: #000; min-height: 350px; box-shadow: 0 0 20px rgba(0,0,0,0.5);"></div>
+    <div id="result" style="margin-top: 24px; font-size: 1.4rem; font-weight: 800; color: var(--accent2);"></div>
+    <p class="muted" style="margin-top: 10px; font-size: 0.9rem;">המערכת תזהה את הברקוד ותוביל אותך לעדכון המחשב באופן אוטומטי</p>
+</div>
+
+<!-- Edit Form (Hidden initially) -->
+<div id="edit-form-container" class="card" style="display: none; max-width: 600px; margin: 40px auto; animation: fadeIn 0.5s ease-out;">
+    <h2 style="margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">עדכון מחשב: <span id="form-barcode" style="color: var(--accent2);"></span></h2>
+    <form id="update-form">
+        <input type="hidden" id="computer-id">
+        <div class="form-group">
+            <label>מספר תיק</label>
+            <input type="text" id="case_number" class="form-control" placeholder="הכנס מספר תיק...">
+        </div>
+        <div class="form-group">
+            <label>מספר כלוב</label>
+            <input type="text" id="cage_number" class="form-control" placeholder="הכנס מספר כלוב...">
+        </div>
+        <div class="form-group">
+            <label>סטטוס</label>
+            <select id="status" class="form-control">
+                <option value="פעיל">פעיל</option>
+                <option value="תקול">תקול</option>
+                <option value="בתיקון">בתיקון</option>
+                <option value="אחר">אחר</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>מיקום</label>
+            <input type="text" id="location" class="form-control" placeholder="מיקום נוכחי...">
+        </div>
+        <div class="form-group">
+            <label>מבחן \ ערעור</label>
+            <input type="text" id="exam_appeal" class="form-control" placeholder="פרטי מבחן או ערעור...">
+        </div>
+        <div class="form-group">
+            <label>הערות</label>
+            <textarea id="notes" class="form-control" placeholder="הערות נוספות..."></textarea>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button type="submit" class="btn btn-blue" style="flex: 2;">שמור שינויים</button>
+            <button type="button" onclick="resetScanner()" class="btn btn-ghost" style="flex: 1;">ביטול / סרוק שוב</button>
+        </div>
+    </form>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script>
+    let html5QrcodeScanner = new Html5QrcodeScanner(
+        "reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
+    
+    function onScanSuccess(decodedText, decodedResult) {
+        html5QrcodeScanner.clear(); // Stop scanning
+        document.getElementById('result').innerText = "מעבד ברקוד: " + decodedText;
+        
+        // Fetch data from API
+        fetch('/api/process-scan', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({barcode: decodedText})
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) throw new Error(data.error);
+            showEditForm(data.computer);
+        })
+        .catch(err => {
+            alert("שגיאה בסריקה: " + err.message);
+            resetScanner();
+        });
+    }
+
+    function showEditForm(computer) {
+        document.getElementById('scanner-container').style.display = 'none';
+        document.getElementById('edit-form-container').style.display = 'block';
+        
+        document.getElementById('form-barcode').innerText = computer.barcode;
+        document.getElementById('computer-id').value = computer.id;
+        document.getElementById('case_number').value = computer.case_number || '';
+        document.getElementById('cage_number').value = computer.cage_number || '';
+        document.getElementById('status').value = computer.status || 'פעיל';
+        document.getElementById('location').value = computer.location || '';
+        document.getElementById('exam_appeal').value = computer.exam_appeal || '';
+        document.getElementById('notes').value = computer.notes || '';
+    }
+
+    function resetScanner() {
+        document.getElementById('edit-form-container').style.display = 'none';
+        document.getElementById('scanner-container').style.display = 'block';
+        document.getElementById('result').innerText = '';
+        html5QrcodeScanner.render(onScanSuccess);
+    }
+
+    document.getElementById('update-form').onsubmit = function(e) {
+        e.preventDefault();
+        const data = {
+            id: document.getElementById('computer-id').value,
+            case_number: document.getElementById('case_number').value,
+            cage_number: document.getElementById('cage_number').value,
+            status: document.getElementById('status').value,
+            location: document.getElementById('location').value,
+            exam_appeal: document.getElementById('exam_appeal').value,
+            notes: document.getElementById('notes').value
+        };
+
+        fetch('/api/update-computer', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(resData => {
+            if (resData.success) {
+                alert("המחשב עודכן בהצלחה!");
+                resetScanner();
+            } else {
+                alert("שגיאה בעדכון: " + (resData.error || resData.message));
+            }
+        });
+    };
+
+    html5QrcodeScanner.render(onScanSuccess);
+</script>
+{% endblock %}

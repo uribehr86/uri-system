@@ -28,23 +28,24 @@
         <table>
             <thead>
                 <tr>
-                    <th>#</th>
+                    <th style="width: 40px;">#</th>
                     <th>ברקוד</th>
-                    <th>שם</th>
-                    <th>מיקום</th>
+                    <th>תיק</th>
+                    <th>כלוב</th>
                     <th>סטטוס</th>
-                    <th>זמן סריקה</th>
+                    <th>מיקום</th>
+                    <th>מבחן\ערעור</th>
                     <th>הערות</th>
-                    <th>פעולות</th>
+                    <th style="text-align: left;">פעולות</th>
                 </tr>
             </thead>
             <tbody>
             {% for c in computers %}
-            <tr>
+            <tr style="animation: fadeIn 0.5s ease-out {{ loop.index0 * 0.05 }}s backwards;">
                 <td style="color:var(--muted); font-size:.82rem;">{{ loop.index }}</td>
-                <td><code style="color:var(--accent2); font-size:.9rem;">{{ c.barcode }}</code></td>
-                <td>{{ c.name or '—' }}</td>
-                <td>{{ c.location or '—' }}</td>
+                <td><code style="color:var(--accent2); font-weight: 700;">{{ c.barcode }}</code></td>
+                <td>{{ c.case_number or '—' }}</td>
+                <td>{{ c.cage_number or '—' }}</td>
                 <td>
                     {% if c.status == 'פעיל' %}
                         <span class="badge badge-green">✓ פעיל</span>
@@ -56,20 +57,13 @@
                         <span class="badge badge-blue">{{ c.status }}</span>
                     {% endif %}
                 </td>
-                <td style="color:var(--muted); font-size:.83rem; white-space:nowrap;">
-                    {{ c.last_seen.strftime('%d/%m/%Y %H:%M') if c.last_seen else '—' }}
-                </td>
-                <td style="color:var(--muted); font-size:.85rem; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                <td>{{ c.location or '—' }}</td>
+                <td>{{ c.exam_appeal or '—' }}</td>
+                <td style="color:var(--muted); font-size:.85rem; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                     {{ c.notes or '—' }}
                 </td>
-                <td style="white-space:nowrap;">
-                    <!-- עדכון סריקה -->
-                    <form method="POST" action="{{ url_for('scan_computer', cid=c.id) }}" style="display:inline;">
-                        <button type="submit" class="btn btn-ghost btn-sm" title="עדכן סריקה">📡</button>
-                    </form>
-                    <!-- עריכה -->
+                <td style="white-space:nowrap; text-align: left;">
                     <a href="{{ url_for('edit_computer', cid=c.id) }}" class="btn btn-ghost btn-sm" title="עריכה">✏️</a>
-                    <!-- מחיקה -->
                     <form method="POST" action="{{ url_for('delete_computer', cid=c.id) }}" style="display:inline;"
                           onsubmit="return confirm('למחוק את המחשב {{ c.barcode }}?');">
                         <button type="submit" class="btn btn-danger btn-sm" title="מחיקה">🗑️</button>

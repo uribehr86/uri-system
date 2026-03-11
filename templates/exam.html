@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}מבחן \ ערעור - URI System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>מחשבים בסטטוס מבחן \ ערעור</h1>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>ברקוד</th>
+                    <th>מספר תיק</th>
+                    <th>מספר כלוב</th>
+                    <th>סטטוס</th>
+                    <th>מבחן\ערעור</th>
+                    <th>פעולות</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for computer in computers %}
+                <tr>
+                    <td>{{ computer.barcode }}</td>
+                    <td>{{ computer.case_number or '-' }}</td>
+                    <td>{{ computer.cage_number or '-' }}</td>
+                    <td><span class="badge badge-yellow">{{ computer.status }}</span></td>
+                    <td>{{ computer.exam_appeal }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-ghost">עריכה</button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 40px; color: var(--muted);">
+                        אין מחשבים בסטטוס מבחן או ערעור כרגע
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

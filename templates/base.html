@@ -11,9 +11,9 @@
 
         :root {
             --bg:       #0d1117;
-            --surface:  #161b22;
-            --card:     #1c2230;
-            --border:   #30363d;
+            --surface:  rgba(22, 27, 34, 0.8);
+            --card:     rgba(28, 34, 48, 0.6);
+            --border:   rgba(48, 54, 61, 0.5);
             --accent:   #238636;
             --accent2:  #1f6feb;
             --danger:   #da3633;
@@ -21,15 +21,21 @@
             --text:     #e6edf3;
             --muted:    #8b949e;
             --sidebar-w: 240px;
-            --radius:   12px;
+            --radius:   16px;
+            --glass-blur: 12px;
         }
 
-        html, body { height: 100%; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideInRight { from { transform: translateX(50px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes pulseGlow { 0% { box-shadow: 0 0 5px rgba(31,111,235,0.2); } 50% { box-shadow: 0 0 15px rgba(31,111,235,0.4); } 100% { box-shadow: 0 0 5px rgba(31,111,235,0.2); } }
+
+        html, body { height: 100%; overflow-x: hidden; }
         body {
             font-family: 'Heebo', sans-serif;
-            background: var(--bg);
+            background: radial-gradient(circle at top right, #161b22, #0d1117);
             color: var(--text);
             display: flex;
+            transition: all 0.3s ease;
         }
 
         /* ── Sidebar ── */
@@ -37,6 +43,7 @@
             width: var(--sidebar-w);
             min-height: 100vh;
             background: var(--surface);
+            backdrop-filter: blur(var(--glass-blur));
             border-left: 1px solid var(--border);
             display: flex;
             flex-direction: column;
@@ -46,128 +53,120 @@
             top: 0;
             bottom: 0;
             z-index: 100;
+            animation: slideInRight 0.6s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .sidebar .brand {
             padding: 0 20px 24px;
-            font-size: 1.3rem;
+            font-size: 1.4rem;
             font-weight: 800;
             color: var(--text);
             border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            letter-spacing: -0.5px;
         }
-        .sidebar .brand span { font-size: 1.6rem; }
-        .sidebar nav { padding: 16px 12px; flex: 1; }
+        .sidebar .brand span { font-size: 1.8rem; filter: drop-shadow(0 0 8px var(--accent2)); }
+        .sidebar nav { padding: 20px 12px; flex: 1; }
         .sidebar nav a {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 10px 14px;
-            border-radius: 8px;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: 12px;
             color: var(--muted);
             text-decoration: none;
-            font-size: .93rem;
+            font-size: .95rem;
             font-weight: 500;
-            transition: background .18s, color .18s;
-            margin-bottom: 4px;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-bottom: 6px;
         }
-        .sidebar nav a:hover, .sidebar nav a.active {
-            background: rgba(35,134,54,.15);
+        .sidebar nav a:hover {
+            background: rgba(255, 255, 255, 0.05);
             color: var(--text);
+            transform: translateX(-5px);
         }
-        .sidebar nav a .icon { font-size: 1.1rem; width: 22px; text-align: center; }
+        .sidebar nav a.active {
+            background: linear-gradient(135deg, rgba(31,111,235,0.2), rgba(31,111,235,0.05));
+            color: var(--accent2);
+            border: 1px solid rgba(31,111,235,0.3);
+            animation: pulseGlow 3s infinite;
+        }
+        .sidebar nav a .icon { font-size: 1.2rem; width: 24px; text-align: center; }
+
         .sidebar .user-box {
-            padding: 16px 20px;
-            border-top: 1px solid var(--border);
-            font-size: .85rem;
-            color: var(--muted);
+            padding: 20px;
+            background: rgba(0,0,0,0.2);
+            margin: 10px;
+            border-radius: 14px;
+            border: 1px solid var(--border);
         }
-        .sidebar .user-box strong { display: block; color: var(--text); }
-        .sidebar .user-box a {
-            color: var(--danger);
-            text-decoration: none;
-            font-size: .8rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            margin-top: 6px;
-        }
-        .sidebar .user-box a:hover { text-decoration: underline; }
 
         /* ── Main ── */
         .main {
             margin-right: var(--sidebar-w);
             flex: 1;
             min-height: 100vh;
-            padding: 32px;
+            padding: 40px;
             max-width: calc(100vw - var(--sidebar-w));
-        }
-
-        /* ── Page header ── */
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 28px;
-        }
-        .page-header h1 {
-            font-size: 1.7rem;
-            font-weight: 700;
+            animation: fadeIn 0.8s ease-out;
         }
 
         /* ── Cards ── */
         .card {
             background: var(--card);
+            backdrop-filter: blur(var(--glass-blur));
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: 24px;
-            margin-bottom: 20px;
+            padding: 28px;
+            margin-bottom: 24px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+            border-color: rgba(31,111,235,0.3);
         }
 
         /* ── Stat cards ── */
-        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card {
             background: var(--card);
+            backdrop-filter: blur(var(--glass-blur));
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: 22px;
+            padding: 30px;
             text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
         }
-        .stat-card .number { font-size: 2.6rem; font-weight: 800; }
-        .stat-card .label { font-size: .85rem; color: var(--muted); margin-top: 4px; }
-        .stat-card.green .number { color: var(--accent); }
-        .stat-card.blue  .number { color: var(--accent2); }
-        .stat-card.red   .number { color: var(--danger); }
+        .stat-card::before {
+            content: ''; position: absolute; top: 0; right: 0; width: 4px; height: 100%;
+        }
+        .stat-card.blue::before { background: var(--accent2); }
+        .stat-card.red::before { background: var(--danger); }
+        .stat-card.green::before { background: var(--accent); }
+
+        .stat-card .number { font-size: 3rem; font-weight: 800; line-height: 1; }
+        .stat-card .label { font-size: .9rem; color: var(--muted); margin-top: 8px; font-weight: 500; }
+
+        /* ── Table ── */
+        table { width: 100%; border-collapse: separate; border-spacing: 0 8px; margin-top: -8px; }
+        th { padding: 16px; color: var(--muted); font-weight: 700; font-size: .8rem; text-transform: uppercase; letter-spacing: 1px; border: none; }
+        td { padding: 16px; background: rgba(255,255,255,0.03); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); transition: all 0.2s ease; }
+        td:first-child { border-right: 1px solid var(--border); border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
+        td:last-child { border-left: 1px solid var(--border); border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
+        tr:hover td { background: rgba(255,255,255,0.07); transform: scale(1.005); }
 
         /* ── Buttons ── */
         .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 9px 18px;
-            border-radius: 8px;
-            border: none;
-            font-family: inherit;
-            font-size: .9rem;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-            transition: opacity .15s, transform .12s;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 700;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .btn:hover { opacity: .85; transform: translateY(-1px); }
-        .btn-green  { background: var(--accent);  color: #fff; }
-        .btn-blue   { background: var(--accent2); color: #fff; }
-        .btn-danger { background: var(--danger);  color: #fff; }
-        .btn-ghost  { background: var(--border);  color: var(--text); }
-        .btn-sm { padding: 5px 12px; font-size: .82rem; }
-
-        /* ── Table ── */
-        .table-wrap { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: .92rem; }
-        th, td { padding: 12px 14px; text-align: right; border-bottom: 1px solid var(--border); }
-        th { background: var(--surface); color: var(--muted); font-weight: 600; font-size: .82rem; text-transform: uppercase; letter-spacing: .04em; }
-        tr:hover td { background: rgba(255,255,255,.02); }
+        .btn:active { transform: scale(0.95); }
 
         /* ── Badge ── */
         .badge {
@@ -236,8 +235,17 @@
         <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">
             <span class="icon">📊</span> לוח בקרה
         </a>
+        <a href="{{ url_for('scanner') }}" class="{{ 'active' if request.endpoint == 'scanner' }}">
+            <span class="icon">📷</span> סריקת ברקוד
+        </a>
         <a href="{{ url_for('computers') }}" class="{{ 'active' if request.endpoint in ['computers','add_computer','edit_computer'] }}">
-            <span class="icon">💻</span> מחשבים
+            <span class="icon">💻</span> מלאי מחשבים
+        </a>
+        <a href="{{ url_for('exam_page') }}" class="{{ 'active' if request.endpoint == 'exam_page' }}">
+            <span class="icon">📝</span> מבחן \ ערעור
+        </a>
+        <a href="{{ url_for('history_page') }}" class="{{ 'active' if request.endpoint == 'history_page' }}">
+            <span class="icon">📜</span> היסטוריה
         </a>
         {% if session.get('role') == 'admin' %}
         <a href="{{ url_for('manage_users') }}" class="{{ 'active' if request.endpoint in ['manage_users','add_user'] }}">

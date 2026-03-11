@@ -6,18 +6,18 @@
     <a href="{{ url_for('add_computer') }}" class="btn btn-green">➕ הוסף מחשב</a>
 </div>
 
-<div class="stats">
+<div class="stats" style="animation: fadeIn 0.8s ease-out 0.2s backwards;">
     <div class="stat-card blue">
         <div class="number">{{ total }}</div>
-        <div class="label">🖥️ סה״כ מחשבים</div>
-    </div>
-    <div class="stat-card green">
-        <div class="number">{{ active }}</div>
-        <div class="label">✅ מחשבים פעילים</div>
+        <div class="label">🖥️ סה״כ מחשבים במערכת</div>
     </div>
     <div class="stat-card red">
-        <div class="number">{{ broken }}</div>
+        <div class="number">{{ faulty }}</div>
         <div class="label">🔧 מחשבים תקולים</div>
+    </div>
+    <div class="stat-card green">
+        <div class="number">{{ not_in_cage }}</div>
+        <div class="label">📦 מחשבים שאינם בכלוב</div>
     </div>
 </div>
 
@@ -29,7 +29,7 @@
             <thead>
                 <tr>
                     <th>ברקוד</th>
-                    <th>שם</th>
+                    <th>מספר כלוב</th>
                     <th>מיקום</th>
                     <th>סטטוס</th>
                     <th>זמן אחרון</th>
@@ -40,7 +40,7 @@
             {% for c in recent %}
             <tr>
                 <td><code style="color:var(--accent2)">{{ c.barcode }}</code></td>
-                <td>{{ c.name or '—' }}</td>
+                <td>{{ c.cage_number or '—' }}</td>
                 <td>{{ c.location or '—' }}</td>
                 <td>
                     {% if c.status == 'פעיל' %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}היסטוריית שינויים - URI System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>היסטוריית שינויים</h1>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>זמן</th>
+                    <th>טכנאי</th>
+                    <th>ברקוד</th>
+                    <th>סוג שינוי</th>
+                    <th>ערך קודם</th>
+                    <th>ערך חדש</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in history %}
+                <tr>
+                    <td>{{ entry.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td>{{ entry.technician }}</td>
+                    <td>{{ entry.barcode }}</td>
+                    <td>{{ entry.change_type }}</td>
+                    <td style="font-size: 0.8rem; color: var(--muted);">{{ entry.old_value }}</td>
+                    <td style="font-size: 0.8rem;">{{ entry.new_value }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 40px; color: var(--muted);">
+                        טרם בוצעו שינויים במערכת
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

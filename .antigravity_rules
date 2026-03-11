@@ -1,0 +1,7 @@
+# Antigravity Rules - URI System
+
+1. **Code Safety & Verification**: Never deploy or finalize code that is incomplete, contains decorative parameters but lacks logic, or isn't fully interfaced with the system. Every change must be verified locally before being considered "ready for the internet."
+2. **Premium Design Standard**: Always maintain a "wow" factor. Use Glassmorphism (blur, semi-transparency), smooth CSS transitions, and entrance animations (fadeIn, slideUp). Avoid generic colors; use the established darkened radial-gradient palette.
+3. **Language & RTL**: The primary interface language is Hebrew. Ensure all UI elements are right-to-left (RTL) compliant and use the 'Heebo' font.
+4. **Data Integrity**: When scanning barcodes, the system must prioritize updating existing records over creating new ones. A scan should be treated as a "check-in" or "status update" for a computer.
+5. **Transparency**: Always explain changes in Hebrew and provide a summary of what was done.
