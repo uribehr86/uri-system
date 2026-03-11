@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}מחשבים – URI System{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>💻 ניהול מחשבים</h1>
+    <a href="{{ url_for('add_computer') }}" class="btn btn-green">➕ הוסף מחשב</a>
+</div>
+
+<div class="card">
+    <form method="GET" class="search-bar">
+        <input type="text" name="q" class="form-control" placeholder="🔍 חיפוש לפי ברקוד, שם, מיקום..."
+               value="{{ search }}"/>
+        <select name="status" class="form-control" style="max-width:160px;">
+            <option value="">כל הסטטוסים</option>
+            <option value="פעיל"   {% if status_filter == 'פעיל' %}selected{% endif %}>פעיל</option>
+            <option value="תקול"   {% if status_filter == 'תקול' %}selected{% endif %}>תקול</option>
+            <option value="בתיקון" {% if status_filter == 'בתיקון' %}selected{% endif %}>בתיקון</option>
+            <option value="מאוחסן" {% if status_filter == 'מאוחסן' %}selected{% endif %}>מאוחסן</option>
+        </select>
+        <button type="submit" class="btn btn-blue">חיפוש</button>
+        {% if search or status_filter %}
+        <a href="{{ url_for('computers') }}" class="btn btn-ghost">✕ נקה</a>
+        {% endif %}
+    </form>
+
+    {% if computers %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>ברקוד</th>
+                    <th>שם</th>
+                    <th>מיקום</th>
+                    <th>סטטוס</th>
+                    <th>זמן סריקה</th>
+                    <th>הערות</th>
+                    <th>פעולות</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for c in computers %}
+            <tr>
+                <td style="color:var(--muted); font-size:.82rem;">{{ loop.index }}</td>
+                <td><code style="color:var(--accent2); font-size:.9rem;">{{ c.barcode }}</code></td>
+                <td>{{ c.name or '—' }}</td>
+                <td>{{ c.location or '—' }}</td>
+                <td>
+                    {% if c.status == 'פעיל' %}
+                        <span class="badge badge-green">✓ פעיל</span>
+                    {% elif c.status == 'תקול' %}
+                        <span class="badge badge-red">✗ תקול</span>
+                    {% elif c.status == 'בתיקון' %}
+                        <span class="badge badge-yellow">🔧 בתיקון</span>
+                    {% else %}
+                        <span class="badge badge-blue">{{ c.status }}</span>
+                    {% endif %}
+                </td>
+                <td style="color:var(--muted); font-size:.83rem; white-space:nowrap;">
+                    {{ c.last_seen.strftime('%d/%m/%Y %H:%M') if c.last_seen else '—' }}
+                </td>
+                <td style="color:var(--muted); font-size:.85rem; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    {{ c.notes or '—' }}
+                </td>
+                <td style="white-space:nowrap;">
+                    <!-- עדכון סריקה -->
+                    <form method="POST" action="{{ url_for('scan_computer', cid=c.id) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-ghost btn-sm" title="עדכן סריקה">📡</button>
+                    </form>
+                    <!-- עריכה -->
+                    <a href="{{ url_for('edit_computer', cid=c.id) }}" class="btn btn-ghost btn-sm" title="עריכה">✏️</a>
+                    <!-- מחיקה -->
+                    <form method="POST" action="{{ url_for('delete_computer', cid=c.id) }}" style="display:inline;"
+                          onsubmit="return confirm('למחוק את המחשב {{ c.barcode }}?');">
+                        <button type="submit" class="btn btn-danger btn-sm" title="מחיקה">🗑️</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p style="color:var(--muted); font-size:.82rem; margin-top:12px;">סה״כ: {{ computers|length }} מחשבים</p>
+    {% else %}
+    <p style="color:var(--muted); text-align:center; padding:40px;">
+        {% if search or status_filter %}
+        לא נמצאו תוצאות לחיפוש.
+        {% else %}
+        אין מחשבים רשומים. <a href="{{ url_for('add_computer') }}" style="color:var(--accent2)">הוסף מחשב ראשון ›</a>
+        {% endif %}
+    </p>
+    {% endif %}
+</div>
+{% endblock %}

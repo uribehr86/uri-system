@@ -1,67 +1,81 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
+
 <head>
     <meta charset="UTF-8">
-    <title>ניהול מלאי URI SYSTEM</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>URI SYSTEM - דאשבורד</title>
     <style>
-        body { background-color: #0f172a; color: white; font-family: sans-serif; padding-bottom: 110px; }
-        .navbar { background-color: #1e293b; border-bottom: 1px solid #334155; }
-        .table-container { background: #1e293b; border-radius: 15px; padding: 20px; }
-        .table { color: white !important; border-color: #334155 !important; }
-        .stat-card { background: rgba(30, 41, 59, 0.8); border: 1px solid #334155; border-radius: 12px; padding: 15px; }
-        .stat-val { font-size: 1.8rem; font-weight: 900; }
-        .custom-search { background-color: #0f172a !important; color: white !important; border-radius: 12px; border: 1px solid #334155 !important; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0d1117;
+            color: white;
+            padding: 30px;
+        }
+
+        .card {
+            background: #161b22;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #30363d;
+            margin-bottom: 20px;
+        }
+
+        .num {
+            font-size: 4rem;
+            color: #58a6ff;
+            font-weight: bold;
+        }
+
+        .ai-box {
+            background: #1c2128;
+            border-right: 5px solid #238636;
+            padding: 20px;
+        }
+
+        input {
+            padding: 10px;
+            width: 70%;
+            border-radius: 5px;
+            border: 1px solid #30363d;
+            background: #0d1117;
+            color: white;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #238636;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
     </style>
 </head>
+
 <body>
-    <nav class="navbar navbar-dark"><div class="container-fluid"><a class="navbar-brand fw-bold" href="/index">URI SYSTEM</a></div></nav>
-    <div class="container-fluid py-4">
-        <div class="d-flex gap-3 mb-4">
-            <div class="stat-card flex-grow-1 text-center"><span id="total_count" class="stat-val text-info">0</span><div class="small text-slate-400">סה"כ מלאי</div></div>
-        </div>
-        <div class="row g-3 mb-4">
-            <div class="col-md-6"><input type="text" id="searchPC" class="form-control custom-search p-3" placeholder="🔍 חפש מספר (ללא אפסים)..." onkeyup="filterAll()"></div>
-            <div class="col-md-6"><input type="text" id="searchCage" class="form-control custom-search p-3" placeholder="🔍 חפש כלוב..." onkeyup="filterAll()"></div>
-        </div>
-        <ul class="nav nav-tabs border-0" role="tablist">
-            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#stock">📦 מלאי ({{ computers|length }})</button></li>
-            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#history">📜 היסטוריה</button></li>
-        </ul>
-        <div class="tab-content table-container">
-            <div class="tab-pane fade show active" id="stock"><div class="table-responsive"><table id="stockTable" class="table table-dark table-hover text-center"><thead><tr><th>מחשב</th><th>כלוב</th><th>מיקום</th><th>סטטוס</th><th>עדכון</th></tr></thead><tbody>
-                {% for pc in computers %}<tr class="data-row"><td class="pc-cell fw-bold text-info fs-5">{{ pc.computer_number }}</td><td class="cage-cell fw-bold">{{ pc.cage_number }}</td><td>{{ pc.location }}</td><td>{{ 'תקין' if pc.status == 'Fine' else 'תקול' }}</td><td dir="ltr" class="small">{{ pc.display_time }}</td></tr>{% endfor %}
-            </tbody></table></div></div>
-            <div class="tab-pane fade" id="history"><div class="table-responsive"><table id="historyTable" class="table table-dark table-hover text-center"><thead><tr><th>מחשב</th><th>פעולה</th><th>פירוט</th><th>זמן</th></tr></thead><tbody>
-                {% for h in history %}<tr class="data-row"><td class="pc-cell fw-bold">{{ h.computer_number }}</td><td class="text-info fw-bold">{{ h.action_type }}</td><td class="small">{{ h.details }}</td><td dir="ltr" class="small">{{ h.display_time }}</td></tr>{% endfor %}
-            </tbody></table></div></div>
-        </div>
+    <h1>לוח בקרה - URI SYSTEM</h1>
+    <div class="card">
+        <h3>סה"כ מחשבים ב-Database</h3>
+        <div class="num">{{ total }}</div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <div class="card ai-box">
+        <h3>🤖 שאל את ה-AI על המלאי</h3>
+        <input type="text" id="q" placeholder="כמה מחשבים תקינים יש?">
+        <button onclick="ask()">שאל</button>
+        <p id="ans" style="margin-top:15px;"></p>
+    </div>
     <script>
-        let fullCache = [];
-        document.addEventListener("DOMContentLoaded", () => { buildCache(); updateStats(); });
-        function buildCache() {
-            fullCache = [];
-            document.querySelectorAll(".tab-pane.active .data-row").forEach(row => {
-                let pc = row.querySelector('.pc-cell').innerText.trim().replace(/^0+/, '').toLowerCase();
-                fullCache.push({ element: row, pc: pc, full: row.innerText.toLowerCase() });
+        async function ask() {
+            const q = document.getElementById('q').value;
+            const res = await fetch('/ask_ai', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: q })
             });
-        }
-        function filterAll() {
-            let pcS = document.getElementById("searchPC").value.trim().replace(/^0+/, '').toLowerCase();
-            let cgS = document.getElementById("searchCage").value.trim().toLowerCase();
-            fullCache.forEach(i => {
-                let match = (pcS==="" || i.pc===pcS) && (cgS==="" || i.full.includes(cgS));
-                i.element.style.display = match ? "" : "none";
-            });
-            updateStats();
-        }
-        function updateStats() {
-            let count = 0;
-            fullCache.forEach(i => { if(i.element.style.display !== "none") count++; });
-            document.getElementById('total_count').innerText = count;
+            const data = await res.json();
+            document.getElementById('ans').innerText = data.answer;
         }
     </script>
 </body>
+
 </html>

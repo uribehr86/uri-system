@@ -1,113 +1,85 @@
 import os
-from flask import Flask, render_template, request, jsonify
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from datetime import datetime
-import pytz
+import sqlite3
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from dotenv import load_dotenv
+import openai
 
+# טעינת הגדרות
+load_dotenv()
 app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY', 'uri_system_2026_final')
+DB_PATH = 'system_data.db'
 
-# פונקציה לחיבור לבסיס הנתונים החדש ב-Render
+# הגדרת ה-AI
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
 def get_db_connection():
-    # הוא מושך את הכתובת מה-Environment Variable שהגדרנו בשלב 2
-    conn = psycopg2.connect(os.environ.get('DATABASE_URL'))
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
     return conn
-
-# יצירת הטבלאות אם הן לא קיימות (חשוב למעבר ל-Render)
-def init_db():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS computers (
-            id SERIAL PRIMARY KEY,
-            barcode TEXT UNIQUE NOT NULL,
-            cage_name TEXT,
-            status TEXT DEFAULT 'scanned',
-            location TEXT,
-            notes TEXT,
-            scan_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    cur.close()
-    conn.close()
 
 @app.route('/')
 def index():
-    return render_template('checker.html')
+    # דף הנחיתה המעוצב שראינו בתמונה
+    return render_template('index.html')
 
-@app.route('/scan', methods=['POST'])
-def scan():
-    data = request.json
-    barcode = data.get('barcode')
-    cage = data.get('cage_name')
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        user = request.form.get('username', '').strip()
+        pwd = request.form.get('password', '').strip()
+        
+        # כניסה מהירה לאורי
+        if user == 'admin_uri' and pwd == 'uri*':
+            session.update({'logged_in': True, 'username': user})
+            return redirect(url_for('dashboard'))
+            
+        flash('שם משתמש או סיסמה שגויים', 'danger')
+    return render_template('login.html')
+
+@app.route('/dashboard')
+def dashboard():
+    if not session.get('logged_in'): return redirect(url_for('login'))
     
-    if not barcode:
-        return jsonify({"status": "error", "message": "Missing barcode"}), 400
-
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        # שמירת הסריקה
-        cur.execute(
-            "INSERT INTO computers (barcode, cage_name) VALUES (%s, %s) ON CONFLICT (barcode) DO UPDATE SET cage_name = EXCLUDED.cage_name",
-            (barcode, cage)
-        )
-        
-        conn.commit()
-        cur.close()
-        conn.close()
-        return jsonify({"status": "success", "message": f"Barcode {barcode} saved!"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/api/save_scan_full', methods=['POST'])
-def save_scan_full():
-    data = request.json
-    barcode = data.get('barcode')
-    cage = data.get('cage')
-    location = data.get('location')
-    status = data.get('status')
-    notes = data.get('notes')
+    conn = get_db_connection()
+    # משיכת הנתונים שסנכרנת הרגע (ה-2056)
+    total = conn.execute('SELECT COUNT(*) FROM computers').fetchone()[0]
+    recent = conn.execute('SELECT * FROM computers ORDER BY rowid DESC LIMIT 10').fetchall()
+    conn.close()
     
-    if not barcode or not cage:
-        return jsonify({"status": "error", "message": "Missing barcode or cage"}), 400
+    return render_template('dashboard.html', total=total, recent=recent)
 
+@app.route('/ask_ai', methods=['POST'])
+def ask_ai():
+    if not session.get('logged_in'): return jsonify({'answer': 'נא להתחבר.'})
+    
+    user_query = request.json.get('query', '')
+    conn = get_db_connection()
+    count = conn.execute('SELECT COUNT(*) FROM computers').fetchone()[0]
+    conn.close()
+    
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        # Ensure the table is created with latest columns
-        
-        cur.execute(
-            """INSERT INTO computers (barcode, cage_name, status, location, notes) 
-               VALUES (%s, %s, %s, %s, %s) 
-               ON CONFLICT (barcode) 
-               DO UPDATE SET 
-                  cage_name = EXCLUDED.cage_name, 
-                  status = EXCLUDED.status,
-                  location = EXCLUDED.location,
-                  notes = EXCLUDED.notes""",
-            (barcode, cage, status, location, notes)
+        response = openai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": f"אתה העוזר של אורי. במערכת יש {count} מחשבים. תענה בעברית קצרה."},
+                {"role": "user", "content": user_query}
+            ]
         )
+        answer = response.choices[0].message.content
+    except:
+        answer = f"אורי, ה-AI כרגע לא זמין, אבל בסיס הנתונים מחובר ויש בו {count} מחשבים."
         
-        # Get current count for this cage
-        cur.execute("SELECT COUNT(*) FROM computers WHERE cage_name = %s", (cage,))
-        cage_count = cur.fetchone()[0]
-        
-        conn.commit()
-        cur.close()
-        conn.close()
-        
-        return jsonify({
-            "status": "success", 
-            "message": f"Barcode {barcode} saved!",
-            "cage_count": cage_count
-        })
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    return jsonify({'answer': answer})
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    init_db()
-    app.run(host='0.0.0.0', port=10000)
+    print("\n" + "="*30)
+    print("🚀 URI SYSTEM IS LIVE!")
+    print("🌐 Link: http://127.0.0.1:5000")
+    print("="*30 + "\n")
+    app.run(debug=True, port=5000)

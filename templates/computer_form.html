@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ 'עריכת מחשב' if action == 'edit' else 'הוספת מחשב' }} – URI System{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>{{ '✏️ עריכת מחשב' if action == 'edit' else '➕ הוספת מחשב' }}</h1>
+    <a href="{{ url_for('computers') }}" class="btn btn-ghost">← חזרה</a>
+</div>
+
+<div class="card" style="max-width: 560px;">
+    <form method="POST">
+        <div class="form-group">
+            <label for="barcode">ברקוד *</label>
+            <input type="text" id="barcode" name="barcode" class="form-control"
+                   placeholder="לדוגמה: PC-2024-001"
+                   value="{{ computer.barcode if computer else '' }}" required/>
+        </div>
+        <div class="form-group">
+            <label for="name">שם מחשב</label>
+            <input type="text" id="name" name="name" class="form-control"
+                   placeholder="לדוגמה: Dell OptiPlex 7090"
+                   value="{{ computer.name if computer else '' }}"/>
+        </div>
+        <div class="form-group">
+            <label for="location">מיקום</label>
+            <input type="text" id="location" name="location" class="form-control"
+                   placeholder="לדוגמה: כיתה 201"
+                   value="{{ computer.location if computer else '' }}"/>
+        </div>
+        <div class="form-group">
+            <label for="status">סטטוס</label>
+            <select id="status" name="status" class="form-control">
+                {% set cur_status = computer.status if computer else 'פעיל' %}
+                <option value="פעיל"   {% if cur_status == 'פעיל'   %}selected{% endif %}>✅ פעיל</option>
+                <option value="תקול"   {% if cur_status == 'תקול'   %}selected{% endif %}>❌ תקול</option>
+                <option value="בתיקון" {% if cur_status == 'בתיקון' %}selected{% endif %}>🔧 בתיקון</option>
+                <option value="מאוחסן" {% if cur_status == 'מאוחסן' %}selected{% endif %}>📦 מאוחסן</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="notes">הערות</label>
+            <textarea id="notes" name="notes" class="form-control"
+                      placeholder="הערות נוספות...">{{ computer.notes if computer else '' }}</textarea>
+        </div>
+        <div style="display:flex; gap:12px; margin-top:8px;">
+            <button type="submit" class="btn btn-green">
+                {{ '💾 שמור שינויים' if action == 'edit' else '✅ הוסף מחשב' }}
+            </button>
+            <a href="{{ url_for('computers') }}" class="btn btn-ghost">ביטול</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
