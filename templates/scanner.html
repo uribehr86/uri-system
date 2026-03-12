@@ -63,41 +63,26 @@
 
 <script src="https://unpkg.com/html5-qrcode"></script>
 <style>
-    #reader video {
-        object-fit: cover;
-    }
-    #qr-shaded-region {
-        border-color: rgba(35, 134, 54, 0.5) !important;
-    }
+    #qr-shaded-region { border-color: rgba(35, 134, 54, 0.5) !important; }
+    #reader button { padding: 8px 16px; margin: 10px; border-radius: 8px; background: var(--accent); color: #fff; border: none; cursor: pointer; }
+    #reader select { padding: 8px; border-radius: 8px; margin-bottom: 10px; }
 </style>
 <script>
-    let html5QrCode = null;
-    
-    function startScanner() {
-        if (html5QrCode) {
-            html5QrCode.clear().catch(e => console.log("Clear err:", e));
+    let html5QrcodeScanner = null;
+
+    function initScanner() {
+        if (html5QrcodeScanner) {
+            html5QrcodeScanner.clear();
         }
+        html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
         
-        html5QrCode = new Html5Qrcode("reader");
-        const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
-        
-        html5QrCode.start(
-            { facingMode: "environment" }, 
-            config, 
-            onScanSuccess,
-            (error) => { /* Ignore constant scan frame errors */ }
-        ).catch(err => {
-            console.error("Camera start failed:", err);
-            document.getElementById('result').innerHTML = `<span style="color:var(--danger);">שגיאה בפתיחת המצלמה. אנא בדוק הרשאות.</span>`;
-        });
+        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
     }
 
     function onScanSuccess(decodedText, decodedResult) {
-        if (html5QrCode) {
-            html5QrCode.stop().then(() => {
-                html5QrCode.clear();
-            }).catch(console.error);
-        }
+        // Pause scanning so it doesn't fire multiple times
+        html5QrcodeScanner.pause();
         
         document.getElementById('result').innerHTML = `<span style="color:var(--accent);">✓ סריקה הצליחה: </span> ${decodedText}`;
         
@@ -115,6 +100,10 @@
             alert("שגיאה בסריקה: " + err.message);
             resetScanner();
         });
+    }
+
+    function onScanFailure(error) {
+        // Ignore constant frame errors
     }
 
     function showEditForm(computer) {
@@ -135,7 +124,11 @@
         document.getElementById('edit-form-container').style.display = 'none';
         document.getElementById('scanner-container').style.display = 'block';
         document.getElementById('result').innerHTML = '';
-        startScanner();
+        if (html5QrcodeScanner) {
+            html5QrcodeScanner.resume();
+        } else {
+            initScanner();
+        }
     }
 
     document.getElementById('update-form').onsubmit = function (e) {
@@ -166,6 +159,6 @@
             });
     };
 
-    window.addEventListener('load', startScanner);
+    window.addEventListener('load', initScanner);
 </script>
 {% endblock %}
