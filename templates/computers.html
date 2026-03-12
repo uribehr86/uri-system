@@ -3,23 +3,70 @@
 {% block content %}
 <style>
     /* Excel-like compact table styles overrides */
-    .table-wrap { overflow-x: auto; margin-top: 10px; border-radius: 8px; border: 1px solid var(--border); }
-    table { width: 100%; min-width: 800px; border-collapse: collapse; border-spacing: 0; }
-    th, td { padding: 6px 10px; font-size: 0.8rem; text-align: right; border-bottom: 1px solid var(--border); border-right: 1px solid rgba(255,255,255,0.05); }
-    th { background: rgba(0,0,0,0.4); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: #a1a1aa; border-top: none; }
-    td { background: var(--bg); transition: background 0.1s; }
-    td:last-child, th:last-child { border-right: none; }
-    tr:hover td { background: rgba(255,255,255,0.04); transform: none; }
-    
+    .table-wrap {
+        overflow-x: auto;
+        margin-top: 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+    }
+
+    table {
+        width: 100%;
+        min-width: 800px;
+        border-collapse: collapse;
+        border-spacing: 0;
+    }
+
+    th,
+    td {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+        text-align: right;
+        border-bottom: 1px solid var(--border);
+        border-right: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    th {
+        background: rgba(0, 0, 0, 0.4);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 700;
+        color: #a1a1aa;
+        border-top: none;
+    }
+
+    td {
+        background: var(--bg);
+        transition: background 0.1s;
+    }
+
+    td:last-child,
+    th:last-child {
+        border-right: none;
+    }
+
+    tr:hover td {
+        background: rgba(255, 255, 255, 0.04);
+        transform: none;
+    }
+
     /* Undo the rounded corners on extreme cells from base.html */
-    td:first-child[class], td:last-child[class] { border-radius: 0; border-left: none; }
-    
+    td:first-child[class],
+    td:last-child[class] {
+        border-radius: 0;
+        border-left: none;
+    }
+
     /* Checkbox column */
-    .col-chk { width: 30px; text-align: center; }
-    
+    .col-chk {
+        width: 30px;
+        text-align: center;
+    }
+
     /* Batch Action Bar */
     .batch-actions {
-        display: none; /* hidden until selected */
+        display: none;
+        /* hidden until selected */
         background: var(--surface);
         border: 1px solid var(--accent2);
         padding: 10px 16px;
@@ -27,42 +74,73 @@
         margin-bottom: 14px;
         align-items: center;
         gap: 12px;
-        box-shadow: 0 4px 15px rgba(31,111,235,0.2);
+        box-shadow: 0 4px 15px rgba(31, 111, 235, 0.2);
         animation: fadeIn 0.3s ease;
     }
-    .batch-actions.show { display: flex; flex-wrap: wrap; }
-    .batch-count { font-weight: 800; color: var(--accent2); font-size: 0.95rem; }
-    .batch-actions select, .batch-actions input {
-        background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: #fff;
-        padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; outline: none;
+
+    .batch-actions.show {
+        display: flex;
+        flex-wrap: wrap;
     }
-</style>
-{% block content %}
+
+    .batch-count {
+        font-weight: 800;
+        color: var(--accent2);
+        font-size: 0.95rem;
+    }
+
+    .batch-actions select,
+    .batch-actions input {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid var(--border);
+        color: #fff;
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-size: 0.8rem;
 <div class="page-header">
-    <h1>💻 ניהול מחשבים</h1>
-    <a href="{{ url_for('add_computer') }}" class="btn btn-green">➕ הוסף מחשב</a>
+    <h1>📊 לוח בקרה ומלאי</h1>
+    <div>
+        <a href="{{ url_for('scanner') }}" class="btn btn-blue" style="margin-left: 8px; font-weight: bold; font-size: 1rem;"><span style="font-size: 1.2rem;">📸</span> סריקה מהירה</a>
+        <a href="{{ url_for('add_computer') }}" class="btn btn-green">➕ הוסף מחשב</a>
+    </div>
+</div>
+
+<div class="stats" style="margin-bottom: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+    <div class="stat-card" style="background: rgba(31, 111, 235, 0.1); border: 1px solid rgba(31, 111, 235, 0.3); border-radius: 12px; padding: 20px; text-align: center;">
+        <div class="number" style="font-size: 2rem; font-weight: 800; color: var(--accent2);">{{ total }}</div>
+        <div class="label" style="color: var(--muted); font-size: 0.9rem;">🖥️ סה״כ מחשבים</div>
+    </div>
+    <div class="stat-card" style="background: rgba(218, 54, 51, 0.1); border: 1px solid rgba(218, 54, 51, 0.3); border-radius: 12px; padding: 20px; text-align: center;">
+        <div class="number" style="font-size: 2rem; font-weight: 800; color: var(--danger);">{{ faulty }}</div>
+        <div class="label" style="color: var(--muted); font-size: 0.9rem;">🔧 תקלות פתוחות</div>
+    </div>
+    <div class="stat-card" style="background: rgba(35, 134, 54, 0.1); border: 1px solid rgba(35, 134, 54, 0.3); border-radius: 12px; padding: 20px; text-align: center;">
+        <div class="number" style="font-size: 2rem; font-weight: 800; color: var(--accent);">{{ not_in_cage }}</div>
+        <div class="label" style="color: var(--muted); font-size: 0.9rem;">📦 מחוץ לכלוב</div>
+    </div>
 </div>
 
 <div class="card">
     <form method="GET" class="search-bar" style="margin-bottom: 12px;">
-        <input type="text" name="q" class="form-control" placeholder="🔍 חיפוש..." style="padding: 6px 10px; max-width:200px;" value="{{ search }}"/>
+        <input type="text" name="q" class="form-control" placeholder="🔍 חיפוש..."
+            style="padding: 6px 10px; max-width:200px;" value="{{ search }}" />
         <select name="status" class="form-control" style="padding: 6px 10px; max-width:140px;">
             <option value="">כל הסטטוסים</option>
-            <option value="פעיל"   {% if status_filter == 'פעיל' %}selected{% endif %}>פעיל</option>
-            <option value="תקול"   {% if status_filter == 'תקול' %}selected{% endif %}>תקול</option>
-            <option value="בתיקון" {% if status_filter == 'בתיקון' %}selected{% endif %}>בתיקון</option>
-            <option value="מאוחסן" {% if status_filter == 'מאוחסן' %}selected{% endif %}>מאוחסן</option>
+            <option value="פעיל" {% if status_filter=='פעיל' %}selected{% endif %}>פעיל</option>
+            <option value="תקול" {% if status_filter=='תקול' %}selected{% endif %}>תקול</option>
+            <option value="בתיקון" {% if status_filter=='בתיקון' %}selected{% endif %}>בתיקון</option>
+            <option value="מאוחסן" {% if status_filter=='מאוחסן' %}selected{% endif %}>מאוחסן</option>
         </select>
         <button type="submit" class="btn btn-blue" style="padding: 6px 12px;">חיפוש</button>
         {% if search or status_filter %}
         <a href="{{ url_for('computers') }}" class="btn btn-ghost" style="padding: 6px 12px;">✕ נקה</a>
         {% endif %}
     </form>
-    
+
     <!-- Batch Action Bar -->
     <div class="batch-actions" id="batchActionBar">
         <span class="batch-count"><span id="selCount">0</span> סומנו</span>
-        
+
         <select id="batchLocation">
             <option value="">-- עדכן מיקום --</option>
             <option value="מחסן">מחסן</option>
@@ -73,9 +151,9 @@
             <option value="בית">בית</option>
             <option value="חוץ">חוץ</option>
         </select>
-        
+
         <input type="text" id="batchCage" placeholder="עדכן כלוב..." style="width: 100px;">
-        
+
         <select id="batchStatus">
             <option value="">-- עדכן סטטוס --</option>
             <option value="פעיל">פעיל</option>
@@ -84,7 +162,7 @@
         </select>
 
         <button class="btn btn-blue" style="padding: 6px 12px;" onclick="applyBatchUpdates()">שמור שינויים</button>
-        
+
         {% if session.get('role') == 'admin' %}
         <span style="color: var(--border);">|</span>
         <button class="btn btn-danger" style="padding: 6px 12px;" onclick="applyBatchDelete()">מחק נבחרים</button>
@@ -109,40 +187,44 @@
                 </tr>
             </thead>
             <tbody>
-            {% for c in computers %}
-            <tr data-id="{{ c.id }}">
-                <td class="col-chk"><input type="checkbox" class="row-chk" value="{{ c.id }}" onchange="updateBatchBar()"></td>
-                <td style="color:var(--muted); font-size:.7rem;">{{ loop.index }}</td>
-                <td><code style="color:var(--accent2); font-weight: 700;">{{ c.barcode }}</code></td>
-                <td>{{ c.case_number or '—' }}</td>
-                <td>{{ c.cage_number or '—' }}</td>
-                <td>
-                    {% if c.status == 'פעיל' %}
+                {% for c in computers %}
+                <tr data-id="{{ c.id }}">
+                    <td class="col-chk"><input type="checkbox" class="row-chk" value="{{ c.id }}"
+                            onchange="updateBatchBar()"></td>
+                    <td style="color:var(--muted); font-size:.7rem;">{{ loop.index }}</td>
+                    <td><code style="color:var(--accent2); font-weight: 700;">{{ c.barcode }}</code></td>
+                    <td>{{ c.case_number or '—' }}</td>
+                    <td>{{ c.cage_number or '—' }}</td>
+                    <td>
+                        {% if c.status == 'פעיל' %}
                         <span style="color:#4ade80; font-weight:700;">✓ פעיל</span>
-                    {% elif c.status == 'תקול' %}
+                        {% elif c.status == 'תקול' %}
                         <span style="color:#f87171; font-weight:700;">✗ תקול</span>
-                    {% elif c.status == 'בתיקון' %}
+                        {% elif c.status == 'בתיקון' %}
                         <span style="color:#facc15; font-weight:700;">🔧 בתיקון</span>
-                    {% else %}
+                        {% else %}
                         <span>{{ c.status }}</span>
-                    {% endif %}
-                </td>
-                <td>{{ c.location or '—' }}</td>
-                <td>{{ c.exam_appeal or '—' }}</td>
-                <td style="color:var(--muted); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ c.notes or '' }}">
-                    {{ c.notes or '—' }}
-                </td>
-                <td style="white-space:nowrap; text-align: left;">
-                    <a href="{{ url_for('edit_computer', cid=c.id) }}" style="text-decoration:none; margin-left:8px;" title="עריכה">✏️</a>
-                    {% if session.get('role') == 'admin' %}
-                    <form method="POST" action="{{ url_for('delete_computer', cid=c.id) }}" style="display:inline;"
-                          onsubmit="return confirm('למחוק את המחשב {{ c.barcode }}?');">
-                        <button type="submit" style="background:none; border:none; cursor:pointer;" title="מחיקה">🗑️</button>
-                    </form>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
+                        {% endif %}
+                    </td>
+                    <td>{{ c.location or '—' }}</td>
+                    <td>{{ c.exam_appeal or '—' }}</td>
+                    <td style="color:var(--muted); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                        title="{{ c.notes or '' }}">
+                        {{ c.notes or '—' }}
+                    </td>
+                    <td style="white-space:nowrap; text-align: left;">
+                        <a href="{{ url_for('edit_computer', cid=c.id) }}"
+                            style="text-decoration:none; margin-left:8px;" title="עריכה">✏️</a>
+                        {% if session.get('role') == 'admin' %}
+                        <form method="POST" action="{{ url_for('delete_computer', cid=c.id) }}" style="display:inline;"
+                            onsubmit="return confirm('למחוק את המחשב {{ c.barcode }}?');">
+                            <button type="submit" style="background:none; border:none; cursor:pointer;"
+                                title="מחיקה">🗑️</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
             </tbody>
         </table>
     </div>
@@ -156,7 +238,6 @@
         {% endif %}
     </p>
     {% endif %}
-</div>
 </div>
 
 <script>
@@ -177,62 +258,62 @@
             document.getElementById('selectAll').checked = false;
         }
     }
-    
+
     function getSelectedIds() {
         return Array.from(document.querySelectorAll('.row-chk:checked')).map(c => c.value);
     }
-    
+
     function applyBatchUpdates() {
         const ids = getSelectedIds();
-        if(!ids.length) return;
-        
+        if (!ids.length) return;
+
         const updates = {};
         const loc = document.getElementById('batchLocation').value;
         const cage = document.getElementById('batchCage').value.trim();
         const stat = document.getElementById('batchStatus').value;
-        
-        if(loc) updates.location = loc;
-        if(cage) {
+
+        if (loc) updates.location = loc;
+        if (cage) {
             updates.cage_number = cage;
             updates.cage_name = cage; // Usually matching in this app
         }
-        if(stat) updates.status = stat;
-        
-        if(Object.keys(updates).length === 0) {
+        if (stat) updates.status = stat;
+
+        if (Object.keys(updates).length === 0) {
             alert("אנא בחר שדה לעדכון (מיקום / כלוב / סטטוס)");
             return;
         }
-        
-        if(!confirm(`האם לעדכן את ${ids.length} המחשבים שנבחרו?`)) return;
-        
+
+        if (!confirm(`האם לעדכן את ${ids.length} המחשבים שנבחרו?`)) return;
+
         fetch('/api/batch-update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ids: ids, updates: updates })
         })
-        .then(r => r.json())
-        .then(data => {
-            if(data.success) location.reload();
-            else alert("שגיאה בעדכון: " + data.error);
-        });
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) location.reload();
+                else alert("שגיאה בעדכון: " + data.error);
+            });
     }
-    
+
     function applyBatchDelete() {
         const ids = getSelectedIds();
-        if(!ids.length) return;
-        
-        if(!confirm(`זהירות! האם אתה בטוח שברצונך למחוק ${ids.length} מחשבים לצמיתות?`)) return;
-        
+        if (!ids.length) return;
+
+        if (!confirm(`זהירות! האם אתה בטוח שברצונך למחוק ${ids.length} מחשבים לצמיתות?`)) return;
+
         fetch('/api/batch-delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ids: ids })
         })
-        .then(r => r.json())
-        .then(data => {
-            if(data.success) location.reload();
-            else alert("שגיאה במחיקה: " + data.error);
-        });
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) location.reload();
+                else alert("שגיאה במחיקה: " + data.error);
+            });
     }
 </script>
 {% endblock %}

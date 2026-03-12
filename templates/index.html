@@ -460,7 +460,7 @@
                 <a href="#ai">בינה מלאכותית</a>
                 <a href="#about">אודות</a>
                 {% if session.get('logged_in') %}
-                    <a href="{{ url_for('dashboard') }}" class="btn-primary">לוח בקרה</a>
+                    <a href="{{ url_for('computers') }}" class="btn-primary">לוח בקרה</a>
                 {% else %}
                     <a href="{{ url_for('login') }}" class="btn-outline">התחברות</a>
                     <a href="{{ url_for('login') }}" class="btn-primary">הצטרפות עכשיו</a>
@@ -476,7 +476,7 @@
             <p>URI SYSTEM מעניקה לך שליטה מלאה, חכמה ואוטומטית על כל המחשבים, הציוד והמשתמשים בארגון שלך. הכל במקום אחד, בעיצוב מהפנט.</p>
             <div class="hero-actions">
                 {% if session.get('logged_in') %}
-                    <a href="{{ url_for('dashboard') }}" class="btn-primary">כנס למערכת</a>
+                    <a href="{{ url_for('computers') }}" class="btn-primary">כנס למערכת</a>
                 {% else %}
                     <a href="{{ url_for('login') }}" class="btn-primary">התחל עכשיו חינם</a>
                 {% endif %}

@@ -117,59 +117,50 @@ def portal():
     return render_template('portal.html')
 
 @app.route('/dashboard')
+@app.route('/manage-computers')
+@app.route('/computers') # תמיכה בשני השמות
 @login_required
-def dashboard():
-    conn = get_db_connection()
-    if not conn:
-        return "<h1>⚠️ המערכת לא מצליחה להתחבר לענן. בדוק חיבור אינטרנט.</h1>"
+def computers():
+    search = request.args.get('q', '').strip()
+    status_filter = request.args.get('status', '').strip()
     
+    conn = get_db_connection()
+    if not conn: return "<h1>⚠️ המערכת לא מצליחה להתחבר לענן. בדוק חיבור אינטרנט.</h1>"
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Dashboard Stats
         cur.execute("SELECT COUNT(*) as total FROM computers")
         total = cur.fetchone()['total']
         
         cur.execute("SELECT status, COUNT(*) as count FROM computers GROUP BY status")
         stats = cur.fetchall()
-        
-        # Stats dict based on template requirements
         stats_dict = {row['status']: row['count'] for row in stats}
         faulty_count = stats_dict.get('תקול', 0)
         not_in_cage_count = 0 
         
-        cur.execute("""
-            SELECT id, barcode, cage_name, cage_number, location, status, scan_time as last_seen 
-            FROM computers 
-            ORDER BY scan_time DESC NULLS LAST 
-            LIMIT 10
-        """)
-        recent = cur.fetchall()
-        cur.close()
-        return render_template('dashboard.html', total=total, faulty=faulty_count, not_in_cage=not_in_cage_count, recent=recent)
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        print(f"[ERROR] Error in dashboard:\n{error_details}")
-        return f"<h1>[ERROR] שגיאה בשליפת הנתונים מהענן.</h1><pre>{e}</pre>"
-    finally:
-        release_db_connection(conn)
-
-@app.route('/manage-computers')
-@app.route('/computers') # תמיכה בשני השמות
-@login_required
-def computers():
-    conn = get_db_connection()
-    if not conn: return redirect(url_for('dashboard'))
-    try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("""
-            SELECT id, barcode, cage_name as name, location, status, notes, scan_time as last_seen 
-            FROM computers 
-            ORDER BY scan_time DESC NULLS LAST 
-            LIMIT 100
-        """)
+        # Query Computers with filters
+        query = "SELECT id, barcode, case_number, cage_name, cage_number, location, status, exam_appeal, notes, scan_time as last_seen FROM computers WHERE 1=1"
+        params = []
+        if search:
+            query += " AND (barcode ILIKE %s OR case_number ILIKE %s)"
+            params.extend([f"%{search}%", f"%{search}%"])
+        if status_filter:
+            query += " AND status = %s"
+            params.append(status_filter)
+            
+        query += " ORDER BY scan_time DESC NULLS LAST LIMIT 150"
+        cur.execute(query, params)
         computers = cur.fetchall()
         cur.close()
-        return render_template('computers.html', computers=computers)
+        
+        return render_template('computers.html', 
+                               computers=computers, 
+                               search=search, 
+                               status_filter=status_filter,
+                               total=total, 
+                               faulty=faulty_count, 
+                               not_in_cage=not_in_cage_count)
     finally:
         release_db_connection(conn)
 
