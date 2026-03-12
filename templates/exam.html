@@ -3,33 +3,105 @@
 {% block title %}מבחן \ ערעור - URI System{% endblock %}
 
 {% block content %}
+<style>
+    /* Excel-like Tabs */
+    .excel-tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 20px;
+        border-bottom: 2px solid var(--border);
+        padding-left: 20px;
+    }
+    .excel-tab {
+        padding: 10px 24px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border);
+        border-bottom: none;
+        border-radius: 8px 8px 0 0;
+        color: var(--muted);
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s;
+        font-size: 0.95rem;
+    }
+    .excel-tab.active {
+        background: var(--surface);
+        color: var(--accent2);
+        border-color: var(--accent2);
+        border-bottom: 2px solid var(--surface);
+        margin-bottom: -2px;
+    }
+    .excel-tab:hover:not(.active) {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+    }
+    
+    /* Excel-like compact table styles overrides */
+    .table-wrap { overflow-x: auto; margin-top: 10px; border-radius: 8px; border: 1px solid var(--border); }
+    table { width: 100%; min-width: 800px; border-collapse: collapse; border-spacing: 0; }
+    th, td { padding: 6px 10px; font-size: 0.8rem; text-align: right; border-bottom: 1px solid var(--border); border-right: 1px solid rgba(255,255,255,0.05); }
+    th { background: rgba(0,0,0,0.4); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: #a1a1aa; border-top: none; }
+    td { background: var(--bg); transition: background 0.1s; }
+    td:last-child, th:last-child { border-right: none; }
+    tr:hover td { background: rgba(255,255,255,0.04); transform: none; }
+    
+    /* Undo the rounded corners on extreme cells from base.html */
+    td:first-child[class], td:last-child[class] { border-radius: 0; border-left: none; }
+</style>
+
 <div class="page-header">
     <h1>מחשבים בסטטוס מבחן \ ערעור</h1>
+</div>
+
+<div class="excel-tabs">
+    <a href="{{ url_for('computers') }}" class="excel-tab">מלאי מחשבים</a>
+    <a href="{{ url_for('exam_page') }}" class="excel-tab active">מבחן\ערעור</a>
+    <a href="{{ url_for('history_page') }}" class="excel-tab">היסטוריית שינויים</a>
 </div>
 
 <div class="card">
     <div class="table-wrap">
         <table>
             <thead>
-                <tr>
                     <th>ברקוד מחשב</th>
                     <th>מספר תיק</th>
                     <th>מספר כלוב</th>
-                    <th>סטטוס</th>
-                    <th>מבחן\ערעור</th>
+                    <th>מצב תקינות (בסריקה)</th>
+                    <th>סיבת מבחן\ערעור</th>
+                    <th>הערות אחרונות</th>
                     <th>פעולות</th>
                 </tr>
             </thead>
             <tbody>
                 {% for computer in computers %}
-                <tr>
-                    <td>{{ computer.barcode }}</td>
-                    <td>{{ computer.case_number or '-' }}</td>
-                    <td>{{ computer.cage_number or '-' }}</td>
-                    <td><span class="badge badge-yellow">{{ computer.status }}</span></td>
-                    <td>{{ computer.exam_appeal }}</td>
+                    <td><code style="color:var(--accent2); font-weight: 700;">{{ computer.barcode }}</code></td>
+                    <td>{{ computer.case_number or '—' }}</td>
                     <td>
-                        <button class="btn btn-sm btn-ghost">עריכה</button>
+                        {% set display_cage = computer.cage_number or computer.cage_name %}
+                        {% if display_cage and display_cage|trim != '' %}
+                        <span class="badge" style="background-color: {{ get_cage_color(display_cage) }}; color: #000; font-weight: 800; padding: 4px 10px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">{{ display_cage }}</span>
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if computer.status == 'פעיל' %}
+                        <span style="color:#4ade80; font-weight:700;">✓ פעיל</span>
+                        {% elif computer.status == 'תקול' %}
+                        <span style="color:#f87171; font-weight:700;">✗ תקול</span>
+                        {% elif computer.status == 'בתיקון' %}
+                        <span style="color:#facc15; font-weight:700;">🔧 בתיקון</span>
+                        {% else %}
+                        <span>{{ computer.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-weight: 700;">{{ computer.exam_appeal or '—' }}</td>
+                    <td style="color:var(--muted); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                        title="{{ computer.notes or '' }}">
+                        {{ computer.notes or '—' }}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('edit_computer', cid=computer.id) }}" class="btn btn-sm btn-ghost" style="padding: 4px 8px;">עריכה</a>
                     </td>
                 </tr>
                 {% else %}

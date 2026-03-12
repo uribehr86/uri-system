@@ -569,19 +569,18 @@
         <div class="nav-links">
             <a href="{{ url_for('computers') }}"
                 class="{{ 'active' if request.endpoint in ['computers','dashboard','add_computer','edit_computer'] }}">📊 לוח בקרה ומלאי</a>
-            <a href="{{ url_for('exam_page') }}" class="{{ 'active' if request.endpoint == 'exam_page' }}">📝 מבחן\ערעור</a>
-            <a href="{{ url_for('history_page') }}" class="{{ 'active' if request.endpoint == 'history_page' }}">📜 היסטוריה</a>
             <a href="{{ url_for('export_computers') }}">📤 ייצוא</a>
-            {% if session.get('role') == 'admin' or session.get('user') == 'admin_uri' %}
-            <a href="{{ url_for('manage_users') }}"
-                class="{{ 'active' if request.endpoint in ['manage_users','add_user'] }}">⚙️ ניהול משתמשים</a>
-            {% endif %}
         </div>
 
         <div class="user-badge">
             <div class="info">
+                {% if session.get('role') == 'admin' %}
                 <span class="name">{{ session.get('username') }}</span>
-                <span class="role">{{ '🔑 מנהל' if session.get('role') == 'admin' else '👤 טכנאי' }}</span>
+                <span class="role">🔑 מנהל</span>
+                {% else %}
+                <span class="name">טכנאי מחובר</span>
+                <span class="role">👤 טכנאי</span>
+                {% endif %}
             </div>
             <a href="{{ url_for('logout') }}" class="logout" title="התנתקות">⎋</a>
         </div>

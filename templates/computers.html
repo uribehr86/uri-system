@@ -97,12 +97,53 @@
         padding: 6px 10px;
         border-radius: 6px;
         font-size: 0.8rem;
+    }
+
+    /* Excel-like Tabs */
+    .excel-tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 20px;
+        border-bottom: 2px solid var(--border);
+        padding-left: 20px;
+    }
+    .excel-tab {
+        padding: 10px 24px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border);
+        border-bottom: none;
+        border-radius: 8px 8px 0 0;
+        color: var(--muted);
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s;
+        font-size: 0.95rem;
+    }
+    .excel-tab.active {
+        background: var(--surface);
+        color: var(--accent2);
+        border-color: var(--accent2);
+        border-bottom: 2px solid var(--surface);
+        margin-bottom: -2px;
+    }
+    .excel-tab:hover:not(.active) {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+    }
+</style>
+
 <div class="page-header">
     <h1>📊 לוח בקרה ומלאי</h1>
     <div>
         <a href="{{ url_for('scanner') }}" class="btn btn-blue" style="margin-left: 8px; font-weight: bold; font-size: 1rem;"><span style="font-size: 1.2rem;">📸</span> סריקה מהירה</a>
         <a href="{{ url_for('add_computer') }}" class="btn btn-green">➕ הוסף מחשב</a>
     </div>
+</div>
+
+<div class="excel-tabs">
+    <a href="{{ url_for('computers') }}" class="excel-tab active">מלאי מחשבים</a>
+    <a href="{{ url_for('exam_page') }}" class="excel-tab">מבחן\ערעור</a>
+    <a href="{{ url_for('history_page') }}" class="excel-tab">היסטוריית שינויים</a>
 </div>
 
 <div class="stats" style="margin-bottom: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
@@ -121,9 +162,13 @@
 </div>
 
 <div class="card">
-    <form method="GET" class="search-bar" style="margin-bottom: 12px;">
-        <input type="text" name="q" class="form-control" placeholder="🔍 חיפוש..."
-            style="padding: 6px 10px; max-width:200px;" value="{{ search }}" />
+    <form method="GET" class="search-bar" style="margin-bottom: 12px; gap: 8px;">
+        <input type="text" name="q" class="form-control" placeholder="🔍 חיפוש חופשי (ברקוד, תיק, מיקום...)"
+            style="padding: 6px 10px; max-width:250px;" value="{{ search }}" />
+        
+        <input type="text" name="cage_q" class="form-control" placeholder="📦 חיפוש לפי כלוב..."
+            style="padding: 6px 10px; max-width:160px;" value="{{ cage_search }}" />
+
         <select name="status" class="form-control" style="padding: 6px 10px; max-width:140px;">
             <option value="">כל הסטטוסים</option>
             <option value="פעיל" {% if status_filter=='פעיל' %}selected{% endif %}>פעיל</option>
@@ -131,8 +176,10 @@
             <option value="בתיקון" {% if status_filter=='בתיקון' %}selected{% endif %}>בתיקון</option>
             <option value="מאוחסן" {% if status_filter=='מאוחסן' %}selected{% endif %}>מאוחסן</option>
         </select>
+        <input type="hidden" name="sort" value="{{ sort }}">
+        <input type="hidden" name="dir" value="{{ direction }}">
         <button type="submit" class="btn btn-blue" style="padding: 6px 12px;">חיפוש</button>
-        {% if search or status_filter %}
+        {% if search or status_filter or cage_search %}
         <a href="{{ url_for('computers') }}" class="btn btn-ghost" style="padding: 6px 12px;">✕ נקה</a>
         {% endif %}
     </form>
@@ -176,13 +223,37 @@
                 <tr>
                     <th class="col-chk"><input type="checkbox" id="selectAll" onclick="toggleAll(this)"></th>
                     <th style="width: 30px;">#</th>
-                    <th>ברקוד</th>
-                    <th>תיק</th>
-                    <th>כלוב</th>
-                    <th>סטטוס</th>
-                    <th>מיקום</th>
-                    <th>מבחן\ערעור</th>
+                    <th>
+                        <a href="{{ url_for('computers', sort='barcode', dir='asc' if sort != 'barcode' or direction == 'desc' else 'desc', q=search, status=status_filter, cage_q=cage_search) }}" style="color:inherit; text-decoration:none;">
+                            מחשב {% if sort == 'barcode' %}{{ '🔼' if direction == 'asc' else '🔽' }}{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('computers', sort='case_number', dir='asc' if sort != 'case_number' or direction == 'desc' else 'desc', q=search, status=status_filter, cage_q=cage_search) }}" style="color:inherit; text-decoration:none;">
+                            תיק {% if sort == 'case_number' %}{{ '🔼' if direction == 'asc' else '🔽' }}{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('computers', sort='cage_number', dir='asc' if sort != 'cage_number' or direction == 'desc' else 'desc', q=search, status=status_filter, cage_q=cage_search) }}" style="color:inherit; text-decoration:none;">
+                            כלוב {% if sort == 'cage_number' %}{{ '🔼' if direction == 'asc' else '🔽' }}{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('computers', sort='status', dir='asc' if sort != 'status' or direction == 'desc' else 'desc', q=search, status=status_filter, cage_q=cage_search) }}" style="color:inherit; text-decoration:none;">
+                            סטטוס {% if sort == 'status' %}{{ '🔼' if direction == 'asc' else '🔽' }}{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('computers', sort='location', dir='asc' if sort != 'location' or direction == 'desc' else 'desc', q=search, status=status_filter, cage_q=cage_search) }}" style="color:inherit; text-decoration:none;">
+                            מיקום {% if sort == 'location' %}{{ '🔼' if direction == 'asc' else '🔽' }}{% endif %}
+                        </a>
+                    </th>
                     <th>הערות</th>
+                    <th>
+                        <a href="{{ url_for('computers', sort='exam_appeal', dir='asc' if sort != 'exam_appeal' or direction == 'desc' else 'desc', q=search, status=status_filter, cage_q=cage_search) }}" style="color:inherit; text-decoration:none;">
+                            מבחן\ערעור {% if sort == 'exam_appeal' %}{{ '🔼' if direction == 'asc' else '🔽' }}{% endif %}
+                        </a>
+                    </th>
                     <th style="text-align: left; width: 60px;">פעולות</th>
                 </tr>
             </thead>
@@ -194,7 +265,14 @@
                     <td style="color:var(--muted); font-size:.7rem;">{{ loop.index }}</td>
                     <td><code style="color:var(--accent2); font-weight: 700;">{{ c.barcode }}</code></td>
                     <td>{{ c.case_number or '—' }}</td>
-                    <td>{{ c.cage_number or '—' }}</td>
+                    <td>
+                        {% set display_cage = c.cage_number or c.cage_name %}
+                        {% if display_cage and display_cage|trim != '' %}
+                        <span class="badge" style="background-color: {{ get_cage_color(display_cage) }}; color: #000; font-weight: 800; padding: 4px 10px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">{{ display_cage }}</span>
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
                     <td>
                         {% if c.status == 'פעיל' %}
                         <span style="color:#4ade80; font-weight:700;">✓ פעיל</span>
@@ -207,11 +285,11 @@
                         {% endif %}
                     </td>
                     <td>{{ c.location or '—' }}</td>
-                    <td>{{ c.exam_appeal or '—' }}</td>
                     <td style="color:var(--muted); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
                         title="{{ c.notes or '' }}">
                         {{ c.notes or '—' }}
                     </td>
+                    <td>{{ c.exam_appeal or '—' }}</td>
                     <td style="white-space:nowrap; text-align: left;">
                         <a href="{{ url_for('edit_computer', cid=c.id) }}"
                             style="text-decoration:none; margin-left:8px;" title="עריכה">✏️</a>
@@ -228,7 +306,30 @@
             </tbody>
         </table>
     </div>
-    <p style="color:var(--muted); font-size:.82rem; margin-top:12px;">סה״כ: {{ computers|length }} מחשבים</p>
+    <p style="color:var(--muted); font-size:.82rem; margin-top:12px;">
+        נמצאו: {{ total_matching }} מחשבים (מתוך {{ total }} סה״כ במערכת)
+    </p>
+
+    <!-- Pagination Controls -->
+    {% if total_pages > 1 %}
+    <div class="pagination" style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 20px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 10px;">
+        {% if page > 1 %}
+        <a href="{{ url_for('computers', page=page-1, q=search, status=status_filter, sort=sort, dir=direction, cage_q=cage_search) }}" class="btn btn-ghost" style="padding: 6px 12px; font-size: 0.85rem;">‹ הקודם</a>
+        {% else %}
+        <span class="btn btn-ghost disabled" style="opacity: 0.3; padding: 6px 12px; font-size: 0.85rem; cursor: not-allowed;">‹ הקודם</span>
+        {% endif %}
+
+        <span style="font-size: 0.9rem; font-weight: 600; color: var(--muted);">
+            דף {{ page }} מתוך {{ total_pages }}
+        </span>
+
+        {% if page < total_pages %}
+        <a href="{{ url_for('computers', page=page+1, q=search, status=status_filter, sort=sort, dir=direction, cage_q=cage_search) }}" class="btn btn-ghost" style="padding: 6px 12px; font-size: 0.85rem;">הבא ›</a>
+        {% else %}
+        <span class="btn btn-ghost disabled" style="opacity: 0.3; padding: 6px 12px; font-size: 0.85rem; cursor: not-allowed;">הבא ›</span>
+        {% endif %}
+    </div>
+    {% endif %}
     {% else %}
     <p style="color:var(--muted); text-align:center; padding:40px;">
         {% if search or status_filter %}

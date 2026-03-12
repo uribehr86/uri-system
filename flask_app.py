@@ -47,6 +47,52 @@ def close_db(error):
     # though it's better to do it manually in routes.
     pass
 
+@app.context_processor
+def utility_processor():
+    def get_cage_color(cage):
+        if not cage: return "inherit"
+        val = sum(ord(c) for c in str(cage))
+        hue = (val * 137) % 360
+        return f"hsl({hue}, 70%, 65%)"
+    return dict(get_cage_color=get_cage_color)
+
+import json
+import ast
+
+@app.template_filter('format_history')
+def format_history_filter(val_str):
+    if not val_str:
+        return ""
+    try:
+        val = json.loads(val_str)
+    except:
+        try:
+            val = ast.literal_eval(val_str)
+        except:
+            return val_str
+            
+    if not isinstance(val, dict):
+        return str(val)
+        
+    tmap = {
+        'status': 'סטטוס',
+        'location': 'מיקום',
+        'cage_number': 'כלוב',
+        'cage_name': 'שם כלוב',
+        'case_number': 'תיק',
+        'notes': 'הערות',
+        'exam_appeal': 'מבחן/ערעור',
+        'barcode': 'ברקוד'
+    }
+    
+    parts = []
+    for k, v in val.items():
+        if k in ['id', 'computer_id', 'scan_time', 'created_at'] or v is None:
+            continue
+        parts.append(f"{tmap.get(k, k)}: {v}")
+        
+    return " | ".join(parts) if parts else "פעולת מערכת"
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -122,7 +168,27 @@ def portal():
 @login_required
 def computers():
     search = request.args.get('q', '').strip()
+    cage_search = request.args.get('cage_q', '').strip()
     status_filter = request.args.get('status', '').strip()
+    page = request.args.get('page', 1, type=int)
+    sort = request.args.get('sort', 'scan_time')
+    direction = request.args.get('dir', 'desc').lower()
+    
+    per_page = 100
+    offset = (page - 1) * per_page
+    
+    # Whitelist of allowed sort columns
+    allowed_sorts = {
+        'barcode': 'barcode',
+        'case_number': 'case_number',
+        'cage_number': 'cage_number',
+        'status': 'status',
+        'location': 'location',
+        'scan_time': 'scan_time',
+        'exam_appeal': 'exam_appeal'
+    }
+    sort_col = allowed_sorts.get(sort, 'scan_time')
+    sort_dir = 'ASC' if direction == 'asc' else 'DESC'
     
     conn = get_db_connection()
     if not conn: return "<h1>⚠️ המערכת לא מצליחה להתחבר לענן. בדוק חיבור אינטרנט.</h1>"
@@ -131,7 +197,7 @@ def computers():
         
         # Dashboard Stats
         cur.execute("SELECT COUNT(*) as total FROM computers")
-        total = cur.fetchone()['total']
+        total_in_db = cur.fetchone()['total']
         
         cur.execute("SELECT status, COUNT(*) as count FROM computers GROUP BY status")
         stats = cur.fetchall()
@@ -139,18 +205,52 @@ def computers():
         faulty_count = stats_dict.get('תקול', 0)
         not_in_cage_count = 0 
         
-        # Query Computers with filters
-        query = "SELECT id, barcode, case_number, cage_name, cage_number, location, status, exam_appeal, notes, scan_time as last_seen FROM computers WHERE 1=1"
+        # Base query for computers and count of total matching records
+        base_where = " WHERE 1=1"
         params = []
+        
+        # Free search across multiple fields
         if search:
-            query += " AND (barcode ILIKE %s OR case_number ILIKE %s)"
-            params.extend([f"%{search}%", f"%{search}%"])
-        if status_filter:
-            query += " AND status = %s"
-            params.append(status_filter)
+            base_where += """ AND (
+                barcode ILIKE %s OR 
+                case_number ILIKE %s OR 
+                cage_number ILIKE %s OR 
+                cage_name ILIKE %s OR
+                location ILIKE %s OR 
+                notes ILIKE %s OR 
+                exam_appeal ILIKE %s
+            )"""
+            s = f"%{search}%"
+            params.extend([s, s, s, s, s, s, s])
             
-        query += " ORDER BY scan_time DESC NULLS LAST LIMIT 150"
-        cur.execute(query, params)
+        # Dedicated cage search
+        if cage_search:
+            base_where += " AND (cage_number ILIKE %s OR cage_name ILIKE %s)"
+            cs = f"%{cage_search}%"
+            params.extend([cs, cs])
+            
+        if status_filter:
+            base_where += " AND status = %s"
+            params.append(status_filter)
+
+        # Get total matching count for pagination
+        cur.execute("SELECT COUNT(*) as cnt FROM computers" + base_where, params)
+        total_matching = cur.fetchone()['cnt']
+        total_pages = (total_matching + per_page - 1) // per_page
+            
+        # Query results for current page
+        query = "SELECT id, barcode, case_number, cage_name, cage_number, location, status, exam_appeal, notes, scan_time as last_seen FROM computers"
+        query += base_where
+        
+        # Order by logic
+        if sort_col == 'scan_time':
+            query += f" ORDER BY {sort_col} {sort_dir} NULLS LAST"
+        else:
+            query += f" ORDER BY {sort_col} {sort_dir}"
+            
+        query += " LIMIT %s OFFSET %s"
+        
+        cur.execute(query, params + [per_page, offset])
         computers = cur.fetchall()
         cur.close()
         
@@ -158,9 +258,15 @@ def computers():
                                computers=computers, 
                                search=search, 
                                status_filter=status_filter,
-                               total=total, 
+                               total=total_in_db, 
                                faulty=faulty_count, 
-                               not_in_cage=not_in_cage_count)
+                               not_in_cage=not_in_cage_count,
+                               page=page,
+                               total_pages=total_pages,
+                               total_matching=total_matching,
+                               sort=sort,
+                               direction=direction,
+                               cage_search=cage_search)
     finally:
         release_db_connection(conn)
 

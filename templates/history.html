@@ -15,9 +15,47 @@
     
     /* Undo the rounded corners on extreme cells from base.html */
     td:first-child[class], td:last-child[class] { border-radius: 0; border-left: none; }
+
+    /* Excel-like Tabs */
+    .excel-tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 20px;
+        border-bottom: 2px solid var(--border);
+        padding-left: 20px;
+    }
+    .excel-tab {
+        padding: 10px 24px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border);
+        border-bottom: none;
+        border-radius: 8px 8px 0 0;
+        color: var(--muted);
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s;
+        font-size: 0.95rem;
+    }
+    .excel-tab.active {
+        background: var(--surface);
+        color: var(--accent2);
+        border-color: var(--accent2);
+        border-bottom: 2px solid var(--surface);
+        margin-bottom: -2px;
+    }
+    .excel-tab:hover:not(.active) {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+    }
 </style>
 <div class="page-header">
     <h1>היסטוריית שינויים</h1>
+</div>
+
+<div class="excel-tabs">
+    <a href="{{ url_for('computers') }}" class="excel-tab">מלאי מחשבים</a>
+    <a href="{{ url_for('exam_page') }}" class="excel-tab">מבחן\ערעור</a>
+    <a href="{{ url_for('history_page') }}" class="excel-tab active">היסטוריית שינויים</a>
 </div>
 
 <div class="card">
@@ -44,11 +82,11 @@
                             {{ entry.change_type }}
                         </span>
                     </td>
-                    <td style="font-size: 0.75rem; color: var(--muted); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ entry.old_value }}">
-                        {{ entry.old_value or '—' }}
+                    <td style="font-size: 0.75rem; color: var(--muted); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ entry.old_value | format_history }}">
+                        {{ (entry.old_value | format_history) or '—' }}
                     </td>
-                    <td style="font-size: 0.75rem; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ entry.new_value }}">
-                        {{ entry.new_value or '—' }}
+                    <td style="font-size: 0.75rem; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ entry.new_value | format_history }}">
+                        {{ (entry.new_value | format_history) or '—' }}
                     </td>
                 </tr>
                 {% else %}
