@@ -113,8 +113,13 @@
     }
 
     @media (max-width: 600px) {
-        .portal-header h1 { font-size: 2.5rem; }
-        .portal-grid { grid-template-columns: 1fr; }
+        .portal-header h1 {
+            font-size: 2.5rem;
+        }
+
+        .portal-grid {
+            grid-template-columns: 1fr;
+        }
     }
 </style>
 
@@ -143,13 +148,6 @@
             <p>ניהול ומעקב אחר מחשבים בסטטוס ערעור או מבחן.</p>
         </a>
 
-        {% if session.get('role') == 'admin' or session.get('user') == 'admin_uri' %}
-        <a href="{{ url_for('manage_users') }}" class="portal-card">
-            <div class="icon-wrapper">👥</div>
-            <h3>ניהול משתמשים ומחיקות</h3>
-            <p>ניהול מערכת ואישור תלוי ועומד למחיקת מחשבים.</p>
-        </a>
-        {% endif %}
     </div>
 </div>
 

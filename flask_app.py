@@ -6,6 +6,7 @@ import os
 from dotenv import load_dotenv
 from functools import wraps
 from datetime import datetime
+import json
 
 # טעינת הגדרות
 load_dotenv()
@@ -216,7 +217,12 @@ def edit_computer(cid):
             cur.execute("""
                 INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
                 VALUES (%s, %s, 'Manual Edit', %s, %s)
-            """, (cid, session.get('username'), str(old_val), str(dict(data))))
+            """, (
+                cid, 
+                session.get('username'), 
+                json.dumps(dict(old_val), default=str) if old_val else None, 
+                json.dumps(dict(data), default=str)
+            ))
             
             conn.commit()
             cur.close()
@@ -362,7 +368,12 @@ def api_update_computer():
             cur.execute("""
                 INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
                 VALUES (%s, %s, 'Update via Scan', %s, %s)
-            """, (cid, session.get('username'), str(old_val), str(data)))
+            """, (
+                cid, 
+                session.get('username'), 
+                json.dumps(dict(old_val), default=str) if old_val else None, 
+                json.dumps(data, default=str)
+            ))
             
             conn.commit()
             cur.close()
@@ -447,5 +458,6 @@ def logout():
 
 if __name__ == '__main__':
     print("\n🚀 URI SYSTEM IS LIVE!")
-    print("🌐 Link: http://127.0.0.1:5000\n")
-    app.run(debug=True, port=5000)
+    print("🌐 Link: http://127.0.0.1:5000")
+    print("📱 Mobile Link: http://10.0.0.31:5000\n")
+    app.run(host='0.0.0.0', debug=True, port=5000)

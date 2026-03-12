@@ -7,15 +7,21 @@
     <h1>סריקת ברקוד מחשב</h1>
 </div>
 
-<div id="scanner-container" class="card" style="text-align: center; max-width: 600px; margin: 20px auto; animation: fadeIn 1s ease-out; border: 1px solid var(--accent2);">
-    <div id="reader" style="width: 100%; border-radius: 12px; overflow: hidden; background: #000; min-height: 250px; box-shadow: 0 0 20px rgba(0,0,0,0.5);"></div>
+<div id="scanner-container" class="card"
+    style="text-align: center; max-width: 600px; margin: 20px auto; animation: fadeIn 1s ease-out; border: 1px solid var(--accent2);">
+    <div id="reader"
+        style="width: 100%; border-radius: 12px; overflow: hidden; background: #000; min-height: 250px; box-shadow: 0 0 20px rgba(0,0,0,0.5);">
+    </div>
     <div id="result" style="margin-top: 20px; font-size: 1.2rem; font-weight: 800; color: var(--accent2);"></div>
-    <p class="muted" style="margin-top: 10px; font-size: 0.85rem; padding: 0 10px;">המערכת תזהה את ברקוד המחשב ותוביל אותך לעדכונם באופן אוטומטי</p>
+    <p class="muted" style="margin-top: 10px; font-size: 0.85rem; padding: 0 10px;">המערכת תזהה את ברקוד המחשב ותוביל
+        אותך לעדכונם באופן אוטומטי</p>
 </div>
 
 <!-- Edit Form (Hidden initially) -->
-<div id="edit-form-container" class="card" style="display: none; max-width: 600px; margin: 40px auto; animation: fadeIn 0.5s ease-out;">
-    <h2 style="margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">עדכון מחשב: <span id="form-barcode" style="color: var(--accent2);"></span></h2>
+<div id="edit-form-container" class="card"
+    style="display: none; max-width: 600px; margin: 40px auto; animation: fadeIn 0.5s ease-out;">
+    <h2 style="margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">עדכון מחשב: <span
+            id="form-barcode" style="color: var(--accent2);"></span></h2>
     <form id="update-form">
         <input type="hidden" id="computer-id">
         <div class="form-group">
@@ -49,21 +55,52 @@
         </div>
         <div style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
             <button type="submit" class="btn btn-blue" style="flex: 2; min-width: 150px;">שמור שינויים</button>
-            <button type="button" onclick="resetScanner()" class="btn btn-ghost" style="flex: 1; min-width: 150px;">ביטול / סרוק שוב</button>
+            <button type="button" onclick="resetScanner()" class="btn btn-ghost"
+                style="flex: 1; min-width: 150px;">ביטול / סרוק שוב</button>
         </div>
     </form>
 </div>
 
 <script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+    #reader video {
+        object-fit: cover;
+    }
+    #qr-shaded-region {
+        border-color: rgba(35, 134, 54, 0.5) !important;
+    }
+</style>
 <script>
-    let html5QrcodeScanner = new Html5QrcodeScanner(
-        "reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
+    let html5QrCode = null;
     
-    function onScanSuccess(decodedText, decodedResult) {
-        html5QrcodeScanner.clear(); // Stop scanning
-        document.getElementById('result').innerText = "מעבד ברקוד מחשב: " + decodedText;
+    function startScanner() {
+        if (html5QrCode) {
+            html5QrCode.clear().catch(e => console.log("Clear err:", e));
+        }
         
-        // Fetch data from API
+        html5QrCode = new Html5Qrcode("reader");
+        const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
+        
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            config, 
+            onScanSuccess,
+            (error) => { /* Ignore constant scan frame errors */ }
+        ).catch(err => {
+            console.error("Camera start failed:", err);
+            document.getElementById('result').innerHTML = `<span style="color:var(--danger);">שגיאה בפתיחת המצלמה. אנא בדוק הרשאות.</span>`;
+        });
+    }
+
+    function onScanSuccess(decodedText, decodedResult) {
+        if (html5QrCode) {
+            html5QrCode.stop().then(() => {
+                html5QrCode.clear();
+            }).catch(console.error);
+        }
+        
+        document.getElementById('result').innerHTML = `<span style="color:var(--accent);">✓ סריקה הצליחה: </span> ${decodedText}`;
+        
         fetch('/api/process-scan', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -97,11 +134,11 @@
     function resetScanner() {
         document.getElementById('edit-form-container').style.display = 'none';
         document.getElementById('scanner-container').style.display = 'block';
-        document.getElementById('result').innerText = '';
-        html5QrcodeScanner.render(onScanSuccess);
+        document.getElementById('result').innerHTML = '';
+        startScanner();
     }
 
-    document.getElementById('update-form').onsubmit = function(e) {
+    document.getElementById('update-form').onsubmit = function (e) {
         e.preventDefault();
         const data = {
             id: document.getElementById('computer-id').value,
@@ -115,20 +152,20 @@
 
         fetch('/api/update-computer', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         })
-        .then(res => res.json())
-        .then(resData => {
-            if (resData.success) {
-                alert("המחשב עודכן בהצלחה!");
-                resetScanner();
-            } else {
-                alert("שגיאה בעדכון: " + (resData.error || resData.message));
-            }
-        });
+            .then(res => res.json())
+            .then(resData => {
+                if (resData.success) {
+                    alert("המחשב עודכן בהצלחה!");
+                    resetScanner();
+                } else {
+                    alert("שגיאה בעדכון: " + (resData.error || resData.message));
+                }
+            });
     };
 
-    html5QrcodeScanner.render(onScanSuccess);
+    window.addEventListener('load', startScanner);
 </script>
 {% endblock %}
