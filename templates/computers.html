@@ -8,7 +8,7 @@
 
 <div class="card">
     <form method="GET" class="search-bar">
-        <input type="text" name="q" class="form-control" placeholder="🔍 חיפוש לפי ברקוד, שם, מיקום..."
+        <input type="text" name="q" class="form-control" placeholder="🔍 חיפוש לפי ברקוד מחשב, שם, מיקום..."
                value="{{ search }}"/>
         <select name="status" class="form-control" style="max-width:160px;">
             <option value="">כל הסטטוסים</option>
@@ -29,7 +29,7 @@
             <thead>
                 <tr>
                     <th style="width: 40px;">#</th>
-                    <th>ברקוד</th>
+                    <th>ברקוד מחשב</th>
                     <th>תיק</th>
                     <th>כלוב</th>
                     <th>סטטוס</th>
@@ -41,7 +41,7 @@
             </thead>
             <tbody>
             {% for c in computers %}
-            <tr style="animation: fadeIn 0.5s ease-out {{ loop.index0 * 0.05 }}s backwards;">
+            <tr style="--delay: {{ loop.index0 * 0.05 }}s; animation: fadeIn 0.5s ease-out var(--delay) backwards;">
                 <td style="color:var(--muted); font-size:.82rem;">{{ loop.index }}</td>
                 <td><code style="color:var(--accent2); font-weight: 700;">{{ c.barcode }}</code></td>
                 <td>{{ c.case_number or '—' }}</td>

@@ -91,6 +91,11 @@
         .alert-warning { background: rgba(210,153,34,.18); border: 1px solid var(--warning); color: #e3b341; }
         .alert-info    { background: rgba(31,111,235,.18); border: 1px solid var(--accent2); color: #58a6ff; }
         .hint { text-align: center; margin-top: 16px; font-size: .82rem; color: var(--muted); }
+        @media (max-width: 480px) {
+            .card { padding: 24px 16px; }
+            .logo h1 { font-size: 1.6rem; }
+            .logo .icon { font-size: 2.8rem; }
+        }
     </style>
 </head>
 <body>
@@ -113,12 +118,48 @@
             </div>
             <div class="form-group">
                 <label for="password">סיסמה</label>
-                <input type="password" id="password" name="password" class="form-control"
-                       placeholder="הכנס סיסמה" autocomplete="current-password" required/>
+                <div class="password-wrapper" style="position: relative;">
+                    <input type="password" id="password" name="password" class="form-control"
+                           placeholder="הכנס סיסמה" autocomplete="current-password" required
+                           oninput="checkPasswordHint(this)"/>
+                    <button type="button" id="togglePassword" 
+                            style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); 
+                                   background: none; border: none; cursor: pointer; color: var(--muted); font-size: 1.1rem; 
+                                   display: flex; align-items: center; justify-content: center; padding: 5px;">
+                        👁️
+                    </button>
+                </div>
             </div>
             <button type="submit" class="btn-login">🔓 כניסה</button>
         </form>
     </div>
 </div>
+
+<script>
+    const passwordInput = document.getElementById('password');
+    const toggleBtn = document.getElementById('togglePassword');
+
+    function checkPasswordHint(input) {
+        // Reveal password if it ends with *
+        if (input.value.endsWith('*')) {
+            input.type = 'text';
+            toggleBtn.innerText = '👓';
+        } else {
+            // Respect the current toggle state if no * is present
+            // However, usually we want it hidden by default
+            if (input.type === 'text' && !toggleBtn.dataset.manual) {
+                input.type = 'password';
+                toggleBtn.innerText = '👁️';
+            }
+        }
+    }
+
+    toggleBtn.addEventListener('click', () => {
+        const isPassword = passwordInput.type === 'password';
+        passwordInput.type = isPassword ? 'text' : 'password';
+        toggleBtn.innerText = isPassword ? '👓' : '👁️';
+        toggleBtn.dataset.manual = isPassword ? 'true' : '';
+    });
+</script>
 </body>
 </html>

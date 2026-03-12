@@ -36,6 +36,7 @@
                                 <tr>
                                     <th>שם משתמש</th>
                                     <th>תפקיד / הרשאה</th>
+                                    <th>פעילות אחרונה</th>
                                     <th>פעולות</th>
                                 </tr>
                             </thead>
@@ -50,6 +51,9 @@
                                         {% elif u.role == 'manager' %}<span class="badge bg-primary px-3">מנהל (צפייה)</span>
                                         {% elif u.role == 'logistics' %}<span class="badge bg-info text-dark px-3">לוגיסטיקה</span>
                                         {% else %}<span class="badge bg-dark px-3">{{ u.role }}</span>{% endif %}
+                                    </td>
+                                    <td class="text-white-50 small">
+                                        {{ u.timestamp.strftime('%d/%m/%Y %H:%M') if u.timestamp else 'לא ידוע' }}
                                     </td>
                                     <td>
                                         {% if u.username != 'admin_uri' %}

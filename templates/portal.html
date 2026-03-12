@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}מלאי מחשבים – URI System{% endblock %}
+{% block content %}
+
+<style>
+    .portal-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 70vh;
+        gap: 40px;
+        animation: fadeIn 1s ease-out;
+    }
+
+    .portal-header {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .portal-header h1 {
+        font-size: 3.5rem;
+        font-weight: 800;
+        background: linear-gradient(to right, #fff, var(--accent2));
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 10px;
+    }
+
+    .portal-header p {
+        color: var(--muted);
+        font-size: 1.2rem;
+    }
+
+    .portal-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 25px;
+        width: 100%;
+        max-width: 1000px;
+    }
+
+    .portal-card {
+        background: var(--card);
+        backdrop-filter: blur(var(--glass-blur));
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        padding: 40px;
+        text-align: center;
+        text-decoration: none;
+        color: var(--text);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .portal-card:hover {
+        transform: translateY(-12px);
+        border-color: var(--accent2);
+        box-shadow: 0 15px 45px rgba(31, 111, 235, 0.2);
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .portal-card .icon-wrapper {
+        width: 80px;
+        height: 80px;
+        background: rgba(31, 111, 235, 0.1);
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+        transition: all 0.3s ease;
+    }
+
+    .portal-card:hover .icon-wrapper {
+        background: var(--accent2);
+        color: white;
+        transform: rotate(5deg) scale(1.1);
+    }
+
+    .portal-card h3 {
+        font-size: 1.6rem;
+        font-weight: 700;
+    }
+
+    .portal-card p {
+        font-size: 0.95rem;
+        color: var(--muted);
+        line-height: 1.4;
+    }
+
+    .portal-card::after {
+        content: '←';
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        font-size: 1.2rem;
+        opacity: 0;
+        transform: translateX(10px);
+        transition: all 0.3s ease;
+        color: var(--accent2);
+    }
+
+    .portal-card:hover::after {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    @media (max-width: 600px) {
+        .portal-header h1 { font-size: 2.5rem; }
+        .portal-grid { grid-template-columns: 1fr; }
+    }
+</style>
+
+<div class="portal-container">
+    <div class="portal-header">
+        <h1>מלאי מחשבים</h1>
+        <p>ברוך הבא למערכת הניהול. בחר פעולה להמשך:</p>
+    </div>
+
+    <div class="portal-grid">
+        <a href="{{ url_for('dashboard') }}" class="portal-card">
+            <div class="icon-wrapper">📊</div>
+            <h3>לוח בקרה ומלאי</h3>
+            <p>צפייה בסטטיסטיקות, ניהול מלאי המחשבים ועדכון סטטוסים.</p>
+        </a>
+
+        <a href="{{ url_for('scanner') }}" class="portal-card">
+            <div class="icon-wrapper">📸</div>
+            <h3>סריקה מהירה</h3>
+            <p>עדכון מיקום וסטטוס של מחשבים באמצעות סריקת ברקוד.</p>
+        </a>
+
+        <a href="{{ url_for('exam_page') }}" class="portal-card">
+            <div class="icon-wrapper">📝</div>
+            <h3>מבחן \ ערעור</h3>
+            <p>ניהול ומעקב אחר מחשבים בסטטוס ערעור או מבחן.</p>
+        </a>
+
+        {% if session.get('role') == 'admin' or session.get('user') == 'admin_uri' %}
+        <a href="{{ url_for('manage_users') }}" class="portal-card">
+            <div class="icon-wrapper">👥</div>
+            <h3>ניהול משתמשים ומחיקות</h3>
+            <p>ניהול מערכת ואישור תלוי ועומד למחיקת מחשבים.</p>
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

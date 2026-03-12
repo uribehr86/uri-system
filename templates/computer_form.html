@@ -8,9 +8,9 @@
 
 <div class="card" style="max-width: 650px; margin: 0 auto; animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);">
     <form method="POST">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div class="form-grid">
             <div class="form-group">
-                <label for="barcode">ברקוד (מספר מחשב) *</label>
+                <label for="barcode">ברקוד מחשב *</label>
                 <input type="text" id="barcode" name="barcode" class="form-control"
                     value="{{ computer.barcode if computer else '' }}" required {{ 'readonly' if action=='edit' else ''
                     }} />
@@ -51,9 +51,9 @@
             <textarea id="notes" name="notes" class="form-control"
                 style="min-height: 120px;">{{ computer.notes if computer else '' }}</textarea>
         </div>
-        <div style="display:flex; gap:16px; margin-top:24px; justify-content: flex-end;">
-            <a href="{{ url_for('computers') }}" class="btn btn-ghost" style="flex: 1; text-align: center;">ביטול</a>
-            <button type="submit" class="btn btn-blue" style="flex: 2;">
+        <div style="display:flex; gap:16px; margin-top:24px; justify-content: flex-end; flex-wrap: wrap;">
+            <a href="{{ url_for('computers') }}" class="btn btn-ghost" style="flex: 1; text-align: center; min-width: 120px;">ביטול</a>
+            <button type="submit" class="btn btn-blue" style="flex: 2; min-width: 180px;">
                 {{ '💾 שמור שינויים' if action == 'edit' else '✅ הוסף מחשב' }}
             </button>
         </div>

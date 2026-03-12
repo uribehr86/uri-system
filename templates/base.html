@@ -52,9 +52,48 @@
             right: 0;
             top: 0;
             bottom: 0;
-            z-index: 100;
-            animation: slideInRight 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 1000;
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
+        
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            right: 0;
+            left: 0;
+            height: 60px;
+            background: var(--surface);
+            backdrop-filter: blur(var(--glass-blur));
+            border-bottom: 1px solid var(--border);
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 900;
+        }
+
+        .menu-toggle {
+            background: none;
+            border: none;
+            color: var(--text);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 950;
+            backdrop-filter: blur(2px);
+        }
+
         .sidebar .brand {
             padding: 0 20px 24px;
             font-size: 1.4rem;
@@ -67,7 +106,7 @@
             letter-spacing: -0.5px;
         }
         .sidebar .brand span { font-size: 1.8rem; filter: drop-shadow(0 0 8px var(--accent2)); }
-        .sidebar nav { padding: 20px 12px; flex: 1; }
+        .sidebar nav { padding: 20px 12px; flex: 1; overflow-y: auto; }
         .sidebar nav a {
             display: flex;
             align-items: center;
@@ -78,7 +117,7 @@
             text-decoration: none;
             font-size: .95rem;
             font-weight: 500;
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.25s;
             margin-bottom: 6px;
         }
         .sidebar nav a:hover {
@@ -90,7 +129,6 @@
             background: linear-gradient(135deg, rgba(31,111,235,0.2), rgba(31,111,235,0.05));
             color: var(--accent2);
             border: 1px solid rgba(31,111,235,0.3);
-            animation: pulseGlow 3s infinite;
         }
         .sidebar nav a .icon { font-size: 1.2rem; width: 24px; text-align: center; }
 
@@ -110,6 +148,7 @@
             padding: 40px;
             max-width: calc(100vw - var(--sidebar-w));
             animation: fadeIn 0.8s ease-out;
+            transition: margin-right 0.3s ease;
         }
 
         /* ── Cards ── */
@@ -152,12 +191,19 @@
         .stat-card .label { font-size: .9rem; color: var(--muted); margin-top: 8px; font-weight: 500; }
 
         /* ── Table ── */
-        table { width: 100%; border-collapse: separate; border-spacing: 0 8px; margin-top: -8px; }
-        th { padding: 16px; color: var(--muted); font-weight: 700; font-size: .8rem; text-transform: uppercase; letter-spacing: 1px; border: none; }
-        td { padding: 16px; background: rgba(255,255,255,0.03); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); transition: all 0.2s ease; }
+        .table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 12px; margin-top: -8px; }
+        table { width: 100%; min-width: 600px; border-collapse: separate; border-spacing: 0 8px; }
+        th { padding: 12px 16px; color: var(--muted); font-weight: 700; font-size: .75rem; text-transform: uppercase; letter-spacing: 1px; border: none; text-align: right; }
+        td { padding: 12px 16px; background: rgba(255,255,255,0.03); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); transition: all 0.2s ease; text-align: right; }
         td:first-child { border-right: 1px solid var(--border); border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
         td:last-child { border-left: 1px solid var(--border); border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
-        tr:hover td { background: rgba(255,255,255,0.07); transform: scale(1.005); }
+        tr:hover td { background: rgba(255,255,255,0.07); transform: scale(1.002); }
+
+        @media (max-width: 600px) {
+            th, td { padding: 8px 10px; font-size: 0.85rem; }
+            .stat-card .number { font-size: 2rem; }
+            .btn { padding: 10px 16px; font-size: 0.85rem; }
+        }
 
         /* ── Buttons ── */
         .btn {
@@ -198,6 +244,11 @@
         }
         .form-control:focus { border-color: var(--accent2); }
         textarea.form-control { resize: vertical; min-height: 90px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 600px) {
+            .form-grid { grid-template-columns: 1fr; gap: 10px; }
+            .sidebar { width: 100%; } /* Take full width on very small screens */
+        }
 
         /* ── Flash messages ── */
         .flashes { margin-bottom: 20px; }
@@ -221,43 +272,68 @@
         .search-bar input, .search-bar select { flex: 1; min-width: 160px; }
 
         /* ── Responsive ── */
-        @media (max-width: 700px) {
-            .sidebar { display: none; }
-            .main { margin-right: 0; padding: 16px; max-width: 100vw; }
+        @media (max-width: 900px) {
+            .sidebar { transform: translateX(100%); width: 280px; }
+            .sidebar.open { transform: translateX(0); }
+            .sidebar-overlay.open { display: block; }
+            .mobile-header { display: flex; }
+            .main { margin-right: 0; padding: 80px 15px 30px; max-width: 100vw; }
+            
+            .page-header { flex-direction: column; align-items: stretch; gap: 15px; }
+            .page-header h1 { font-size: 1.8rem; }
+            .stats { grid-template-columns: 1fr; }
+            
+            .card { padding: 20px 15px; }
+            .search-bar { flex-direction: column; }
+            .search-bar input, .search-bar select, .search-bar button { width: 100%; max-width: none !important; }
         }
     </style>
 </head>
-<body>
+<body class="{{ 'with-sidebar' if session.get('user_id') }}">
 {% if session.get('user_id') %}
-<aside class="sidebar">
+<div class="mobile-header">
+    <div class="brand" style="border:none; padding:0; font-size:1.1rem;"><span>🖥️</span> URI System</div>
+    <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+</div>
+
+<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+<aside class="sidebar" id="sidebar">
     <div class="brand"><span>🖥️</span> URI System</div>
     <nav>
+        <a href="{{ url_for('portal') }}" class="{{ 'active' if request.endpoint == 'portal' }}">
+            <span class="icon">🏠</span> תפריט ראשי
+        </a>
+        <div style="margin: 15px 16px 8px; font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;">ניהול מלאי</div>
         <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">
             <span class="icon">📊</span> לוח בקרה
         </a>
-        <a href="{{ url_for('scanner') }}" class="{{ 'active' if request.endpoint == 'scanner' }}">
-            <span class="icon">📷</span> סריקת ברקוד
-        </a>
         <a href="{{ url_for('computers') }}" class="{{ 'active' if request.endpoint in ['computers','add_computer','edit_computer'] }}">
-            <span class="icon">💻</span> מלאי מחשבים
+            <span class="icon">💻</span> רשימת מחשבים
         </a>
+        <a href="{{ url_for('scanner') }}" class="{{ 'active' if request.endpoint == 'scanner' }}">
+            <span class="icon">📸</span> סריקת ברקוד
+        </a>
+        
+        <div style="margin: 15px 16px 8px; font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;">תפעול</div>
         <a href="{{ url_for('exam_page') }}" class="{{ 'active' if request.endpoint == 'exam_page' }}">
             <span class="icon">📝</span> מבחן \ ערעור
         </a>
         <a href="{{ url_for('history_page') }}" class="{{ 'active' if request.endpoint == 'history_page' }}">
             <span class="icon">📜</span> היסטוריה
         </a>
-        {% if session.get('role') == 'admin' %}
+        
+        {% if session.get('role') == 'admin' or session.get('user') == 'admin_uri' %}
+        <div style="margin: 15px 16px 8px; font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;">מערכת</div>
         <a href="{{ url_for('manage_users') }}" class="{{ 'active' if request.endpoint in ['manage_users','add_user'] }}">
-            <span class="icon">👥</span> משתמשים
+            <span class="icon">⚙️</span> ניהול ומחיקות
         </a>
         {% endif %}
     </nav>
     <div class="user-box">
-        <strong>{{ session.get('username') }}</strong>
-        <span>{{ '🔑 מנהל' if session.get('role') == 'admin' else '👤 משתמש' }}</span>
-        <br/>
-        <a href="{{ url_for('logout') }}">⎋ התנתקות</a>
+        <div style="font-weight: 700; margin-bottom: 4px;">{{ session.get('username') }}</div>
+        <div style="font-size: 0.8rem; color: var(--muted); margin-bottom: 12px;">{{ '🔑 מנהל' if session.get('role') == 'admin' else '👤 טכנאי' }}</div>
+        <a href="{{ url_for('logout') }}" style="color: var(--danger); text-decoration: none; font-weight: 700; font-size: 0.9rem;">⎋ התנתקות</a>
     </div>
 </aside>
 {% endif %}
@@ -273,5 +349,26 @@
     </div>
     {% block content %}{% endblock %}
 </main>
+
+<script>
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.querySelector('.sidebar-overlay');
+        if (sidebar) {
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('open');
+        }
+    }
+
+    // Close sidebar on link click (for mobile SPA feel)
+    const navLinks = document.querySelectorAll('.sidebar nav a');
+    navLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 900) {
+                toggleSidebar();
+            }
+        });
+    });
+</script>
 </body>
 </html>

@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 import psycopg2
+from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
 import os
 from dotenv import load_dotenv
@@ -12,16 +13,35 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'uri_system_2026')
 
-# פונקציה לחיבור לענן עם "הגנת תקיעה"
+# Initialize Connection Pool
+db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
+try:
+    db_pool = psycopg2.pool.SimpleConnectionPool(1, 10, db_url)
+    print("✅ Database connection pool created successfully")
+except Exception as e:
+    print(f"❌ Error creating connection pool: {e}")
+    db_pool = None
+
+# פונקציה לחיבור לענן עם "הגנת תקיעה" ושימוש ב-Pool
 def get_db_connection():
-    conn_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
-    try:
-        # הוספנו connect_timeout=5 כדי שלא יתקע לך את המחשב
-        conn = psycopg2.connect(conn_url, connect_timeout=5)
-        return conn
-    except Exception as e:
-        print(f"❌ שגיאה: המערכת לא מצליחה להגיע לענן. {e}")
+    if not db_pool:
         return None
+    try:
+        # Get connection from pool
+        return db_pool.getconn()
+    except Exception as e:
+        print(f"❌ שגיאה: לא ניתן לקבל חיבור מהמאגר. {e}")
+        return None
+
+def release_db_connection(conn):
+    if db_pool and conn:
+        db_pool.putconn(conn)
+
+@app.teardown_appcontext
+def close_db(error):
+    # This ensures connections are released if forgotten, 
+    # though it's better to do it manually in routes.
+    pass
 
 def login_required(f):
     @wraps(f)
@@ -32,28 +52,65 @@ def login_required(f):
 
 @app.route('/')
 def index():
-    return redirect(url_for('dashboard')) if 'user' in session else redirect(url_for('login'))
+    return redirect(url_for('portal')) if 'user' in session else redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
         
-        # בדיקה מהירה: אם זה uri ו-1234, תכניס אותו
-        if username.lower() == "uri" and password == "1234":
+        print(f"DEBUG: Login attempt - username: '{username}', password: '{password}'")
+        
+        # Hardcoded super-admin fallback
+        if (username.lower() == "uri" and password == "1234") or (username.lower() == "admin_uri" and password == "uri*"):
             session.update({
                 'user': username,
                 'user_id': 1,
-                'username': "אורי בר",
+                'username': "אורי מנהל מערכת",
                 'role': 'admin'
             })
-            print(f"✅ משתמש {username} התחבר בהצלחה")
-            return redirect(url_for('dashboard'))
+            print(f"✅ משתמש {username} התחבר החיבור מהיר (hardcoded)")
+            return redirect(url_for('portal'))
+            
+        # Check database
+        conn = get_db_connection()
+        if conn:
+            try:
+                cur = conn.cursor(cursor_factory=RealDictCursor)
+                cur.execute("SELECT * FROM users WHERE username = %s AND password = %s", (username, password))
+                user = cur.fetchone()
+                cur.close()
+                
+                if user:
+                    # Update last active time
+                    cur.execute("UPDATE users SET timestamp = NOW() WHERE id = %s", (user['id'],))
+                    conn.commit()
+                    
+                    session.update({
+                        'user': user['username'],
+                        'user_id': user.get('id', 999), # In case id is missing
+                        'username': user['username'],
+                        'role': user['role']
+                    })
+                    print(f"✅ משתמש {username} התחבר דרך DB")
+                    return redirect(url_for('portal'))
+                else:
+                    flash("שם משתמש או סיסמה שגויים", "danger")
+            except Exception as e:
+                print(f"DB Login Error: {e}")
+                flash("שגיאה בהתחברות למסד הנתונים", "danger")
+            finally:
+                release_db_connection(conn)
         else:
-            flash("שם משתמש או סיסמה שגויים", "danger")
+            flash("שגיאת חיבור למסד הנתונים", "danger")
             
     return render_template('login.html')
+
+@app.route('/portal')
+@login_required
+def portal():
+    return render_template('portal.html')
 
 @app.route('/dashboard')
 @login_required
@@ -62,61 +119,55 @@ def dashboard():
     if not conn:
         return "<h1>⚠️ המערכת לא מצליחה להתחבר לענן. בדוק חיבור אינטרנט.</h1>"
     
-    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute("SELECT COUNT(*) as total FROM computers")
         total = cur.fetchone()['total']
         
         cur.execute("SELECT status, COUNT(*) as count FROM computers GROUP BY status")
         stats = cur.fetchall()
         
-        # התאמה לטמפלייט הקיים כדי שיראו את המספרים בעיצוב היפה
+        # Stats dict based on template requirements
         stats_dict = {row['status']: row['count'] for row in stats}
-        active_count = stats_dict.get('פעיל', 0)
-        broken_count = stats_dict.get('תקול', 0)
+        faulty_count = stats_dict.get('תקול', 0)
+        not_in_cage_count = 0 
         
-        # שליפת סריקות אחרונות (כדי שיהיה תוכן בטבלה)
         cur.execute("""
-            SELECT id, barcode, cage_name as name, location, status, scan_time as last_seen 
+            SELECT id, barcode, cage_name, cage_number, location, status, scan_time as last_seen 
             FROM computers 
             ORDER BY scan_time DESC NULLS LAST 
             LIMIT 10
         """)
         recent = cur.fetchall()
-        
         cur.close()
-        conn.close()
-        return render_template('dashboard.html', 
-                               total=total, 
-                               stats=stats, 
-                               active=active_count, 
-                               broken=broken_count, 
-                               recent=recent)
+        return render_template('dashboard.html', total=total, faulty=faulty_count, not_in_cage=not_in_cage_count, recent=recent)
     except Exception as e:
-        print(f"Error in dashboard: {e}")
-        return "<h1>❌ שגיאה בשליפת הנתונים מהענן.</h1>"
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ Error in dashboard:\n{error_details}")
+        return f"<h1>❌ שגיאה בשליפת הנתונים מהענן.</h1><pre>{e}</pre>"
+    finally:
+        release_db_connection(conn)
 
 @app.route('/manage-computers')
 @app.route('/computers') # תמיכה בשני השמות
 @login_required
-def manage_computers():
+def computers():
     conn = get_db_connection()
     if not conn: return redirect(url_for('dashboard'))
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    
-    # שאילתה מותאמת לטמפלייט
-    cur.execute("""
-        SELECT id, barcode, cage_name as name, location, status, notes, scan_time as last_seen 
-        FROM computers 
-        ORDER BY scan_time DESC NULLS LAST 
-        LIMIT 100
-    """)
-    computers = cur.fetchall()
-    cur.close()
-    conn.close()
-    
-    # בודק איזה טמפלייט קיים ומעדיף את computers.html המלא
-    return render_template('computers.html', computers=computers)
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            SELECT id, barcode, cage_name as name, location, status, notes, scan_time as last_seen 
+            FROM computers 
+            ORDER BY scan_time DESC NULLS LAST 
+            LIMIT 100
+        """)
+        computers = cur.fetchall()
+        cur.close()
+        return render_template('computers.html', computers=computers)
+    finally:
+        release_db_connection(conn)
 
 # נתיבים נוספים שנדרשים בטמפלייט base.html
 @app.route('/add-computer', methods=['GET', 'POST'])
@@ -126,21 +177,21 @@ def add_computer():
         data = request.form
         conn = get_db_connection()
         if not conn: return "DB connection failed", 500
-        cur = conn.cursor()
         try:
+            cur = conn.cursor()
             cur.execute("""
                 INSERT INTO computers (barcode, case_number, cage_number, status, location, exam_appeal, notes, scan_time)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
             """, (data['barcode'], data['case_number'], data['cage_number'], data['status'], data['location'], data['exam_appeal'], data['notes']))
             conn.commit()
+            cur.close()
             flash("מחשב נוסף בהצלחה!", "success")
             return redirect(url_for('computers'))
         except Exception as e:
             conn.rollback()
             flash(f"שגיאה בהוספת מחשב: {e}", "danger")
         finally:
-            cur.close()
-            conn.close()
+            release_db_connection(conn)
             
     return render_template('computer_form.html', action='add', computer=None)
 
@@ -149,12 +200,10 @@ def add_computer():
 def edit_computer(cid):
     conn = get_db_connection()
     if not conn: return "DB connection failed", 500
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    
     try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         if request.method == 'POST':
             data = request.form
-            # Record history before update
             cur.execute("SELECT * FROM computers WHERE id = %s", (cid,))
             old_val = cur.fetchone()
             
@@ -164,38 +213,44 @@ def edit_computer(cid):
                 WHERE id=%s
             """, (data['case_number'], data['cage_number'], data['status'], data['location'], data['exam_appeal'], data['notes'], cid))
             
-            # History log
             cur.execute("""
                 INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
                 VALUES (%s, %s, 'Manual Edit', %s, %s)
-            """, (cid, session.get('username'), old_val, dict(data)))
+            """, (cid, session.get('username'), str(old_val), str(dict(data))))
             
             conn.commit()
+            cur.close()
             flash("פרטי המחשב עודכנו!", "success")
             return redirect(url_for('computers'))
             
         cur.execute("SELECT * FROM computers WHERE id = %s", (cid,))
         computer = cur.fetchone()
+        cur.close()
         return render_template('computer_form.html', action='edit', computer=computer)
     finally:
-        cur.close()
-        conn.close()
+        release_db_connection(conn)
 
 @app.route('/delete-computer/<int:cid>', methods=['POST'])
 @login_required
 def delete_computer(cid):
     conn = get_db_connection()
     if not conn: return "DB connection failed", 500
-    cur = conn.cursor()
     try:
-        cur.execute("DELETE FROM computers WHERE id = %s", (cid,))
+        cur = conn.cursor()
+        # Only admin_uri can hard delete
+        if session.get('user') == 'admin_uri':
+            cur.execute("DELETE FROM computers WHERE id = %s", (cid,))
+            flash("המחשב נמחק מהמערכת סופית (admin_uri)", "warning")
+        else:
+            cur.execute("UPDATE computers SET status = 'ממתין למחיקה' WHERE id = %s", (cid,))
+            flash("הבקשה למחיקת המחשב הועברה לאישור מנהל העל (admin_uri)", "info")
+            
         conn.commit()
-        flash("המחשב נמחק מהמערכת", "warning")
+        cur.close()
     except Exception as e:
         flash(f"שגיאה במחיקה: {e}", "danger")
     finally:
-        cur.close()
-        conn.close()
+        release_db_connection(conn)
     return redirect(url_for('computers'))
 
 @app.route('/scanner')
@@ -208,30 +263,34 @@ def scanner():
 def exam_page():
     conn = get_db_connection()
     if not conn: return redirect(url_for('dashboard'))
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("SELECT * FROM computers WHERE exam_appeal IS NOT NULL AND exam_appeal != ''")
-    computers = cur.fetchall()
-    cur.close()
-    conn.close()
-    return render_template('exam.html', computers=computers)
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT * FROM computers WHERE exam_appeal IS NOT NULL AND exam_appeal != ''")
+        computers = cur.fetchall()
+        cur.close()
+        return render_template('exam.html', computers=computers)
+    finally:
+        release_db_connection(conn)
 
 @app.route('/history')
 @login_required
 def history_page():
     conn = get_db_connection()
     if not conn: return redirect(url_for('dashboard'))
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("""
-        SELECT h.*, c.barcode 
-        FROM inventory_history h
-        LEFT JOIN computers c ON h.computer_id = c.id
-        ORDER BY h.timestamp DESC
-        LIMIT 100
-    """)
-    history = cur.fetchall()
-    cur.close()
-    conn.close()
-    return render_template('history.html', history=history)
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            SELECT h.*, c.barcode 
+            FROM inventory_history h
+            LEFT JOIN computers c ON h.computer_id = c.id
+            ORDER BY h.timestamp DESC
+            LIMIT 100
+        """)
+        history = cur.fetchall()
+        cur.close()
+        return render_template('history.html', history=history)
+    finally:
+        release_db_connection(conn)
 
 @app.route('/api/process-scan', methods=['POST'])
 @login_required
@@ -242,9 +301,8 @@ def process_scan():
 
     conn = get_db_connection()
     if not conn: return {"error": "DB connection failed"}, 500
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    
     try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         # Check if computer exists
         cur.execute("SELECT * FROM computers WHERE barcode = %s", (barcode,))
         computer = cur.fetchone()
@@ -253,6 +311,7 @@ def process_scan():
             # Update scan_time (last seen)
             cur.execute("UPDATE computers SET scan_time = NOW() WHERE id = %s", (computer['id'],))
             conn.commit()
+            cur.close()
             return {"exists": True, "computer": computer}
         else:
             # Create new record
@@ -263,14 +322,14 @@ def process_scan():
             """, (barcode,))
             new_computer = cur.fetchone()
             conn.commit()
+            cur.close()
             return {"exists": False, "computer": new_computer}
             
     except Exception as e:
         print(f"Error in process_scan: {e}")
         return {"error": str(e)}, 500
     finally:
-        cur.close()
-        conn.close()
+        release_db_connection(conn)
 
 @app.route('/api/update-computer', methods=['POST'])
 @login_required
@@ -281,9 +340,8 @@ def api_update_computer():
 
     conn = get_db_connection()
     if not conn: return {"error": "DB connection failed"}, 500
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    
     try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         # Get old values for history
         cur.execute("SELECT * FROM computers WHERE id = %s", (cid,))
         old_val = cur.fetchone()
@@ -304,9 +362,10 @@ def api_update_computer():
             cur.execute("""
                 INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
                 VALUES (%s, %s, 'Update via Scan', %s, %s)
-            """, (cid, session.get('username'), old_val, data))
+            """, (cid, session.get('username'), str(old_val), str(data)))
             
             conn.commit()
+            cur.close()
             return {"success": True}
         return {"success": False, "message": "No fields to update"}
         
@@ -314,8 +373,72 @@ def api_update_computer():
         print(f"Error in api_update_computer: {e}")
         return {"error": str(e)}, 500
     finally:
+        release_db_connection(conn)
+
+@app.route('/api/admin_approve_delete', methods=['POST'])
+@login_required
+def admin_approve_delete():
+    # Only admin_uri can approve deletes
+    if session.get('user') != 'admin_uri':
+        return {"success": False, "error": "Unauthorized: Only admin_uri can perform this action"}, 403
+        
+    data = request.json
+    barcode = data.get('barcode')
+    action = data.get('action')
+    
+    if not barcode or not action:
+        return {"success": False, "error": "Missing parameters"}, 400
+        
+    conn = get_db_connection()
+    if not conn: return {"success": False, "error": "DB Error"}, 500
+    try:
+        cur = conn.cursor()
+        if action == 'hard_delete':
+            cur.execute("DELETE FROM computers WHERE barcode = %s", (barcode,))
+        elif action == 'restore':
+            cur.execute("UPDATE computers SET status = 'פעיל' WHERE barcode = %s", (barcode,))
+            
+        conn.commit()
         cur.close()
-        conn.close()
+        return {"success": True}
+    except Exception as e:
+        print(f"Error in admin_approve_delete: {e}")
+        return {"success": False, "error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
+@app.route('/manage-users')
+@login_required
+def manage_users():
+    if session.get('role') != 'admin' and session.get('user') != 'admin_uri':
+        flash("אין לך הרשאה לגשת לעמוד זה", "danger")
+        return redirect(url_for('portal'))
+        
+    conn = get_db_connection()
+    if not conn: return "DB connection failed", 500
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        # 1. Fetch users
+        cur.execute("SELECT username, role, timestamp FROM users ORDER BY timestamp DESC")
+        users = cur.fetchall()
+        
+        # 2. Fetch pending deletions
+        cur.execute("SELECT barcode as computer_number, cage_number FROM computers WHERE status = 'ממתין למחיקה'")
+        pending_raw = cur.fetchall()
+        
+        # Format pending for template
+        pending = []
+        for p in pending_raw:
+            pending.append({
+                'computer_number': p['computer_number'],
+                'cage_number': p['cage_number'] or 'לא ידוע',
+                'scanned_by': 'טכנאי' # Could join with history for exact user if needed
+            })
+            
+        cur.close()
+        return render_template('manage_users.html', users=users, pending=pending)
+    finally:
+        release_db_connection(conn)
 
 @app.route('/logout')
 def logout():
