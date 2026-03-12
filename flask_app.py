@@ -18,9 +18,9 @@ app.secret_key = os.getenv('SECRET_KEY', 'uri_system_2026')
 db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
 try:
     db_pool = psycopg2.pool.SimpleConnectionPool(1, 10, db_url)
-    print("✅ Database connection pool created successfully")
+    print("[OK] Database connection pool created successfully")
 except Exception as e:
-    print(f"❌ Error creating connection pool: {e}")
+    print(f"[ERROR] Error creating connection pool: {e}")
     db_pool = None
 
 # פונקציה לחיבור לענן עם "הגנת תקיעה" ושימוש ב-Pool
@@ -31,7 +31,7 @@ def get_db_connection():
         # Get connection from pool
         return db_pool.getconn()
     except Exception as e:
-        print(f"❌ שגיאה: לא ניתן לקבל חיבור מהמאגר. {e}")
+        print(f"[ERROR] שגיאה: לא ניתן לקבל חיבור מהמאגר. {e}")
         return None
 
 def release_db_connection(conn):
@@ -71,7 +71,7 @@ def login():
                 'username': "אורי מנהל מערכת",
                 'role': 'admin'
             })
-            print(f"✅ משתמש {username} התחבר החיבור מהיר (hardcoded)")
+            print(f"[OK] משתמש {username} התחבר החיבור מהיר (hardcoded)")
             return redirect(url_for('portal'))
             
         # Check database
@@ -94,7 +94,7 @@ def login():
                         'username': user['username'],
                         'role': user['role']
                     })
-                    print(f"✅ משתמש {username} התחבר דרך DB")
+                    print(f"[OK] משתמש {username} התחבר דרך DB")
                     return redirect(url_for('portal'))
                 else:
                     flash("שם משתמש או סיסמה שגויים", "danger")
@@ -145,8 +145,8 @@ def dashboard():
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        print(f"❌ Error in dashboard:\n{error_details}")
-        return f"<h1>❌ שגיאה בשליפת הנתונים מהענן.</h1><pre>{e}</pre>"
+        print(f"[ERROR] Error in dashboard:\n{error_details}")
+        return f"<h1>[ERROR] שגיאה בשליפת הנתונים מהענן.</h1><pre>{e}</pre>"
     finally:
         release_db_connection(conn)
 
@@ -457,7 +457,8 @@ def logout():
     return redirect(url_for('login'))
 
 if __name__ == '__main__':
-    print("\n🚀 URI SYSTEM IS LIVE!")
-    print("🌐 Link: http://127.0.0.1:5000")
-    print("📱 Mobile Link: http://10.0.0.31:5000\n")
-    app.run(host='0.0.0.0', debug=True, port=5000)
+    print("\n[START] URI SYSTEM IS LIVE! (HTTPS ENABLED FOR MOBILE SCANNER)")
+    print("URL Link: https://127.0.0.1:5000")
+    print("Mobile Link: https://10.0.0.31:5000\n")
+    print("[WARNING] When opening on iPhone, you will see a 'Not Private' warning. Click 'Show Details' -> 'Visit this website' to bypass and test the scanner.")
+    app.run(host='0.0.0.0', debug=True, port=5000, ssl_context='adhoc')
