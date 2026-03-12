@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block title %}ניהול כלובים - URI System{% endblock %}
+{% block content %}
+<style>
+  .cages-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .cages-header h1 { margin: 0; font-size: 1.6rem; }
+  .search-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .search-bar input { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 9px 14px; border-radius: 10px; font-size: 0.9rem; outline: none; width: 200px; }
+  .cage-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .cage-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; transition: border-color 0.2s, transform 0.15s; cursor: pointer; }
+  .cage-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .cage-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .cage-id { font-size: 1.4rem; font-weight: 900; }
+  .cage-count { background: rgba(37,99,235,0.15); border: 1px solid rgba(37,99,235,0.3); border-radius: 20px; padding: 4px 12px; font-size: 0.85rem; font-weight: 700; color: #60a5fa; }
+  .cage-name { color: var(--muted); font-size: 0.88rem; margin-bottom: 8px; }
+  .cage-location { font-size: 0.82rem; color: var(--accent2); }
+  .cage-statuses { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .status-pill { font-size: 0.72rem; font-weight: 700; padding: 3px 9px; border-radius: 12px; }
+  .status-pill.ok { background: rgba(34,197,94,0.15); color: #4ade80; }
+  .status-pill.broken { background: rgba(239,68,68,0.15); color: #f87171; }
+  .status-pill.other { background: rgba(250,204,21,0.1); color: #facc15; }
+  .cage-actions { display: flex; gap: 8px; margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .btn-sm { padding: 7px 14px; font-size: 0.8rem; border-radius: 8px; border: none; cursor: pointer; font-weight: 700; transition: opacity 0.2s; }
+  .btn-sm:hover { opacity: 0.85; }
+  .btn-edit { background: var(--accent); color: #fff; }
+  .btn-view { background: rgba(255,255,255,0.07); color: var(--text); }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+
+  /* Edit modal */
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; align-items: center; justify-content: center; }
+  .modal-bg.show { display: flex; }
+  .modal-box { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 28px; width: 90%; max-width: 440px; }
+  .modal-box h3 { margin: 0 0 20px; font-size: 1.2rem; }
+  .modal-box .form-group { margin-bottom: 14px; }
+  .modal-box label { display: block; font-size: 0.78rem; font-weight: 700; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; }
+  .modal-box input, .modal-box select, .modal-box textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: 10px; font-size: 0.95rem; outline: none; box-sizing: border-box; }
+  .modal-box textarea { resize: none; height: 70px; }
+  .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
+  .modal-btns .btn-primary { flex: 2; }
+  .modal-btns .btn-ghost { flex: 1; }
+</style>
+
+<div class="cages-header">
+  <h1>📦 ניהול כלובים</h1>
+  <div class="search-bar">
+    <input type="text" id="cage-search" placeholder="חיפוש כלוב..." oninput="filterCages(this.value)" />
+    <button class="btn btn-blue" onclick="openAddModal()">+ כלוב חדש</button>
+  </div>
+</div>
+
+{% if cages %}
+<div class="cage-grid" id="cage-grid">
+  {% for cage in cages %}
+  <div class="cage-card" data-cage-id="{{ cage.cage_id }}" data-name="{{ cage.name or '' }}" onclick="viewCageComputers('{{ cage.cage_id }}')">
+    <div class="cage-card-top">
+      <div class="cage-id">{{ cage.cage_id }}</div>
+      <div class="cage-count">{{ cage.computer_count }} מחשבים</div>
+    </div>
+    {% if cage.name %}
+    <div class="cage-name">{{ cage.name }}</div>
+    {% endif %}
+    {% if cage.location %}
+    <div class="cage-location">📍 {{ cage.location }}</div>
+    {% endif %}
+    <div class="cage-statuses">
+      {% if cage.ok_count %}<span class="status-pill ok">✅ {{ cage.ok_count }} תקין</span>{% endif %}
+      {% if cage.broken_count %}<span class="status-pill broken">❌ {{ cage.broken_count }} תקול</span>{% endif %}
+      {% if cage.other_count %}<span class="status-pill other">⚠️ {{ cage.other_count }} אחר</span>{% endif %}
+    </div>
+    <div class="cage-actions" onclick="event.stopPropagation()">
+      <button class="btn-sm btn-view" onclick="viewCageComputers('{{ cage.cage_id }}')">👁️ צפה</button>
+      <button class="btn-sm btn-edit"
+        data-cage-id="{{ cage.cage_id }}"
+        data-cage-name="{{ cage.name or '' }}"
+        data-cage-location="{{ cage.location or '' }}"
+        data-cage-notes="{{ cage.notes or '' }}"
+        onclick="openEditModalFromBtn(this)">✏️ ערוך</button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <div style="font-size: 3rem; margin-bottom: 12px;">📦</div>
+  <h3>אין כלובים עדיין</h3>
+  <p>כלובים נוצרים אוטומטית בעת סריקת מחשב עם מספר כלוב, או לחץ "+ כלוב חדש"</p>
+</div>
+{% endif %}
+
+<!-- Computers in cage modal -->
+<div class="modal-bg" id="view-modal">
+  <div class="modal-box" style="max-width: 560px; max-height: 80vh; overflow-y: auto;">
+    <h3 id="view-title">מחשבים בכלוב</h3>
+    <div id="view-list"></div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModals()">סגור</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit modal -->
+<div class="modal-bg" id="edit-modal">
+  <div class="modal-box">
+    <h3 id="modal-title">ערוך כלוב</h3>
+    <input type="hidden" id="modal-cage-id">
+    <div class="form-group">
+      <label>מזהה כלוב</label>
+      <input type="text" id="modal-cage-id-input" placeholder="מספר/שם כלוב">
+    </div>
+    <div class="form-group">
+      <label>שם תיאור</label>
+      <input type="text" id="modal-name" placeholder="תיאור אופציונלי...">
+    </div>
+    <div class="form-group">
+      <label>מיקום</label>
+      <select id="modal-location">
+        <option value="">-- בחר מיקום --</option>
+        <option value="מחסן">מחסן</option>
+        <option value="אפעל 6">אפעל 6</option>
+        <option value="אקספו">אקספו</option>
+        <option value="בנייני האומה">בנייני האומה</option>
+        <option value="שיבא">שיבא</option>
+        <option value="בית">בית</option>
+        <option value="חוץ">חוץ</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>הערות</label>
+      <textarea id="modal-notes" placeholder="הערות..."></textarea>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModals()">ביטול</button>
+      <button class="btn btn-blue btn-primary" onclick="saveCage()">💾 שמור</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function filterCages(q) {
+    q = q.toLowerCase();
+    document.querySelectorAll('.cage-card').forEach(card => {
+      const id = card.dataset.cageId.toLowerCase();
+      const name = card.dataset.name.toLowerCase();
+      card.style.display = (id.includes(q) || name.includes(q)) ? '' : 'none';
+    });
+  }
+
+  function openAddModal() {
+    document.getElementById('modal-title').textContent = 'הוסף כלוב חדש';
+    document.getElementById('modal-cage-id').value = '';
+    document.getElementById('modal-cage-id-input').value = '';
+    document.getElementById('modal-cage-id-input').disabled = false;
+    document.getElementById('modal-name').value = '';
+    document.getElementById('modal-location').value = '';
+    document.getElementById('modal-notes').value = '';
+    document.getElementById('edit-modal').classList.add('show');
+  }
+
+  function openEditModalFromBtn(btn) {
+    openEditModal(btn.dataset.cageId, btn.dataset.cageName, btn.dataset.cageLocation, btn.dataset.cageNotes);
+  }
+
+  function openEditModal(cageId, name, location, notes) {
+    document.getElementById('modal-title').textContent = 'ערוך כלוב ' + cageId;
+    document.getElementById('modal-cage-id').value = cageId;
+    document.getElementById('modal-cage-id-input').value = cageId;
+    document.getElementById('modal-cage-id-input').disabled = true;
+    document.getElementById('modal-name').value = name;
+    document.getElementById('modal-location').value = location;
+    document.getElementById('modal-notes').value = notes;
+    document.getElementById('edit-modal').classList.add('show');
+  }
+
+  function closeModals() {
+    document.getElementById('edit-modal').classList.remove('show');
+    document.getElementById('view-modal').classList.remove('show');
+  }
+
+  function saveCage() {
+    const existingId = document.getElementById('modal-cage-id').value;
+    const cageId = document.getElementById('modal-cage-id-input').value.trim();
+    if (!cageId) return alert('נא להזין מזהה כלוב');
+
+    fetch('/api/cage/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cage_id: cageId,
+        existing_id: existingId,
+        name: document.getElementById('modal-name').value,
+        location: document.getElementById('modal-location').value,
+        notes: document.getElementById('modal-notes').value
+      })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) location.reload();
+      else alert('שגיאה: ' + data.error);
+    });
+  }
+
+  function viewCageComputers(cageId) {
+    document.getElementById('view-title').textContent = '📦 כלוב ' + cageId + ' — טוען...';
+    document.getElementById('view-list').innerHTML = '<div style="text-align:center;padding:20px;">⏳ טוען...</div>';
+    document.getElementById('view-modal').classList.add('show');
+
+    fetch('/api/cage/' + encodeURIComponent(cageId))
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('view-title').textContent = '📦 כלוב ' + cageId + ' — ' + (data.total || 0) + ' מחשבים';
+      const computers = data.computers || [];
+      if (!computers.length) {
+        document.getElementById('view-list').innerHTML = '<div style="text-align:center;color:#666;padding:20px;">אין מחשבים רשומים</div>';
+        return;
+      }
+      document.getElementById('view-list').innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+          <thead><tr style="border-bottom:1px solid var(--border);">
+            <th style="padding:6px;text-align:right">ברקוד</th>
+            <th style="padding:6px;text-align:right">סטטוס</th>
+            <th style="padding:6px;text-align:right">מיקום</th>
+            <th style="padding:6px;text-align:right">נסרק</th>
+          </tr></thead>
+          <tbody>${computers.map(c => `
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+              <td style="padding:7px;font-weight:700">${c.barcode}</td>
+              <td style="padding:7px;color:${c.status==='תקול'?'#f87171':'#86efac'}">${c.status||'—'}</td>
+              <td style="padding:7px;color:#94a3b8">${c.location||'—'}</td>
+              <td style="padding:7px;color:#64748b;font-size:0.75rem">${c.scan_time?c.scan_time.slice(0,16).replace('T',' '):'—'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>`;
+    });
+  }
+</script>
+{% endblock %}

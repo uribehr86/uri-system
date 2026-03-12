@@ -3,6 +3,19 @@
 {% block title %}היסטוריית שינויים - URI System{% endblock %}
 
 {% block content %}
+<style>
+    /* Excel-like compact table styles overrides */
+    .table-wrap { overflow-x: auto; margin-top: 10px; border-radius: 8px; border: 1px solid var(--border); }
+    table { width: 100%; min-width: 800px; border-collapse: collapse; border-spacing: 0; }
+    th, td { padding: 6px 10px; font-size: 0.8rem; text-align: right; border-bottom: 1px solid var(--border); border-right: 1px solid rgba(255,255,255,0.05); }
+    th { background: rgba(0,0,0,0.4); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: #a1a1aa; border-top: none; }
+    td { background: var(--bg); transition: background 0.1s; }
+    td:last-child, th:last-child { border-right: none; }
+    tr:hover td { background: rgba(255,255,255,0.04); transform: none; }
+    
+    /* Undo the rounded corners on extreme cells from base.html */
+    td:first-child[class], td:last-child[class] { border-radius: 0; border-left: none; }
+</style>
 <div class="page-header">
     <h1>היסטוריית שינויים</h1>
 </div>
@@ -23,12 +36,20 @@
             <tbody>
                 {% for entry in history %}
                 <tr>
-                    <td>{{ entry.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
-                    <td>{{ entry.technician }}</td>
-                    <td>{{ entry.barcode }}</td>
-                    <td>{{ entry.change_type }}</td>
-                    <td style="font-size: 0.8rem; color: var(--muted);">{{ entry.old_value }}</td>
-                    <td style="font-size: 0.8rem;">{{ entry.new_value }}</td>
+                    <td style="color:var(--muted); font-size:0.75rem; white-space:nowrap;">{{ entry.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td style="font-weight:700;">{{ entry.technician }}</td>
+                    <td><code style="color:var(--accent2); font-weight: 700;">{{ entry.barcode }}</code></td>
+                    <td>
+                        <span class="badge" style="background: rgba(31,111,235,0.15); color: #60a5fa; border: 1px solid rgba(31,111,235,0.3); font-size: 0.7rem;">
+                            {{ entry.change_type }}
+                        </span>
+                    </td>
+                    <td style="font-size: 0.75rem; color: var(--muted); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ entry.old_value }}">
+                        {{ entry.old_value or '—' }}
+                    </td>
+                    <td style="font-size: 0.75rem; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ entry.new_value }}">
+                        {{ entry.new_value or '—' }}
+                    </td>
                 </tr>
                 {% else %}
                 <tr>

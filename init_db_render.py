@@ -7,14 +7,14 @@ load_dotenv()
 def init_db():
     conn_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
     if not conn_url:
-        print("❌ RENDER_DB_URL or DATABASE_URL not found")
+        print("RENDER_DB_URL or DATABASE_URL not found")
         return
 
     try:
         conn = psycopg2.connect(conn_url)
         cur = conn.cursor()
 
-        print("🚀 Creating/Updating 'computers' table...")
+        print("Creating/Updating 'computers' table...")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS computers (
                 id SERIAL PRIMARY KEY,
@@ -30,7 +30,7 @@ def init_db():
             );
         """)
 
-        print("➕ Creating 'inventory_history' table...")
+        print("Creating 'inventory_history' table...")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS inventory_history (
                 id SERIAL PRIMARY KEY,
@@ -44,11 +44,11 @@ def init_db():
         """)
 
         conn.commit()
-        print("✅ Database initialized successfully!")
+        print("Database initialized successfully!")
         cur.close()
         conn.close()
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
     init_db()

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 import psycopg2
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
@@ -7,6 +7,9 @@ from dotenv import load_dotenv
 from functools import wraps
 from datetime import datetime
 import json
+import io
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment
 
 # טעינת הגדרות
 load_dotenv()
@@ -17,7 +20,7 @@ app.secret_key = os.getenv('SECRET_KEY', 'uri_system_2026')
 # Initialize Connection Pool
 db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
 try:
-    db_pool = psycopg2.pool.SimpleConnectionPool(1, 10, db_url)
+    db_pool = psycopg2.pool.SimpleConnectionPool(2, 20, db_url)
     print("[OK] Database connection pool created successfully")
 except Exception as e:
     print(f"[ERROR] Error creating connection pool: {e}")
@@ -386,6 +389,200 @@ def api_update_computer():
     finally:
         release_db_connection(conn)
 
+# ── API: Batch Operations ──────────────────────────────────────────────
+@app.route('/api/batch-update', methods=['POST'])
+@login_required
+def api_batch_update():
+    data = request.json
+    ids = data.get('ids', [])
+    updates = data.get('updates', {})
+    
+    if not ids or not updates:
+        return {"success": False, "error": "Missing ids or updates"}, 400
+        
+    conn = get_db_connection()
+    if not conn: return {"success": False, "error": "DB connection failed"}, 500
+    try:
+        cur = conn.cursor()
+        
+        set_clauses = []
+        params = []
+        for key in ['location', 'cage_number', 'cage_name', 'status', 'exam_appeal', 'notes']:
+            if key in updates:
+                set_clauses.append(f"{key} = %s")
+                params.append(updates[key])
+                
+        if not set_clauses:
+            return {"success": False, "error": "No valid fields provided"}, 400
+            
+        params.extend(ids)
+        placeholders = ','.join(['%s'] * len(ids))
+        
+        query = f"UPDATE computers SET {', '.join(set_clauses)} WHERE id IN ({placeholders})"
+        cur.execute(query, params)
+        
+        # Log to history for each (simplified to avoid mass select first, assuming identical change)
+        for cid in ids:
+            cur.execute("""
+                INSERT INTO inventory_history (computer_id, technician, change_type, new_value)
+                VALUES (%s, %s, 'Batch Update', %s)
+            """, (cid, session.get('username'), json.dumps(updates, default=str)))
+            
+        conn.commit()
+        cur.close()
+        return {"success": True}
+    except Exception as e:
+        print(f"Error in batch-update: {e}")
+        return {"success": False, "error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
+@app.route('/api/batch-delete', methods=['POST'])
+@login_required
+def api_batch_delete():
+    # Only admin should be able to trigger this in the UI, verify on server too
+    if session.get('role') != 'admin' and session.get('user') != 'admin_uri':
+        return {"success": False, "error": "Unauthorized"}, 403
+        
+    data = request.json
+    ids = data.get('ids', [])
+    if not ids: return {"success": False, "error": "No ids provided"}, 400
+    
+    conn = get_db_connection()
+    if not conn: return {"success": False, "error": "DB connection failed"}, 500
+    try:
+        cur = conn.cursor()
+        placeholders = ','.join(['%s'] * len(ids))
+        cur.execute(f"DELETE FROM computers WHERE id IN ({placeholders})", ids)
+        conn.commit()
+        cur.close()
+        return {"success": True}
+    except Exception as e:
+        print(f"Error in batch-delete: {e}")
+        return {"success": False, "error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
+
+# ── API: שליפת מידע כלוב ──────────────────────────────────────────────
+@app.route('/api/cage/<cage_id>', methods=['GET'])
+@login_required
+def api_get_cage(cage_id):
+    """מחזיר מידע על כלוב + רשימת המחשבים בו"""
+    conn = get_db_connection()
+    if not conn: return {"error": "DB connection failed"}, 500
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        # שליפת פרטי הכלוב (אם קיים בטבלת cages)
+        cur.execute("SELECT * FROM cages WHERE cage_id = %s", (cage_id,))
+        cage = cur.fetchone()
+
+        # שליפת מחשבים בכלוב זה
+        cur.execute("""
+            SELECT id, barcode, status, location, scan_time, notes
+            FROM computers
+            WHERE cage_number = %s OR cage_name = %s
+            ORDER BY scan_time DESC NULLS LAST
+        """, (cage_id, cage_id))
+        computers_in_cage = cur.fetchall()
+
+        # סטטיסטיקות
+        total = len(computers_in_cage)
+        status_counts = {}
+        for c in computers_in_cage:
+            s_val = c.get('status')
+            s = s_val if s_val is not None else 'לא ידוע'
+            status_counts[s] = status_counts.get(s, 0) + 1
+
+        cur.close()
+        return {
+            "cage": dict(cage) if cage else {"cage_id": cage_id, "name": f"כלוב {cage_id}"},
+            "computers": [dict(c) for c in computers_in_cage],
+            "total": total,
+            "status_counts": status_counts
+        }
+    except Exception as e:
+        print(f"Error in api_get_cage: {e}")
+        return {"error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
+# ── API: סריקה מהירה (ללא חלון) ───────────────────────────────────────
+@app.route('/api/fast-scan', methods=['POST'])
+@login_required
+def api_fast_scan():
+    """
+    סריקה מהירה - מעדכן מחשב ישירות ללא תצוגת UI מפורטת.
+    user שולח: barcode, location, cage_number, cage_name, status
+    """
+    data = request.json
+    barcode = data.get('barcode', '').strip()
+    if not barcode:
+        return {"success": False, "error": "ברקוד חסר"}, 400
+
+    location   = data.get('location', '')
+    cage_number = data.get('cage_number', '')
+    cage_name  = data.get('cage_name', cage_number)
+    status     = data.get('status', 'פעיל')
+    technician = session.get('username', 'לא ידוע')
+
+    conn = get_db_connection()
+    if not conn: return {"success": False, "error": "DB connection failed"}, 500
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        # בדיקה אם מחשב קיים
+        cur.execute("SELECT * FROM computers WHERE barcode = %s", (barcode,))
+        computer = cur.fetchone()
+
+        if computer:
+            old_val = dict(computer)
+            # Build a scan-log line to APPEND to notes (not overwrite)
+            now_str = datetime.now().strftime('%d/%m/%Y %H:%M')
+            log_line = f"[{now_str}] {technician} → {location}, כלוב {cage_number}, {status}"
+            existing_notes = computer.get('notes') or ''
+            new_notes = (existing_notes + '\n' + log_line).strip()
+            cur.execute("""
+                UPDATE computers
+                SET location=%s, cage_number=%s, cage_name=%s, status=%s,
+                    scan_time=NOW(), notes=%s
+                WHERE barcode=%s
+            """, (location, cage_number, cage_name, status, new_notes, barcode))
+        else:
+            # New computer — create with initial log in notes
+            now_str = datetime.now().strftime('%d/%m/%Y %H:%M')
+            init_notes = f"[{now_str}] {technician} → נוסף, {location}, כלוב {cage_number}, {status}"
+            cur.execute("""
+                INSERT INTO computers (barcode, location, cage_number, cage_name, status, scan_time, notes)
+                VALUES (%s, %s, %s, %s, %s, NOW(), %s)
+                RETURNING *
+            """, (barcode, location, cage_number, cage_name, status, init_notes))
+            computer = cur.fetchone()
+            old_val = None
+
+        # תיעוד היסטוריה
+        cur.execute("""
+            INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
+            VALUES (%s, %s, 'Fast Scan', %s, %s)
+        """, (
+            computer['id'],
+            technician,
+            json.dumps(old_val, default=str) if old_val else None,
+            json.dumps(data, default=str)
+        ))
+
+        conn.commit()
+        cur.close()
+        return {"success": True, "barcode": barcode, "is_new": old_val is None}
+
+    except Exception as e:
+        print(f"Error in api_fast_scan: {e}")
+        return {"success": False, "error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
+
 @app.route('/api/admin_approve_delete', methods=['POST'])
 @login_required
 def admin_approve_delete():
@@ -451,10 +648,244 @@ def manage_users():
     finally:
         release_db_connection(conn)
 
+
+# ════════════════════════════════════════════════════════════════
+# CAGE MANAGEMENT
+# ════════════════════════════════════════════════════════════════
+
+@app.route('/cages')
+@login_required
+def cages_page():
+    conn = get_db_connection()
+    if not conn: return "DB Error", 500
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        # Get all cages with computer counts and status breakdowns
+        cur.execute("""
+            SELECT
+                c.cage_id, c.name, c.location, c.notes,
+                COUNT(comp.id) AS computer_count,
+                SUM(CASE WHEN comp.status = 'פעיל' THEN 1 ELSE 0 END) AS ok_count,
+                SUM(CASE WHEN comp.status = 'תקול' THEN 1 ELSE 0 END) AS broken_count,
+                SUM(CASE WHEN comp.status NOT IN ('פעיל','תקול') AND comp.status IS NOT NULL THEN 1 ELSE 0 END) AS other_count
+            FROM cages c
+            LEFT JOIN computers comp ON comp.cage_number = c.cage_id OR comp.cage_name = c.cage_id
+            GROUP BY c.id, c.cage_id, c.name, c.location, c.notes
+            ORDER BY computer_count DESC
+        """)
+        cages = cur.fetchall()
+
+        # Also include cages that exist in computers but not in cages table
+        cur.execute("""
+            SELECT cage_number as cage_id, COUNT(*) as computer_count
+            FROM computers
+            WHERE cage_number IS NOT NULL AND cage_number != ''
+            AND cage_number NOT IN (SELECT cage_id FROM cages)
+            GROUP BY cage_number
+            ORDER BY computer_count DESC
+        """)
+        implicit_cages = cur.fetchall()
+        for ic in implicit_cages:
+            cages.append({**dict(ic), 'name': None, 'location': None, 'notes': None, 'ok_count': 0, 'broken_count': 0, 'other_count': 0})
+
+        cur.close()
+        return render_template('cages.html', cages=cages)
+    except Exception as e:
+        print(f"Error in cages_page: {e}")
+        return f"<h1>Error: {e}</h1>", 500
+    finally:
+        release_db_connection(conn)
+
+
+@app.route('/api/cage/save', methods=['POST'])
+@login_required
+def api_save_cage():
+    """Create or update a cage record"""
+    data = request.json
+    cage_id = data.get('cage_id', '').strip()
+    existing_id = data.get('existing_id', '').strip()
+    if not cage_id:
+        return {'success': False, 'error': 'cage_id is required'}, 400
+
+    conn = get_db_connection()
+    if not conn: return {'success': False, 'error': 'DB Error'}, 500
+    try:
+        cur = conn.cursor()
+        if existing_id:
+            cur.execute("""
+                UPDATE cages SET name=%s, location=%s, notes=%s, updated_at=NOW()
+                WHERE cage_id=%s
+            """, (data.get('name',''), data.get('location',''), data.get('notes',''), existing_id))
+        else:
+            cur.execute("""
+                INSERT INTO cages (cage_id, name, location, notes)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (cage_id) DO UPDATE
+                SET name=EXCLUDED.name, location=EXCLUDED.location, notes=EXCLUDED.notes, updated_at=NOW()
+            """, (cage_id, data.get('name',''), data.get('location',''), data.get('notes','')))
+        conn.commit()
+        cur.close()
+        return {'success': True}
+    except Exception as e:
+        print(f"Error saving cage: {e}")
+        return {'success': False, 'error': str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
+
+# ════════════════════════════════════════════════════════════════
+# SCAN DASHBOARD — LIVE STATS
+# ════════════════════════════════════════════════════════════════
+
+@app.route('/scan-dashboard')
+@login_required
+def scan_dashboard():
+    return render_template('scan_dashboard.html')
+
+
+@app.route('/api/scan-stats')
+@login_required
+def api_scan_stats():
+    """Returns today's scan stats for the live dashboard"""
+    conn = get_db_connection()
+    if not conn: return {'error': 'DB Error'}, 500
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Scans today (via history)
+        cur.execute("""
+            SELECT COUNT(*) as cnt FROM inventory_history
+            WHERE timestamp::date = CURRENT_DATE
+            AND change_type IN ('Fast Scan', 'Update via Scan')
+        """)
+        today_total = cur.fetchone()['cnt']
+
+        # Total computers
+        cur.execute("SELECT COUNT(*) as cnt FROM computers")
+        total_computers = cur.fetchone()['cnt']
+
+        # Broken count
+        cur.execute("SELECT COUNT(*) as cnt FROM computers WHERE status = 'תקול'")
+        broken = cur.fetchone()['cnt']
+
+        # Per worker today
+        cur.execute("""
+            SELECT technician, COUNT(*) as count, MAX(timestamp) as last_scan
+            FROM inventory_history
+            WHERE timestamp::date = CURRENT_DATE
+            AND change_type IN ('Fast Scan', 'Update via Scan')
+            AND technician IS NOT NULL
+            GROUP BY technician
+            ORDER BY count DESC
+        """)
+        workers = [dict(r) for r in cur.fetchall()]
+
+        # Hourly (today)
+        cur.execute("""
+            SELECT EXTRACT(HOUR FROM timestamp) as hour, COUNT(*) as cnt
+            FROM inventory_history
+            WHERE timestamp::date = CURRENT_DATE
+            AND change_type IN ('Fast Scan', 'Update via Scan')
+            GROUP BY hour
+            ORDER BY hour
+        """)
+        hourly = {int(r['hour']): r['cnt'] for r in cur.fetchall()}
+
+        cur.close()
+        return {
+            'today_total': today_total,
+            'total_computers': total_computers,
+            'broken': broken,
+            'workers': workers,
+            'hourly': hourly
+        }
+    except Exception as e:
+        print(f"Error in api_scan_stats: {e}")
+        return {'error': str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
+
+# ════════════════════════════════════════════════════════════════
+# EXCEL EXPORT
+# ════════════════════════════════════════════════════════════════
+
+@app.route('/export/computers')
+@login_required
+def export_computers():
+    """Export computers to Excel with optional filters"""
+    location_filter = request.args.get('location', '')
+    cage_filter = request.args.get('cage', '')
+    status_filter = request.args.get('status', '')
+
+    conn = get_db_connection()
+    if not conn: return 'DB Error', 500
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        query = "SELECT barcode, cage_number, cage_name, location, status, case_number, exam_appeal, notes, scan_time FROM computers WHERE 1=1"
+        params = []
+        if location_filter:
+            query += " AND location = %s"; params.append(location_filter)
+        if cage_filter:
+            query += " AND (cage_number = %s OR cage_name = %s)"; params.extend([cage_filter, cage_filter])
+        if status_filter:
+            query += " AND status = %s"; params.append(status_filter)
+        query += " ORDER BY cage_number, barcode"
+        cur.execute(query, params)
+        rows = cur.fetchall()
+        cur.close()
+    finally:
+        release_db_connection(conn)
+
+    # Build Excel
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'מחשבים'
+    ws.sheet_view.rightToLeft = True
+
+    headers = ['ברקוד', 'כלוב', 'שם כלוב', 'מיקום', 'סטטוס', 'מספר תיק', 'מבחן/ערעור', 'הערות', 'נסרק לאחרונה']
+    header_fill = PatternFill(start_color='1E3A5F', end_color='1E3A5F', fill_type='solid')
+    header_font = Font(color='FFFFFF', bold=True, size=11)
+
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+
+    status_colors = {'תקול': 'FFCCCC', 'בתיקון': 'FFF3CC', 'פעיל': 'CCFFCC'}
+    for row_num, row in enumerate(rows, 2):
+        values = [
+            row.get('barcode',''), row.get('cage_number',''), row.get('cage_name',''),
+            row.get('location',''), row.get('status',''), row.get('case_number',''),
+            row.get('exam_appeal',''), row.get('notes',''),
+            str(row.get('scan_time',''))[:16] if row.get('scan_time') else ''
+        ]
+        for col_num, val in enumerate(values, 1):
+            cell = ws.cell(row=row_num, column=col_num, value=val)
+            status = row.get('status','')
+            if status in status_colors:
+                cell.fill = PatternFill(start_color=status_colors[status], end_color=status_colors[status], fill_type='solid')
+
+    # Auto column widths
+    for col in ws.columns:
+        max_len = max((len(str(c.value or '')) for c in col), default=10)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    fname = f"computers_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return send_file(buf, as_attachment=True, download_name=fname,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
 
 if __name__ == '__main__':
     print("\n[START] URI SYSTEM IS LIVE! (HTTPS ENABLED FOR MOBILE SCANNER)")

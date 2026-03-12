@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}דשבורד סריקה לייב - URI System{% endblock %}
+{% block content %}
+<style>
+  .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .dash-header h1 { margin: 0; font-size: 1.5rem; }
+  .live-badge { background: rgba(34,197,94,0.15); border: 1px solid #22c55e; color: #4ade80; padding: 4px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:.3;transform:scale(.9)} 50%{opacity:1;transform:scale(1.2)} }
+
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 28px; }
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; text-align: center; }
+  .stat-val { font-size: 2.2rem; font-weight: 900; color: var(--accent); }
+  .stat-label { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+
+  .section-title { font-size: 1rem; font-weight: 800; margin-bottom: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .workers-table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 14px; overflow: hidden; margin-bottom: 30px; }
+  .workers-table th { background: rgba(255,255,255,0.04); padding: 12px 16px; text-align: right; font-size: 0.8rem; color: var(--muted); text-transform: uppercase; font-weight: 700; }
+  .workers-table td { padding: 13px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.9rem; }
+  .workers-table tr:last-child td { border-bottom: none; }
+  .worker-bar-wrap { background: rgba(255,255,255,0.05); border-radius: 20px; height: 8px; min-width: 100px; overflow: hidden; }
+  .worker-bar { height: 100%; border-radius: 20px; background: linear-gradient(90deg, #2563eb, #60a5fa); transition: width 0.6s ease; }
+
+  .timeline-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 28px; }
+  .hourly-bars { display: flex; align-items: flex-end; gap: 6px; height: 100px; }
+  .hour-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .hour-bar { width: 100%; background: rgba(37,99,235,0.25); border-radius: 4px 4px 0 0; transition: height 0.5s ease; min-height: 4px; }
+  .hour-bar.has-data { background: linear-gradient(180deg, #3b82f6, #1d4ed8); }
+  .hour-label { font-size: 0.6rem; color: var(--muted); }
+
+  .refresh-info { text-align: center; font-size: 0.75rem; color: var(--muted); margin-top: 20px; }
+</style>
+
+<div class="dash-header">
+  <h1>📊 דשבורד סריקה</h1>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <span id="date-label" style="font-size:0.85rem;color:var(--muted);"></span>
+    <div class="live-badge"><div class="live-dot"></div> מתרענן אוטומטית</div>
+  </div>
+</div>
+
+<!-- Stats row -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-val" id="stat-today">—</div>
+    <div class="stat-label">נסרקו היום</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-val" id="stat-total" style="color:var(--accent2);">—</div>
+    <div class="stat-label">סה"כ מחשבים</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-val" id="stat-broken" style="color:#f87171;">—</div>
+    <div class="stat-label">תקולים</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-val" id="stat-workers" style="color:#a78bfa;">—</div>
+    <div class="stat-label">עובדים פעילים היום</div>
+  </div>
+</div>
+
+<!-- Hourly chart -->
+<div class="timeline-wrap">
+  <div class="section-title">📈 סריקות לפי שעה היום</div>
+  <div class="hourly-bars" id="hourly-bars"></div>
+</div>
+
+<!-- Workers table -->
+<div class="section-title">👷 ביצועים לפי עובד — היום</div>
+<table class="workers-table">
+  <thead>
+    <tr>
+      <th>עובד</th>
+      <th>סרוקים</th>
+      <th>קצב</th>
+      <th>אחרון</th>
+    </tr>
+  </thead>
+  <tbody id="workers-tbody">
+    <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:30px;">טוען...</td></tr>
+  </tbody>
+</table>
+
+<div class="refresh-info" id="refresh-label">מתרענן בעוד 15 שניות</div>
+
+<script>
+  let countdown = 15;
+  let maxScans = 1;
+
+  function load() {
+    fetch('/api/scan-stats')
+    .then(r => r.json())
+    .then(data => {
+      // Stats
+      document.getElementById('stat-today').textContent = data.today_total || 0;
+      document.getElementById('stat-total').textContent = data.total_computers || 0;
+      document.getElementById('stat-broken').textContent = data.broken || 0;
+      document.getElementById('stat-workers').textContent = (data.workers || []).length;
+
+      // Date
+      document.getElementById('date-label').textContent = new Date().toLocaleDateString('he-IL', { weekday:'long', day:'numeric', month:'long' });
+
+      // Hourly bars
+      const hours = data.hourly || {};
+      const barsEl = document.getElementById('hourly-bars');
+      maxScans = Math.max(1, ...Object.values(hours));
+      let html = '';
+      for (let h = 6; h <= 22; h++) {
+        const count = hours[h] || 0;
+        const pct = Math.round((count / maxScans) * 100);
+        html += `<div class="hour-col">
+          <div class="hour-bar ${count>0?'has-data':''}" style="height:${Math.max(4,pct)}px;" title="${count} סריקות"></div>
+          <span class="hour-label">${h}</span>
+        </div>`;
+      }
+      barsEl.innerHTML = html;
+
+      // Workers
+      const workers = data.workers || [];
+      if (!workers.length) {
+        document.getElementById('workers-tbody').innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:30px;">אין סריקות היום עדיין</td></tr>';
+        return;
+      }
+      const maxW = Math.max(1, ...workers.map(w => w.count));
+      document.getElementById('workers-tbody').innerHTML = workers.map(w => {
+        const pct = Math.round((w.count / maxW) * 100);
+        const last = w.last_scan ? w.last_scan.slice(11,16) : '—';
+        return `<tr>
+          <td style="font-weight:700">${w.technician}</td>
+          <td style="font-size:1.1rem;font-weight:900;color:var(--accent)">${w.count}</td>
+          <td><div class="worker-bar-wrap"><div class="worker-bar" style="width:${pct}%"></div></div></td>
+          <td style="color:var(--muted);font-size:0.82rem">${last}</td>
+        </tr>`;
+      }).join('');
+    })
+    .catch(() => {});
+
+    countdown = 15;
+  }
+
+  load();
+  setInterval(load, 15000);
+  setInterval(() => {
+    countdown--;
+    document.getElementById('refresh-label').textContent = 'מתרענן בעוד ' + countdown + ' שניות';
+    if (countdown <= 0) countdown = 15;
+  }, 1000);
+</script>
+{% endblock %}

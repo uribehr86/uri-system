@@ -47,6 +47,35 @@ def update_schema():
             );
         """)
 
+        print("📦 Creating 'cages' table...")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS cages (
+                id SERIAL PRIMARY KEY,
+                cage_id TEXT UNIQUE NOT NULL,
+                name TEXT,
+                location TEXT,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            );
+        """)
+
+        print("🔄 Adding 'cage_name' + 'location' columns to 'computers' table...")
+        extra_columns = [
+            ("cage_name", "TEXT"),
+            ("location", "TEXT"),
+        ]
+        for col_name, col_type in extra_columns:
+            cur.execute(f"""
+                DO $$ 
+                BEGIN 
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='computers' AND column_name='{col_name}') THEN 
+                        ALTER TABLE computers ADD COLUMN {col_name} {col_type}; 
+                    END IF; 
+                END $$;
+            """)
+
         conn.commit()
         print("✅ Database schema updated successfully!")
         
