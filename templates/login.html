@@ -90,7 +90,9 @@
         .alert-success { background: rgba(35,134,54,.18); border: 1px solid var(--accent); color: #3fb950; }
         .alert-warning { background: rgba(210,153,34,.18); border: 1px solid var(--warning); color: #e3b341; }
         .alert-info    { background: rgba(31,111,235,.18); border: 1px solid var(--accent2); color: #58a6ff; }
-        .hint { text-align: center; margin-top: 16px; font-size: .82rem; color: var(--muted); }
+        .hint { text-align: center; margin-top: 16px; font-size: .9rem; color: var(--muted); }
+        .hint a { color: var(--accent2); text-decoration: none; font-weight: 600; }
+        .hint a:hover { text-decoration: underline; }
         @media (max-width: 480px) {
             .card { padding: 24px 16px; }
             .logo h1 { font-size: 1.6rem; }
@@ -131,6 +133,9 @@
                 </div>
             </div>
             <button type="submit" class="btn-login">🔓 כניסה</button>
+            <div class="hint">
+                עובד חדש? <a href="{{ url_for('register') }}">לחץ כאן להרשמה</a>
+            </div>
         </form>
     </div>
 </div>

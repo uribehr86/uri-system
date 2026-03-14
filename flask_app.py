@@ -230,6 +230,42 @@ def login():
             
     return render_template('login.html')
 
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        
+        if not username or not password:
+            flash("יש להזין שם משתמש וסיסמה", "warning")
+            return redirect(url_for('register'))
+            
+        conn = get_db_connection()
+        if conn:
+            try:
+                cur = conn.cursor(cursor_factory=RealDictCursor)
+                # Check if exists
+                cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+                if cur.fetchone():
+                    flash("שם המשתמש כבר קיים במערכת, בחר שם אחר או התחבר", "warning")
+                else:
+                    cur.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, 'technician')", (username, password))
+                    conn.commit()
+                    flash(f"משתמש {username} נוצר בהצלחה! כעת ניתן להתחבר.", "success")
+                    cur.close()
+                    release_db_connection(conn)
+                    return redirect(url_for('login'))
+                cur.close()
+            except Exception as e:
+                print(f"DB Register Error: {e}")
+                flash("שגיאה ביצירת המשתמש", "danger")
+            finally:
+                release_db_connection(conn)
+        else:
+            flash("שגיאת חיבור למסד הנתונים", "danger")
+            
+    return render_template('register.html')
+
 @app.route('/portal')
 @login_required
 def portal():
@@ -285,22 +321,22 @@ def computers():
         # Free search across multiple fields
         if search:
             base_where += """ AND (
-                barcode ILIKE %s OR 
-                case_number ILIKE %s OR 
-                cage_number ILIKE %s OR 
+                barcode = %s OR 
+                case_number = %s OR 
+                cage_number = %s OR 
                 cage_name ILIKE %s OR
                 location ILIKE %s OR 
                 notes ILIKE %s OR 
                 exam_appeal ILIKE %s
             )"""
             s = f"%{search}%"
-            params.extend([s, s, s, s, s, s, s])
+            params.extend([search, search, search, s, s, s, s])
             
         # Dedicated cage search
         if cage_search:
-            base_where += " AND (cage_number ILIKE %s OR cage_name ILIKE %s)"
+            base_where += " AND (cage_number = %s OR cage_name ILIKE %s)"
             cs = f"%{cage_search}%"
-            params.extend([cs, cs])
+            params.extend([cage_search, cs])
             
         if status_filter:
             base_where += " AND status = %s"

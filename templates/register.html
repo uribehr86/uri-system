@@ -1,31 +1,167 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <title>הרשמה - URI SYSTEM</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>הרשמה – URI System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;700;800&display=swap" rel="stylesheet"/>
     <style>
-        body { background-color: #0f172a; color: #f8fafc; font-family: sans-serif; }
-        .card { background-color: #1e293b; color: #f8fafc; border: none; }
-        .form-control { background-color: #334155; color: #f8fafc; border: 1px solid #475569; }
-        .form-control:focus { background-color: #334155; color: #f8fafc; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #0d1117; --surface: #161b22; --border: #30363d;
+            --accent: #238636; --accent2: #1f6feb;
+            --danger: #da3633; --warning: #d29922;
+            --text: #e6edf3; --muted: #8b949e;
+        }
+        body {
+            font-family: 'Heebo', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        body::before {
+            content: '';
+            position: fixed; inset: 0;
+            background: radial-gradient(ellipse at 70% 30%, rgba(31,111,235,.15) 0%, transparent 60%),
+                        radial-gradient(ellipse at 20% 80%, rgba(35,134,54,.12) 0%, transparent 55%);
+            pointer-events: none;
+        }
+        .login-wrap {
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .logo .icon { font-size: 3.5rem; display: block; margin-bottom: 10px; }
+        .logo h1 { font-size: 2rem; font-weight: 800; }
+        .logo p  { color: var(--muted); font-size: .9rem; margin-top: 4px; }
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 32px;
+        }
+        .card h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 24px; text-align: center; }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; font-size: .88rem; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+        .form-control {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: .95rem;
+            padding: 11px 14px;
+            outline: none;
+            transition: border-color .2s;
+        }
+        .form-control:focus { border-color: var(--accent2); }
+        .btn-login {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            background: var(--accent);
+            color: #fff;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity .15s, transform .12s;
+            margin-top: 8px;
+        }
+        .btn-login:hover { opacity: .88; transform: translateY(-1px); }
+        .alert {
+            padding: 11px 14px;
+            border-radius: 8px;
+            font-size: .88rem;
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+        .alert-danger  { background: rgba(218,54,51,.18); border: 1px solid var(--danger); color: #f85149; }
+        .alert-success { background: rgba(35,134,54,.18); border: 1px solid var(--accent); color: #3fb950; }
+        .alert-warning { background: rgba(210,153,34,.18); border: 1px solid var(--warning); color: #e3b341; }
+        .alert-info    { background: rgba(31,111,235,.18); border: 1px solid var(--accent2); color: #58a6ff; }
+        .hint { text-align: center; margin-top: 16px; font-size: .9rem; color: var(--muted); }
+        .hint a { color: var(--accent2); text-decoration: none; font-weight: 600; }
+        .hint a:hover { text-decoration: underline; }
+        @media (max-width: 480px) {
+            .card { padding: 24px 16px; }
+            .logo h1 { font-size: 1.6rem; }
+            .logo .icon { font-size: 2.8rem; }
+        }
     </style>
 </head>
-<body class="d-flex align-items-center justify-content-center" style="height: 100vh;">
-    <div class="card shadow p-4" style="width: 350px;">
-        <h3 class="text-center mb-4 text-success">הרשמה למערכת</h3>
+<body>
+<div class="login-wrap">
+    <div class="logo">
+        <span class="icon">📝</span>
+        <h1>URI System</h1>
+        <p>יצירת משתמש חדש</p>
+    </div>
+    <div class="card">
+        <h2>הרשמה למערכת</h2>
+        {% for cat, msg in get_flashed_messages(with_categories=true) %}
+        <div class="alert alert-{{ cat }}">{{ msg }}</div>
+        {% endfor %}
         <form method="POST">
-            <div class="mb-3">
-                <label>שם משתמש</label>
-                <input type="text" name="username" class="form-control" required>
+            <div class="form-group">
+                <label for="username">בחר שם משתמש</label>
+                <input type="text" id="username" name="username" class="form-control"
+                       placeholder="לדוגמה: yaronv" autocomplete="username" required/>
             </div>
-            <div class="mb-3">
-                <label>סיסמה</label>
-                <input type="password" name="password" class="form-control" required>
+            <div class="form-group">
+                <label for="password">בחר סיסמה</label>
+                <div class="password-wrapper" style="position: relative;">
+                    <input type="password" id="password" name="password" class="form-control"
+                           placeholder="השם שלך*" autocomplete="new-password" required
+                           oninput="checkPasswordHint(this)"/>
+                    <button type="button" id="togglePassword" 
+                            style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); 
+                                   background: none; border: none; cursor: pointer; color: var(--muted); font-size: 1.1rem; 
+                                   display: flex; align-items: center; justify-content: center; padding: 5px;">
+                        👁️
+                    </button>
+                </div>
             </div>
-            <button type="submit" class="btn btn-success w-100 mb-2">הרשם למערכת</button>
-            <a href="/login" class="btn btn-outline-info w-100">חזרה להתחברות</a>
+            <button type="submit" class="btn-login">✅ הרשמה</button>
+            <div class="hint">
+                כבר יש לך משתמש? <a href="{{ url_for('login') }}">התחבר כאן</a>
+            </div>
         </form>
     </div>
+</div>
+
+<script>
+    const passwordInput = document.getElementById('password');
+    const toggleBtn = document.getElementById('togglePassword');
+
+    function checkPasswordHint(input) {
+        if (input.value.endsWith('*')) {
+            input.type = 'text';
+            toggleBtn.innerText = '👓';
+        } else {
+            if (input.type === 'text' && !toggleBtn.dataset.manual) {
+                input.type = 'password';
+                toggleBtn.innerText = '👁️';
+            }
+        }
+    }
+
+    toggleBtn.addEventListener('click', () => {
+        const isPassword = passwordInput.type === 'password';
+        passwordInput.type = isPassword ? 'text' : 'password';
+        toggleBtn.innerText = isPassword ? '👓' : '👁️';
+        toggleBtn.dataset.manual = isPassword ? 'true' : '';
+    });
+</script>
 </body>
 </html>
