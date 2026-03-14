@@ -827,6 +827,22 @@ def admin_approve_delete():
     finally:
         release_db_connection(conn)
 
+@app.route('/fix-db')
+def fix_db():
+    conn = get_db_connection()
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            conn.commit()
+            cur.close()
+            return "DB fixed successfully! You can now visit /manage-users"
+        except Exception as e:
+            return f"Error: {e}"
+        finally:
+            release_db_connection(conn)
+    return "Failed to connect"
+
 @app.route('/manage-users')
 @login_required
 def manage_users():
