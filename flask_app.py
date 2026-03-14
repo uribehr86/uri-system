@@ -67,7 +67,7 @@ def format_history_filter(val_str):
         val = json.loads(val_str)
     except:
         try:
-            val = ast.literal_eval(val_str)
+            val = ast.literal_eval(str(val_str))
         except:
             return val_str
             
@@ -716,7 +716,7 @@ def api_get_cage(cage_id):
         for c in computers_in_cage:
             s_val = c.get('status')
             s = s_val if s_val is not None else 'לא ידוע'
-            status_counts[s] = status_counts.get(s, 0) + 1
+            status_counts[s] = status_counts.get(s, 0) + 1  # type: ignore
 
         cur.close()
         return {
@@ -1086,13 +1086,13 @@ def export_computers():
             row.get('barcode',''), row.get('cage_number',''), row.get('cage_name',''),
             row.get('location',''), row.get('status',''), row.get('case_number',''),
             row.get('exam_appeal',''), row.get('notes',''),
-            str(row.get('scan_time',''))[:16] if row.get('scan_time') else ''
+            str(row.get('scan_time',''))[0:16] if row.get('scan_time') else ''  # type: ignore
         ]
         for col_num, val in enumerate(values, 1):
             cell = ws.cell(row=row_num, column=col_num, value=val)
             status = row.get('status','')
             if status in status_colors:
-                cell.fill = PatternFill(start_color=status_colors[status], end_color=status_colors[status], fill_type='solid')
+                cell.fill = PatternFill(start_color=status_colors[status], end_color=status_colors[status], fill_type='solid')  # type: ignore
 
     # Auto column widths
     for col in ws.columns:
