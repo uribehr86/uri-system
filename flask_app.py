@@ -203,7 +203,6 @@ def login():
                 cur = conn.cursor(cursor_factory=RealDictCursor)
                 cur.execute("SELECT * FROM users WHERE username = %s AND password = %s", (username, password))
                 user = cur.fetchone()
-                cur.close()
                 
                 if user:
                     # Update last active time
