@@ -67,8 +67,9 @@
                     <th>טכנאי</th>
                     <th>ברקוד מחשב</th>
                     <th>סוג שינוי</th>
-                    <th>ערך קודם</th>
-                    <th>ערך חדש</th>
+                    <th>תיאור פעולה</th>
+                    <th>לפני</th>
+                    <th>אחרי</th>
                 </tr>
             </thead>
             <tbody>
@@ -82,7 +83,10 @@
                             {{ entry.change_type }}
                         </span>
                     </td>
-                    <td style="font-size: 0.75rem; color: var(--muted); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ entry.old_value | format_history }}">
+                    <td style="font-weight: 600; color: var(--text);">
+                        {{ entry | summarize_history }}
+                    </td>
+                    <td style="font-size: 0.75rem; color: var(--muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ entry.old_value | format_history }}">
                         {{ (entry.old_value | format_history) or '—' }}
                     </td>
                     <td style="font-size: 0.75rem; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ entry.new_value | format_history }}">

@@ -91,7 +91,80 @@ def format_history_filter(val_str):
             continue
         parts.append(f"{tmap.get(k, k)}: {v}")
         
-    return " | ".join(parts) if parts else "פעולת מערכת"
+    return " | ".join(str(p) for p in parts) if parts else "פעולת מערכת"
+
+@app.template_filter('summarize_history')
+def summarize_history_filter(entry):
+    if not entry:
+        return ""
+    
+    def parse_val(v_str) -> dict:
+        if not v_str: return {}
+        if isinstance(v_str, dict): return v_str
+        try:
+            res = json.loads(v_str)
+            if isinstance(res, dict):
+                return res
+        except:
+            pass
+        try:
+            res = ast.literal_eval(v_str) if v_str else {}
+            if isinstance(res, dict):
+                return res
+        except:
+            pass
+        return {}
+
+    old = parse_val(entry.get('old_value'))
+    new = parse_val(entry.get('new_value'))
+    
+    if not isinstance(old, dict):
+        old = {}
+    if not isinstance(new, dict):
+        new = {}
+    
+    # Check for cage movements
+    old_cage = old.get('cage_number') or old.get('cage_name')
+    new_cage = new.get('cage_number') or new.get('cage_name')
+    
+    if old_cage and new_cage and str(old_cage).strip() != str(new_cage).strip():
+        return f"העביר מכלוב {old_cage} לכלוב {new_cage}"
+    
+    if old_cage and not new_cage:
+        # Check if it was moved to home or test
+        loc = new.get('location', '')
+        if 'בית' in str(loc) or 'בדיקה' in str(loc):
+            return f"לקח מכלוב {old_cage} (עבודה מהבית/בדיקה)"
+        return f"לקח מכלוב {old_cage}"
+        
+    # Default behavior: list what changed if not a simple cage move
+    tmap = {
+        'status': 'סטטוס',
+        'location': 'מיקום',
+        'cage_number': 'כלוב',
+        'case_number': 'תיק',
+        'notes': 'הערות',
+        'exam_appeal': 'מבחן/ערעור'
+    }
+    
+    changes = []
+    # If it's a "Fast Scan" or "Update", we can see what's in 'new' that's different from 'old'
+    for k, v in new.items():
+        if k in ['id', 'computer_id', 'scan_time', 'barcode'] or v is None:
+            continue
+        old_v = old.get(k)
+        if str(old_v) != str(v):
+            changes.append(f"{tmap.get(k, k)}: {v}")
+            
+    if changes:
+        return "שינוי: " + " | ".join(str(c) for c in changes)
+    
+    # If no changes detected in common fields, describe by change type
+    ctype = entry.get('change_type', 'פעולה')
+    if ctype == 'Fast Scan' and not old:
+        return f"נוסף מחשב חדש"
+        
+    return ctype
 
 def login_required(f):
     @wraps(f)
@@ -297,6 +370,7 @@ def add_computer():
     return render_template('computer_form.html', action='add', computer=None)
 
 @app.route('/edit-computer/<int:cid>', methods=['GET', 'POST'])
+@app.route('/edit-computer/<int:cid>', methods=['GET', 'POST'])
 @login_required
 def edit_computer(cid):
     conn = get_db_connection()
@@ -410,22 +484,39 @@ def process_scan():
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         # Check if computer exists
-        cur.execute("SELECT * FROM computers WHERE barcode = %s", (barcode,))
+        cur.execute("SELECT * FROM computers WHERE barcode = %s ORDER BY id DESC LIMIT 1", (barcode,))
         computer = cur.fetchone()
         
+        # תמיד ליצור שורה חדשה (חוק שלישי)
+        now_str = datetime.now().strftime('%d/%m/%Y %H:%M')
+        
         if computer:
-            # Update scan_time (last seen)
-            cur.execute("UPDATE computers SET scan_time = NOW() WHERE id = %s", (computer['id'],))
+            cur.execute("""
+                INSERT INTO computers (barcode, case_number, cage_number, cage_name, status, location, scan_time, notes, exam_appeal) 
+                VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s, %s) 
+                RETURNING *
+            """, (
+                barcode, 
+                computer.get('case_number'), 
+                computer.get('cage_number'), 
+                computer.get('cage_name'), 
+                computer.get('status', 'תקין'), 
+                computer.get('location'), 
+                computer.get('notes'),
+                computer.get('exam_appeal')
+            ))
+            new_computer = cur.fetchone()
             conn.commit()
             cur.close()
-            return {"exists": True, "computer": computer}
+            # מחזירים כאילו זה קיים כדי שהטופס יתמלא במידע הקודם, אבל עם ה-ID של השורה החדשה!
+            return {"exists": True, "computer": new_computer}
         else:
-            # Create new record
+            # Create completely new record
             cur.execute("""
-                INSERT INTO computers (barcode, status, scan_time) 
-                VALUES (%s, 'פעיל', NOW()) 
+                INSERT INTO computers (barcode, status, scan_time, notes) 
+                VALUES (%s, 'תקין', NOW(), %s) 
                 RETURNING *
-            """, (barcode,))
+            """, (barcode, None))
             new_computer = cur.fetchone()
             conn.commit()
             cur.close()
@@ -621,7 +712,7 @@ def api_fast_scan():
     location   = data.get('location', '')
     cage_number = data.get('cage_number', '')
     cage_name  = data.get('cage_name', cage_number)
-    status     = data.get('status', 'פעיל')
+    status     = data.get('status', 'תקין')
     technician = session.get('username', 'לא ידוע')
 
     conn = get_db_connection()
@@ -630,40 +721,28 @@ def api_fast_scan():
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
         # בדיקה אם מחשב קיים
-        cur.execute("SELECT * FROM computers WHERE barcode = %s", (barcode,))
+        cur.execute("SELECT * FROM computers WHERE barcode = %s ORDER BY id DESC LIMIT 1", (barcode,))
         computer = cur.fetchone()
 
-        if computer:
-            old_val = dict(computer)
-            # Build a scan-log line to APPEND to notes (not overwrite)
-            now_str = datetime.now().strftime('%d/%m/%Y %H:%M')
-            log_line = f"[{now_str}] {technician} → {location}, כלוב {cage_number}, {status}"
-            existing_notes = computer.get('notes') or ''
-            new_notes = (existing_notes + '\n' + log_line).strip()
-            cur.execute("""
-                UPDATE computers
-                SET location=%s, cage_number=%s, cage_name=%s, status=%s,
-                    scan_time=NOW(), notes=%s
-                WHERE barcode=%s
-            """, (location, cage_number, cage_name, status, new_notes, barcode))
-        else:
-            # New computer — create with initial log in notes
-            now_str = datetime.now().strftime('%d/%m/%Y %H:%M')
-            init_notes = f"[{now_str}] {technician} → נוסף, {location}, כלוב {cage_number}, {status}"
-            cur.execute("""
-                INSERT INTO computers (barcode, location, cage_number, cage_name, status, scan_time, notes)
-                VALUES (%s, %s, %s, %s, %s, NOW(), %s)
-                RETURNING *
-            """, (barcode, location, cage_number, cage_name, status, init_notes))
-            computer = cur.fetchone()
-            old_val = None
+        old_val = dict(computer) if computer else None
+        
+        # תמיד פותח שורה חדשה לפי בקשת המשתמש (חוק שלישי)
+        notes_val = old_val.get('notes') if old_val else None
+        
+        cur.execute("""
+            INSERT INTO computers (barcode, location, cage_number, cage_name, status, scan_time, notes)
+            VALUES (%s, %s, %s, %s, %s, NOW(), %s)
+            RETURNING *
+        """, (barcode, location, cage_number, cage_name, status, notes_val))
+        
+        new_computer = cur.fetchone()
 
         # תיעוד היסטוריה
         cur.execute("""
             INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
             VALUES (%s, %s, 'Fast Scan', %s, %s)
         """, (
-            computer['id'],
+            new_computer['id'],
             technician,
             json.dumps(old_val, default=str) if old_val else None,
             json.dumps(data, default=str)
@@ -701,7 +780,7 @@ def admin_approve_delete():
         if action == 'hard_delete':
             cur.execute("DELETE FROM computers WHERE barcode = %s", (barcode,))
         elif action == 'restore':
-            cur.execute("UPDATE computers SET status = 'פעיל' WHERE barcode = %s", (barcode,))
+            cur.execute("UPDATE computers SET status = 'תקין' WHERE barcode = %s", (barcode,))
             
         conn.commit()
         cur.close()
@@ -762,9 +841,9 @@ def cages_page():
             SELECT
                 c.cage_id, c.name, c.location, c.notes,
                 COUNT(comp.id) AS computer_count,
-                SUM(CASE WHEN comp.status = 'פעיל' THEN 1 ELSE 0 END) AS ok_count,
+                SUM(CASE WHEN comp.status = 'תקין' THEN 1 ELSE 0 END) AS ok_count,
                 SUM(CASE WHEN comp.status = 'תקול' THEN 1 ELSE 0 END) AS broken_count,
-                SUM(CASE WHEN comp.status NOT IN ('פעיל','תקול') AND comp.status IS NOT NULL THEN 1 ELSE 0 END) AS other_count
+                SUM(CASE WHEN comp.status NOT IN ('תקין','תקול') AND comp.status IS NOT NULL THEN 1 ELSE 0 END) AS other_count
             FROM cages c
             LEFT JOIN computers comp ON comp.cage_number = c.cage_id OR comp.cage_name = c.cage_id
             GROUP BY c.id, c.cage_id, c.name, c.location, c.notes
@@ -950,7 +1029,7 @@ def export_computers():
         cell.font = header_font
         cell.alignment = Alignment(horizontal='center')
 
-    status_colors = {'תקול': 'FFCCCC', 'בתיקון': 'FFF3CC', 'פעיל': 'CCFFCC'}
+    status_colors = {'תקול': 'FFCCCC', 'בתיקון': 'FFF3CC', 'תקין': 'CCFFCC'}
     for row_num, row in enumerate(rows, 2):
         values = [
             row.get('barcode',''), row.get('cage_number',''), row.get('cage_name',''),
@@ -989,4 +1068,4 @@ if __name__ == '__main__':
     print("URL Link: https://127.0.0.1:5000")
     print("Mobile Link: https://10.0.0.31:5000\n")
     print("[WARNING] When opening on iPhone, you will see a 'Not Private' warning. Click 'Show Details' -> 'Visit this website' to bypass and test the scanner.")
-    app.run(host='0.0.0.0', debug=True, port=5000, ssl_context='adhoc')
+    app.run(host='0.0.0.0', debug=True, port=5000, ssl_context='adhoc')

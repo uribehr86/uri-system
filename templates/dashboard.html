@@ -43,8 +43,8 @@
                 <td>{{ c.cage_number or '—' }}</td>
                 <td>{{ c.location or '—' }}</td>
                 <td>
-                    {% if c.status == 'פעיל' %}
-                        <span class="badge badge-green">✓ פעיל</span>
+                    {% if c.status == 'תקין' %}
+                        <span class="badge badge-green">✓ תקין</span>
                     {% elif c.status == 'תקול' %}
                         <span class="badge badge-red">✗ תקול</span>
                     {% else %}

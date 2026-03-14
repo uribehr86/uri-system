@@ -22,7 +22,7 @@ def init_db():
                 case_number TEXT,
                 cage_name TEXT,
                 cage_number TEXT,
-                status TEXT DEFAULT 'פעיל',
+                status TEXT DEFAULT 'תקין',
                 location TEXT DEFAULT 'מחסן',
                 exam_appeal TEXT,
                 notes TEXT,

@@ -558,6 +558,141 @@
                 max-width: none !important;
             }
         }
+        /* ── AI Chat Bubble ── */
+        .ai-chat-bubble {
+            position: fixed;
+            bottom: 30px;
+            left: 30px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #1f6feb, #238636);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            z-index: 2000;
+            transition: transform 0.3s;
+        }
+
+        .ai-chat-bubble:hover {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        .ai-window {
+            position: fixed;
+            bottom: 100px;
+            left: 30px;
+            width: 350px;
+            height: 500px;
+            background: var(--surface);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            display: none;
+            flex-direction: column;
+            z-index: 2001;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            animation: fadeIn 0.3s;
+        }
+
+        .ai-window.show {
+            display: flex;
+        }
+
+        .ai-header {
+            padding: 16px;
+            background: rgba(31, 111, 235, 0.2);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .ai-header h3 {
+            margin: 0;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ai-close {
+            cursor: pointer;
+            font-size: 20px;
+            color: var(--muted);
+        }
+
+        .ai-messages {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .ai-msg {
+            padding: 10px 14px;
+            border-radius: 12px;
+            max-width: 85%;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .ai-msg.user {
+            align-self: flex-start;
+            background: rgba(31, 111, 235, 0.2);
+            color: white;
+            border-top-left-radius: 4px;
+        }
+
+        .ai-msg.bot {
+            align-self: flex-end;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text);
+            border-top-right-radius: 4px;
+        }
+
+        .ai-input-area {
+            padding: 16px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 8px;
+        }
+
+        .ai-input-area input {
+            flex: 1;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            outline: none;
+        }
+
+        .ai-send {
+            background: var(--accent2);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        @media (max-width: 600px) {
+            .ai-window {
+                width: calc(100vw - 40px);
+                left: 20px;
+                right: 20px;
+                bottom: 80px;
+            }
+        }
     </style>
 </head>
 
@@ -600,7 +735,74 @@
         {% block content %}{% endblock %}
     </main>
 
+    <div class="ai-chat-bubble" onclick="toggleAI()">✨</div>
+    <div class="ai-window" id="aiWindow">
+        <div class="ai-header">
+            <h3><span>🤖</span> עוזר AI - URI System</h3>
+            <span class="ai-close" onclick="toggleAI()">✕</span>
+        </div>
+        <div class="ai-messages" id="aiMessages">
+            <div class="ai-msg bot">שלום! אני עוזר ה-AI שלך. שאל אותי כל דבר על המלאי, הכלובים או הסטטיסטיקות במערכת.</div>
+        </div>
+        <div class="ai-input-area">
+            <input type="text" id="aiInput" placeholder="שאל אותי משהו..." onkeypress="handleAIKey(event)">
+            <button class="ai-send" onclick="sendAIMessage()">שלח</button>
+        </div>
+    </div>
+
     <script>
+        function toggleAI() {
+            const win = document.getElementById('aiWindow');
+            win.classList.toggle('show');
+            if(win.classList.contains('show')) {
+                document.getElementById('aiInput').focus();
+            }
+        }
+
+        function handleAIKey(e) {
+            if (e.key === 'Enter') sendAIMessage();
+        }
+
+        async function sendAIMessage() {
+            const input = document.getElementById('aiInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            const container = document.getElementById('aiMessages');
+            
+            // User bubble
+            const userDiv = document.createElement('div');
+            userDiv.className = 'ai-msg user';
+            userDiv.textContent = msg;
+            container.appendChild(userDiv);
+            input.value = '';
+            container.scrollTop = container.scrollHeight;
+
+            // Loading state
+            const botDiv = document.createElement('div');
+            botDiv.className = 'ai-msg bot';
+            botDiv.textContent = '...חושב';
+            container.appendChild(botDiv);
+            container.scrollTop = container.scrollHeight;
+
+            try {
+                const resp = await fetch('/api/ai-chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message: msg})
+                });
+                const data = await resp.json();
+                if (data.response) {
+                    botDiv.textContent = data.response;
+                } else {
+                    botDiv.textContent = "שגיאה: " + (data.error || "משהו השתבש");
+                }
+            } catch (err) {
+                botDiv.textContent = "שגיאה בחיבור לשרת.";
+            }
+            container.scrollTop = container.scrollHeight;
+        }
+
         // Smooth scrolling for horizontal nav if needed via mouse wheel
         const navLinks = document.querySelector('.nav-links');
         if (navLinks) {

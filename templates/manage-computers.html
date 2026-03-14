@@ -35,8 +35,8 @@
                         <td>{{ computer.name or '—' }}</td>
                         <td>{{ computer.location or '—' }}</td>
                         <td>
-                            {% if computer.status == 'פעיל' %}
-                                <span class="badge badge-green">✓ פעיל</span>
+                            {% if computer.status == 'תקין' %}
+                                <span class="badge badge-green">✓ תקין</span>
                             {% elif computer.status == 'תקול' %}
                                 <span class="badge badge-red">✗ תקול</span>
                             {% elif computer.status == 'מחסן' %}

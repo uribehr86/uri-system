@@ -171,7 +171,7 @@
 
         <select name="status" class="form-control" style="padding: 6px 10px; max-width:140px;">
             <option value="">כל הסטטוסים</option>
-            <option value="פעיל" {% if status_filter=='פעיל' %}selected{% endif %}>פעיל</option>
+            <option value="תקין" {% if status_filter=='תקין' %}selected{% endif %}>תקין</option>
             <option value="תקול" {% if status_filter=='תקול' %}selected{% endif %}>תקול</option>
             <option value="בתיקון" {% if status_filter=='בתיקון' %}selected{% endif %}>בתיקון</option>
             <option value="מאוחסן" {% if status_filter=='מאוחסן' %}selected{% endif %}>מאוחסן</option>
@@ -203,7 +203,7 @@
 
         <select id="batchStatus">
             <option value="">-- עדכן סטטוס --</option>
-            <option value="פעיל">פעיל</option>
+            <option value="תקין">תקין</option>
             <option value="תקול">תקול</option>
             <option value="בתיקון">בתיקון</option>
         </select>
@@ -274,8 +274,8 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if c.status == 'פעיל' %}
-                        <span style="color:#4ade80; font-weight:700;">✓ פעיל</span>
+                        {% if c.status == 'תקין' %}
+                        <span style="color:#4ade80; font-weight:700;">✓ תקין</span>
                         {% elif c.status == 'תקול' %}
                         <span style="color:#f87171; font-weight:700;">✗ תקול</span>
                         {% elif c.status == 'בתיקון' %}

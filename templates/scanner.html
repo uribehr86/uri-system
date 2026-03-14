@@ -45,11 +45,21 @@
   .bottom-panel { background: #0f172a; border-top: 1px solid rgba(255,255,255,0.07); padding: 10px 14px 14px; flex-shrink: 0; }
 
   /* Fast mode controls */
-  .fast-controls { display: flex; gap: 8px; align-items: center; }
-  .fast-controls select, .fast-controls input { flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #fff; padding: 10px; border-radius: 10px; font-size: 0.9rem; outline: none; }
-  .fast-controls select option { background: #1e293b; }
-  .scan-counter { text-align: center; margin-top: 8px; font-size: 0.78rem; color: #475569; }
-  .scan-counter span { color: #60a5fa; font-weight: 800; font-size: 1rem; }
+  .fast-controls { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+  .locked-label { font-size: 0.85rem; color: #4ade80; text-align: center; font-weight: 700; background: rgba(74, 222, 128, 0.1); padding: 8px; border-radius: 8px; border: 1px solid rgba(74, 222, 128, 0.3); display: none; }
+  .unlocked-hint { font-size: 0.85rem; color: #94a3b8; text-align: center; font-weight: 500; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 8px; }
+
+  .cage-packing-panel { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); }
+  .scan-counter { font-size: 0.85rem; color: #94a3b8; }
+  .scan-counter span { color: #60a5fa; font-weight: 900; font-size: 1.4rem; margin-inline: 4px; }
+  .scan-counter .limit { font-size: 0.9rem; color: #475569; }
+  
+  .pack-btns { display: flex; gap: 8px; }
+  .btn-pack { border: none; padding: 8px 12px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.8rem; filter: brightness(0.9); transition: all 0.2s; }
+  .btn-pack:hover { filter: brightness(1.1); transform: scale(1.05); }
+  .btn-pause { background: #facc15; color: #000; }
+  .btn-resume { background: #22c55e; color: #000; display: none; }
+  .btn-stop { background: #ef4444; color: #fff; }
 
   /* Waiting hint */
   .waiting-hint { text-align: center; padding: 10px 0 4px; font-size: 0.8rem; color: #475569; display: flex; align-items: center; justify-content: center; gap: 6px; }
@@ -124,29 +134,23 @@
     <!-- FAST MODE -->
     <div id="panel-fast">
       <div class="fast-controls">
-        <select id="fast-location">
-          <option value="">📍 בחר מיקום</option>
-          <option value="מחסן">📦 מחסן</option>
-          <option value="אפעל 6">🏢 אפעל 6</option>
-          <option value="אקספו">🏛️ אקספו</option>
-          <option value="בנייני האומה">🏟️ בנייני האומה</option>
-          <option value="שיבא">🏥 שיבא</option>
-          <option value="בית">🏠 בית</option>
-          <option value="חוץ">🌍 חוץ</option>
-        </select>
-        <input type="text" id="fast-cage" placeholder="כלוב #" style="max-width:90px;text-align:center;font-size:1.1rem;font-weight:800;" />
-        <select id="fast-status">
-          <option value="פעיל">✅ תקין</option>
-          <option value="תקול">❌ תקול</option>
-          <option value="בתיקון">🔧 בתיקון</option>
-        </select>
+         <div id="fast-unlocked-hint" class="unlocked-hint">סרוק מחשב ראשון כדי להגדיר כלוב ומיקום לשאר הסריקות</div>
+         <div id="fast-locked-label" class="locked-label">🔒 הגדרות נעולות: כלוב <span id="lbl-cage"></span> | <span id="lbl-loc"></span></div>
       </div>
       <div class="waiting-hint"><div class="pulse-dot"></div> ממתין לסריקה...</div>
       <div id="manual-wrap" class="manual-input-wrap" style="display:none;">
         <input type="text" id="manual-barcode" placeholder="הקלד ברקוד ידנית..." />
         <button onclick="submitManual()">אישור</button>
       </div>
-      <div class="scan-counter">סרוקים בסשן: <span id="session-count">0</span></div>
+
+      <div class="cage-packing-panel">
+        <div class="scan-counter">נסרקו לכלוב:<br><span id="cage-count">0</span><span class="limit">/ 50</span></div>
+        <div class="pack-btns">
+            <button class="btn-pack btn-pause" id="btn-pause" onclick="togglePause()">⏸️ השהה</button>
+            <button class="btn-pack btn-resume" id="btn-resume" onclick="togglePause()">▶️ המשך</button>
+            <button class="btn-pack btn-stop" onclick="finishCage()">⏹️ סיום כלוב</button>
+        </div>
+      </div>
     </div>
 
     <!-- FULL MODE -->
@@ -199,7 +203,7 @@
       <div class="form-field-scan">
         <label>סטטוס</label>
         <select id="sh-status">
-          <option value="פעיל">✅ תקין</option>
+          <option value="תקין">✅ תקין</option>
           <option value="תקול">❌ תקול</option>
           <option value="בתיקון">🔧 בתיקון</option>
           <option value="אחר">אחר</option>
@@ -230,11 +234,17 @@
 </div>
 
 <script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 <script>
   let scanner = null;
   let currentMode = 'fast';
   let isTorchOn = false;
-  let sessionCount = 0;
+  let isPaused = false;
+  let cageCount = 0;
+  let fastSettingsLocked = false;
+  let lockedLocation = '';
+  let lockedCage = '';
+  let lockedStatus = '';
   let isSheetOpen = false;
   let lastCageScan = '';
 
@@ -341,6 +351,10 @@
 
   // ── Scan dispatcher ───────────────────────────────────────────────────
   function onScan(code) {
+    if (isPaused) {
+        showToast('⚠️ הסורק מושהה. לחץ על המשך כדי לסרוק.', true);
+        return;
+    }
     const clean = code.trim();
     if (currentMode === 'cage') onCageScan(clean);
     else if (currentMode === 'fast') onFastScan(clean);
@@ -354,27 +368,43 @@
     fastCooldown = true;
     setTimeout(() => fastCooldown = false, 1500);
 
-    const location = document.getElementById('fast-location').value;
-    const cage = document.getElementById('fast-cage').value.trim();
-    const status = document.getElementById('fast-status').value;
-
-    if (!location) {
-      showToast('⚠️ בחר מיקום תחילה!', true);
-      return;
+    // If settings are NOT locked yet, handle it like a FULL scan to prompt for cage/location.
+    if (!fastSettingsLocked) {
+        onFullScan(barcode);
+        return;
     }
 
+    // Otherwise, fast scan using locked settings
     fetch('/api/fast-scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ barcode, location, cage_number: cage, cage_name: cage, status })
+      body: JSON.stringify({ barcode, location: lockedLocation, cage_number: lockedCage, cage_name: lockedCage, status: lockedStatus })
     })
     .then(r => r.json())
     .then(data => {
       if (data.success) {
         onScanSuccess_visual();
-        sessionCount++;
-        document.getElementById('session-count').textContent = sessionCount;
-        showToast(`${data.is_new ? '🆕' : '✓'} ${barcode}  |  כלוב ${cage || '—'}`);
+        
+        // Counter logic
+        cageCount++;
+        document.getElementById('cage-count').textContent = cageCount;
+        
+        // Check for 50 limit confetti
+        if (cageCount === 50) {
+            confetti({
+              particleCount: 150,
+              spread: 70,
+              origin: { y: 0.6 },
+              colors: ['#2563eb', '#22c55e', '#facc15']
+            });
+            showToast(`🎉 כלוב מלא! (50 מחשבים)`);
+            document.getElementById('cage-count').style.color = '#22c55e';
+            // Auto pause
+            if (!isPaused) togglePause();
+        } else {
+            showToast(`${data.is_new ? '🆕' : '✓'} ${barcode}  |  ${cageCount}/50`);
+        }
+        
         resetFailTimer();
       } else {
         setScanBoxState('fail');
@@ -382,6 +412,38 @@
       }
     })
     .catch(() => { setScanBoxState('fail'); showToast('שגיאת חיבור', true); });
+  }
+
+  function togglePause() {
+      isPaused = !isPaused;
+      document.getElementById('btn-pause').style.display = isPaused ? 'none' : 'block';
+      document.getElementById('btn-resume').style.display = isPaused ? 'block' : 'none';
+      if (isPaused) {
+          scanner.pause();
+          showToast('⏸️ סריקה הושהתה');
+      } else {
+          scanner.resume();
+          showToast('▶️ סריקה ממשיכה');
+          resetFailTimer();
+      }
+  }
+
+  function finishCage() {
+      if (confirm('לסיים סריקת כלוב זה ולפתוח כלוב חדש?')) {
+          cageCount = 0;
+          fastSettingsLocked = false;
+          lockedLocation = '';
+          lockedCage = '';
+          lockedStatus = '';
+          
+          document.getElementById('cage-count').textContent = cageCount;
+          document.getElementById('cage-count').style.color = '#60a5fa';
+          document.getElementById('fast-unlocked-hint').style.display = 'block';
+          document.getElementById('fast-locked-label').style.display = 'none';
+          
+          showToast('המונה אופס. סרוק מחשב ראשון להגדרת כלוב חדש.');
+          if (isPaused) togglePause();
+      }
   }
 
   function submitManual() {
@@ -426,7 +488,7 @@
     document.getElementById('sheet-id').value = computer.id;
     document.getElementById('sh-location').value = computer.location || '';
     document.getElementById('sh-cage').value = computer.cage_number || '';
-    document.getElementById('sh-status').value = computer.status || 'פעיל';
+    document.getElementById('sh-status').value = computer.status || 'תקין';
     document.getElementById('sh-case').value = computer.case_number || '';
     document.getElementById('sh-exam').value = computer.exam_appeal || '';
     document.getElementById('sh-notes').value = computer.notes || '';
@@ -461,7 +523,26 @@
       if (res.success) {
         document.getElementById('sheet-overlay').classList.remove('show');
         isSheetOpen = false;
-        showToast('✓ נשמר!');
+        
+        // FAST MODE LOCKING LOGIC
+        if (currentMode === 'fast' && !fastSettingsLocked) {
+            fastSettingsLocked = true;
+            lockedLocation = data.location;
+            lockedCage = data.cage_number;
+            lockedStatus = data.status;
+            
+            document.getElementById('fast-unlocked-hint').style.display = 'none';
+            document.getElementById('fast-locked-label').style.display = 'block';
+            document.getElementById('lbl-cage').textContent = lockedCage || 'לא צוין';
+            document.getElementById('lbl-loc').textContent = lockedLocation || 'לא צוין';
+            
+            cageCount = 1; // Since we just scanned the first one!
+            document.getElementById('cage-count').textContent = cageCount;
+            showToast(`✓ הגדרות ננעלו! המשך לסרוק בטיל... (1/50)`);
+        } else {
+            showToast('✓ נשמר!');
+        }
+
         setTimeout(() => { scanner.resume(); resetFailTimer(); }, 300);
       } else { showToast('שגיאה בשמירה', true); }
     })
@@ -515,17 +596,12 @@
 
   // ── Restore settings ──────────────────────────────────────────────────
   window.addEventListener('load', () => {
-    const loc = localStorage.getItem('uri_last_loc');
-    const cage = localStorage.getItem('uri_last_cage');
-    if (loc) document.getElementById('fast-location').value = loc;
-    if (cage) document.getElementById('fast-cage').value = cage;
     startScanner();
   });
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      localStorage.setItem('uri_last_loc', document.getElementById('fast-location').value);
-      localStorage.setItem('uri_last_cage', document.getElementById('fast-cage').value);
+      // no-op for now in fast mode
     }
   });
 
