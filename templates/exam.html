@@ -39,7 +39,7 @@
     /* Excel-like compact table styles overrides */
     .table-wrap { overflow-x: auto; margin-top: 10px; border-radius: 8px; border: 1px solid var(--border); }
     table { width: 100%; min-width: 800px; border-collapse: collapse; border-spacing: 0; }
-    th, td { padding: 6px 10px; font-size: 0.8rem; text-align: right; border-bottom: 1px solid var(--border); border-right: 1px solid rgba(255,255,255,0.05); }
+    th, td { padding: 12px 15px; font-size: 0.95rem; text-align: right; border-bottom: 1px solid var(--border); border-right: 1px solid rgba(255,255,255,0.05); }
     th { background: rgba(0,0,0,0.4); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: #a1a1aa; border-top: none; }
     td { background: var(--bg); transition: background 0.1s; }
     td:last-child, th:last-child { border-right: none; }
@@ -79,7 +79,7 @@
                     <td>
                         {% set display_cage = computer.cage_number or computer.cage_name %}
                         {% if display_cage and display_cage|trim != '' %}
-                        <span class="badge" style="background-color: {{ get_cage_color(display_cage) }}; color: #000; font-weight: 800; padding: 4px 10px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">{{ display_cage }}</span>
+                        <span class="badge" style="background-color: {{ get_cage_color(display_cage) }}; color: #000; font-weight: 800; padding: 6px 12px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">{{ display_cage }}</span>
                         {% else %}
                         —
                         {% endif %}

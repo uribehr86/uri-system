@@ -480,7 +480,7 @@ def exam_page():
     if not conn: return redirect(url_for('dashboard'))
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT * FROM computers WHERE exam_appeal ILIKE '%מבחן%' OR exam_appeal ILIKE '%ערעור%'")
+        cur.execute("SELECT * FROM computers WHERE exam_appeal IS NOT NULL AND TRIM(exam_appeal) != ''")
         computers = cur.fetchall()
         cur.close()
         return render_template('exam.html', computers=computers)
