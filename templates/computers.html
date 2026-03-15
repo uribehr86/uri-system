@@ -254,6 +254,7 @@
                             מבחן\ערעור {% if sort == 'exam_appeal' %}{{ '🔼' if direction == 'asc' else '🔽' }}{% endif %}
                         </a>
                     </th>
+                    <th>סורק אחרון</th>
                     <th style="text-align: left; width: 60px;">פעולות</th>
                 </tr>
             </thead>
@@ -290,6 +291,7 @@
                         {{ c.notes or '—' }}
                     </td>
                     <td>{{ c.exam_appeal or '—' }}</td>
+                    <td style="color:var(--muted); font-size:0.85rem;">{{ c.last_technician or 'לא ידוע' }}</td>
                     <td style="white-space:nowrap; text-align: left;">
                         <a href="{{ url_for('edit_computer', cid=c.id) }}"
                             style="text-decoration:none; margin-left:8px;" title="עריכה">✏️</a>

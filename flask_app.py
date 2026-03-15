@@ -347,7 +347,7 @@ def computers():
         total_pages = (total_matching + per_page - 1) // per_page
             
         # Query results for current page
-        query = "SELECT id, barcode, case_number, cage_name, cage_number, location, status, exam_appeal, notes, scan_time as last_seen FROM computers"
+        query = "SELECT id, barcode, case_number, cage_name, cage_number, location, status, exam_appeal, notes, last_technician, scan_time as last_seen FROM computers"
         query += base_where
         
         # Order by logic
