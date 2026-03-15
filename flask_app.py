@@ -535,10 +535,11 @@ def process_scan():
             """, (computer['id'],))
             new_computer = cur.fetchone()
             
-            # Fetch last technician
-            cur.execute("SELECT technician FROM inventory_history WHERE computer_id = %s ORDER BY timestamp DESC LIMIT 1", (new_computer['id'],))
+            # Fetch last technician and time
+            cur.execute("SELECT technician, timestamp FROM inventory_history WHERE computer_id = %s ORDER BY timestamp DESC LIMIT 1", (new_computer['id'],))
             hist = cur.fetchone()
             new_computer['last_technician'] = hist['technician'] if hist and hist['technician'] else "לא ידוע"
+            new_computer['last_scan_time'] = hist['timestamp'].strftime("%d/%m/%Y %H:%M") if hist and hist['timestamp'] else ""
             
             conn.commit()
             cur.close()
@@ -774,11 +775,12 @@ def api_fast_scan():
             """, (location, cage_number, cage_name, status, old_val['id']))
             new_computer = cur.fetchone()
             
-            # Fetch last technician
-            cur.execute("SELECT technician FROM inventory_history WHERE computer_id = %s ORDER BY timestamp DESC LIMIT 1", (new_computer['id'],))
+            # Fetch last technician and time
+            cur.execute("SELECT technician, timestamp FROM inventory_history WHERE computer_id = %s ORDER BY timestamp DESC LIMIT 1", (new_computer['id'],))
             hist = cur.fetchone()
             if hist and hist['technician']:
                 last_technician = hist['technician']
+                last_scan_time = hist['timestamp'].strftime("%d/%m/%Y %H:%M") if hist['timestamp'] else ""
         else:
             cur.execute("""
                 INSERT INTO computers (barcode, location, cage_number, cage_name, status, scan_time)
@@ -805,6 +807,7 @@ def api_fast_scan():
             "barcode": barcode, 
             "is_new": old_val is None,
             "last_technician": last_technician,
+            "last_scan_time": last_scan_time if 'last_scan_time' in locals() else "",
             "notes": notes_val
         }
 

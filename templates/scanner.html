@@ -505,6 +505,7 @@
             }
             if (!data.is_new && data.last_technician) {
                 msg += ` | אחרון: ${data.last_technician}`;
+                if (data.last_scan_time) msg += ` (${data.last_scan_time})`;
             }
             showToast(msg);
         }
@@ -575,7 +576,11 @@
     
     // Check if it's not new and was scanned recently (basic rescan warning)
     if (!isNew && computer.last_technician) {
-        if (!confirm(`המחשב הזה כבר נסרק לאחרונה ע"י ${computer.last_technician}.\nהאם אתה בטוח שברצונך לסרוק ולעדכן אותו שוב?`)) {
+        let warnMsg = `המחשב הזה כבר נסרק לאחרונה ע"י ${computer.last_technician}`;
+        if (computer.last_scan_time) warnMsg += ` ב-${computer.last_scan_time}`;
+        warnMsg += `.\nהאם אתה בטוח שברצונך לסרוק ולעדכן אותו שוב?`;
+        
+        if (!confirm(warnMsg)) {
             isSheetOpen = false;
             scanner.resume();
             return;
@@ -586,7 +591,9 @@
       'מחשב: <span id="sheet-barcode">' + computer.barcode + '</span>';
       
     if (!isNew && computer.last_technician) {
-        titleHtml += `<br><small style="font-size:0.75em; color:#94a3b8; font-weight:normal;">נסרק אחרון ע"י: ${computer.last_technician}</small>`;
+        let techText = `נסרק אחרון ע"י: ${computer.last_technician}`;
+        if (computer.last_scan_time) techText += ` ב-${computer.last_scan_time}`;
+        titleHtml += `<br><small style="font-size:0.75em; color:#94a3b8; font-weight:normal;">${techText}</small>`;
     }
       
     document.getElementById('sheet-title').innerHTML = titleHtml;
