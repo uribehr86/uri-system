@@ -487,6 +487,8 @@ def exam_page():
     finally:
         release_db_connection(conn)
 
+import re
+
 @app.route('/history')
 @login_required
 def history_page():
@@ -510,9 +512,10 @@ def history_page():
 @app.route('/api/process-scan', methods=['POST'])
 @login_required
 def process_scan():
-    barcode = request.json.get('barcode')
+    barcode = request.json.get('barcode', '').strip()
     if not barcode:
         return {"error": "No barcode provided"}, 400
+    barcode = re.sub(r'^0+(?=\d)', '', barcode)
 
     conn = get_db_connection()
     if not conn: return {"error": "DB connection failed"}, 500
@@ -531,6 +534,12 @@ def process_scan():
                 RETURNING *
             """, (computer['id'],))
             new_computer = cur.fetchone()
+            
+            # Fetch last technician
+            cur.execute("SELECT technician FROM inventory_history WHERE computer_id = %s ORDER BY timestamp DESC LIMIT 1", (new_computer['id'],))
+            hist = cur.fetchone()
+            new_computer['last_technician'] = hist['technician'] if hist and hist['technician'] else "לא ידוע"
+            
             conn.commit()
             cur.close()
             # מחזירים את המידע הקיים כדי שהטופס יתמלא נכון
@@ -733,6 +742,7 @@ def api_fast_scan():
     barcode = data.get('barcode', '').strip()
     if not barcode:
         return {"success": False, "error": "ברקוד חסר"}, 400
+    barcode = re.sub(r'^0+(?=\d)', '', barcode)
 
     location   = data.get('location', '')
     cage_number = data.get('cage_number', '')
@@ -751,7 +761,11 @@ def api_fast_scan():
 
         old_val = dict(computer) if computer else None
 
+        last_technician = "לא ידוע"
+        notes_val = ""
+
         if old_val:
+            notes_val = old_val.get('notes') or ""
             cur.execute("""
                 UPDATE computers 
                 SET location = %s, cage_number = %s, cage_name = %s, status = %s, scan_time = NOW()
@@ -759,6 +773,12 @@ def api_fast_scan():
                 RETURNING *
             """, (location, cage_number, cage_name, status, old_val['id']))
             new_computer = cur.fetchone()
+            
+            # Fetch last technician
+            cur.execute("SELECT technician FROM inventory_history WHERE computer_id = %s ORDER BY timestamp DESC LIMIT 1", (new_computer['id'],))
+            hist = cur.fetchone()
+            if hist and hist['technician']:
+                last_technician = hist['technician']
         else:
             cur.execute("""
                 INSERT INTO computers (barcode, location, cage_number, cage_name, status, scan_time)
@@ -780,7 +800,13 @@ def api_fast_scan():
 
         conn.commit()
         cur.close()
-        return {"success": True, "barcode": barcode, "is_new": old_val is None}
+        return {
+            "success": True, 
+            "barcode": barcode, 
+            "is_new": old_val is None,
+            "last_technician": last_technician,
+            "notes": notes_val
+        }
 
     except Exception as e:
         print(f"Error in api_fast_scan: {e}")

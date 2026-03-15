@@ -394,13 +394,19 @@
     } catch(e) { /* not supported */ }
   }
 
+  // ── Barcode Cleanup ───────────────────────────────────────────────────
+  function cleanBarcode(code) {
+      let clean = code.trim();
+      return clean.replace(/^0+(?=\d)/, '');
+  }
+
   // ── Scan dispatcher ───────────────────────────────────────────────────
   function onScan(code) {
     if (isPaused || currentMode === 'exam') {
         if (isPaused) showToast('⚠️ הסורק מושהה. לחץ על המשך כדי לסרוק.', true);
         return;
     }
-    const clean = code.trim();
+    const clean = cleanBarcode(code);
     if (currentMode === 'area') onAreaScan(clean);
     else if (currentMode === 'cage') {
         if (!activePackingCage) onIdentifyCageScan(clean);
@@ -432,8 +438,9 @@
   }
 
   function submitManualArea() {
-    const val = document.getElementById('manual-barcode-area').value.trim();
-    if (val) { document.getElementById('manual-barcode-area').value = ''; onAreaScan(val); }
+    const val = document.getElementById('manual-barcode-area').value;
+    const clean = cleanBarcode(val);
+    if (clean) { document.getElementById('manual-barcode-area').value = ''; onAreaScan(clean); }
   }
 
   // ── CAGE SCAN (Option 2) ─────────────────────────────────────────────
@@ -492,7 +499,14 @@
             document.getElementById('cage-count').style.color = '#22c55e';
             if (!isPaused) togglePause();
         } else {
-            showToast(`${data.is_new ? '🆕' : '✓'} ${barcode} לחץ בכלוב  |  ${cageCount}/50`);
+            let msg = `${data.is_new ? '🆕' : '✓'} ${barcode} לחץ בכלוב  |  ${cageCount}/50`;
+            if (data.notes) {
+                msg += ` | הערות: ${data.notes}`;
+            }
+            if (!data.is_new && data.last_technician) {
+                msg += ` | אחרון: ${data.last_technician}`;
+            }
+            showToast(msg);
         }
         
         resetFailTimer();
@@ -534,12 +548,14 @@
   }
 
   function submitManualCage() {
-    const val = document.getElementById('manual-barcode-cage').value.trim();
-    if (val) { document.getElementById('manual-barcode-cage').value = ''; onIdentifyCageScan(val); }
+    const val = document.getElementById('manual-barcode-cage').value;
+    const clean = cleanBarcode(val);
+    if (clean) { document.getElementById('manual-barcode-cage').value = ''; onIdentifyCageScan(clean); }
   }
   function submitManualPack() {
-    const val = document.getElementById('manual-barcode-pack').value.trim();
-    if (val) { document.getElementById('manual-barcode-pack').value = ''; onPackComputerScan(val); }
+    const val = document.getElementById('manual-barcode-pack').value;
+    const clean = cleanBarcode(val);
+    if (clean) { document.getElementById('manual-barcode-pack').value = ''; onPackComputerScan(clean); }
   }
 
   // Area Scan Form Handling
@@ -548,9 +564,16 @@
     isSheetOpen = true;
     if (failTimer) clearTimeout(failTimer);
     hideManualInput();
-    document.getElementById('sheet-title').innerHTML =
-      (isNew ? '<span class="badge-new">חדש</span>' : '') +
+    
+    let titleHtml = (isNew ? '<span class="badge-new">חדש</span>' : '') +
       'מחשב: <span id="sheet-barcode">' + computer.barcode + '</span>';
+      
+    if (!isNew && computer.last_technician) {
+        titleHtml += `<br><small style="font-size:0.75em; color:#94a3b8; font-weight:normal;">נסרק אחרון ע"י: ${computer.last_technician}</small>`;
+    }
+      
+    document.getElementById('sheet-title').innerHTML = titleHtml;
+    
     document.getElementById('sheet-id').value = computer.id;
     document.getElementById('sh-location').value = computer.location || '';
     document.getElementById('sh-cage').value = computer.cage_number || '';
