@@ -19,8 +19,8 @@
 
     th,
     td {
-        padding: 6px 10px;
-        font-size: 0.8rem;
+        padding: 12px 15px;
+        font-size: 0.95rem;
         text-align: right;
         border-bottom: 1px solid var(--border);
         border-right: 1px solid rgba(255, 255, 255, 0.05);
@@ -94,9 +94,9 @@
         background: rgba(0, 0, 0, 0.3);
         border: 1px solid var(--border);
         color: #fff;
-        padding: 6px 10px;
-        border-radius: 6px;
-        font-size: 0.8rem;
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 0.95rem;
     }
 
     /* Excel-like Tabs */
@@ -143,8 +143,8 @@
             min-width: 100%;
         }
         th, td {
-            padding: 8px 6px;
-            font-size: 0.72rem;
+            padding: 12px 8px;
+            font-size: 0.85rem;
         }
         /* Further tighten column widths for mobile */
         .col-tech { width: 70px; }
@@ -183,12 +183,12 @@
 <div class="card">
     <form method="GET" class="search-bar" style="margin-bottom: 12px; gap: 8px;">
         <input type="text" name="q" class="form-control" placeholder="🔍 חיפוש חופשי (ברקוד, תיק, מיקום...)"
-            style="padding: 6px 10px; max-width:250px;" value="{{ search }}" />
+            style="padding: 10px 14px; max-width:250px;" value="{{ search }}" />
         
         <input type="text" name="cage_q" class="form-control" placeholder="📦 חיפוש לפי כלוב..."
-            style="padding: 6px 10px; max-width:160px;" value="{{ cage_search }}" />
+            style="padding: 10px 14px; max-width:160px;" value="{{ cage_search }}" />
 
-        <select name="status" class="form-control" style="padding: 6px 10px; max-width:140px;">
+        <select name="status" class="form-control" style="padding: 10px 14px; max-width:140px;">
             <option value="">כל הסטטוסים</option>
             <option value="תקין" {% if status_filter=='תקין' %}selected{% endif %}>תקין</option>
             <option value="תקול" {% if status_filter=='תקול' %}selected{% endif %}>תקול</option>
@@ -197,7 +197,7 @@
         </select>
         <input type="hidden" name="sort" value="{{ sort }}">
         <input type="hidden" name="dir" value="{{ direction }}">
-        <button type="submit" class="btn btn-blue" style="padding: 6px 12px;">חיפוש</button>
+        <button type="submit" class="btn btn-blue" style="padding: 10px 18px;">חיפוש</button>
         {% if search or status_filter or cage_search %}
         <a href="{{ url_for('computers') }}" class="btn btn-ghost" style="padding: 6px 12px;">✕ נקה</a>
         {% endif %}
@@ -293,7 +293,7 @@
                     <td>
                         {% set display_cage = c.cage_number or c.cage_name %}
                         {% if display_cage and display_cage|trim != '' %}
-                        <span class="badge" style="background-color: {{ get_cage_color(display_cage) }}; color: #000; font-weight: 800; padding: 4px 10px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">{{ display_cage }}</span>
+                        <span class="badge" style="background-color: {{ get_cage_color(display_cage) }}; color: #000; font-weight: 800; padding: 6px 12px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">{{ display_cage }}</span>
                         {% else %}
                         —
                         {% endif %}
@@ -315,7 +315,7 @@
                         {{ c.notes or '—' }}
                     </td>
                     <td class="hide-mobile">{{ c.exam_appeal or '—' }}</td>
-                    <td style="color: var(--accent2); font-weight: 600; font-size: 0.72rem; line-height: 1.1;">
+                    <td style="color: var(--accent2); font-weight: 600; font-size: 0.9rem; line-height: 1.2;">
                         {{ c.last_technician or '—' }}
                     </td>
                     <td class="hide-mobile" style="color:var(--muted); font-size:0.75rem;">{{ c.last_seen or '—' }}</td>
