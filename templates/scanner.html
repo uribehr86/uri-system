@@ -110,9 +110,9 @@
 
   <!-- Mode selector -->
   <div class="mode-bar">
-    <button class="mode-btn active" onclick="setMode('fast')" id="btn-fast">⚡ מהיר</button>
-    <button class="mode-btn" onclick="setMode('full')" id="btn-full">🔍 מלא</button>
-    <button class="mode-btn" onclick="setMode('cage')" id="btn-cage">📦 כלוב</button>
+    <button class="mode-btn active" onclick="setMode('area')" id="btn-area">🌍 סריקת שטח</button>
+    <button class="mode-btn" onclick="setMode('cage')" id="btn-cage">📦 סריקת כלוב</button>
+    <button class="mode-btn" onclick="setMode('exam')" id="btn-exam">🎓 סריקת מבחנים</button>
   </div>
 
   <!-- Camera -->
@@ -131,41 +131,53 @@
   <!-- Bottom panel -->
   <div class="bottom-panel">
 
-    <!-- FAST MODE -->
-    <div id="panel-fast">
-      <div class="fast-controls">
-         <div id="fast-unlocked-hint" class="unlocked-hint">סרוק מחשב ראשון כדי להגדיר כלוב ומיקום לשאר הסריקות</div>
-         <div id="fast-locked-label" class="locked-label">🔒 הגדרות נעולות: כלוב <span id="lbl-cage"></span> | <span id="lbl-loc"></span></div>
-      </div>
-      <div class="waiting-hint"><div class="pulse-dot"></div> ממתין לסריקה...</div>
-      <div id="manual-wrap" class="manual-input-wrap" style="display:none;">
-        <input type="text" id="manual-barcode" placeholder="הקלד ברקוד ידנית..." />
-        <button onclick="submitManual()">אישור</button>
-      </div>
-
-      <div class="cage-packing-panel">
-        <div class="scan-counter">נסרקו לכלוב:<br><span id="cage-count">0</span><span class="limit">/ 50</span></div>
-        <div class="pack-btns">
-            <button class="btn-pack btn-pause" id="btn-pause" onclick="togglePause()">⏸️ השהה</button>
-            <button class="btn-pack btn-resume" id="btn-resume" onclick="togglePause()">▶️ המשך</button>
-            <button class="btn-pack btn-stop" onclick="finishCage()">⏹️ סיום כלוב</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- FULL MODE -->
-    <div id="panel-full" style="display:none;">
+    <!-- AREA SCAN (formerly Full/Fast) -->
+    <div id="panel-area">
       <div class="waiting-hint"><div class="pulse-dot"></div> סרוק מחשב לפתיחת טופס</div>
-      <div id="manual-wrap-full" class="manual-input-wrap" style="display:none;">
-        <input type="text" id="manual-barcode-full" placeholder="הקלד ברקוד ידנית..." />
-        <button onclick="submitManualFull()">אישור</button>
+      <div id="manual-wrap-area" class="manual-input-wrap" style="display:none;">
+        <input type="text" id="manual-barcode-area" placeholder="הקלד ברקוד ידנית..." />
+        <button onclick="submitManualArea()">אישור</button>
       </div>
     </div>
 
-    <!-- CAGE MODE -->
+    <!-- CAGE SCAN (Continuous packing) -->
     <div id="panel-cage" style="display:none;">
-      <div class="cage-scan-hint">סרוק ברקוד של כלוב לצפייה במידע</div>
-      <div id="cage-card-area"></div>
+      <!-- Step 1: Request Cage -->
+      <div id="cage-step-1">
+          <div class="cage-scan-hint" style="font-weight:700; color:#fff;">סרוק ברקוד של כלוב (לדוגמה: c-1) כדי להתחיל לארוז</div>
+          <div id="manual-wrap-cage" class="manual-input-wrap" style="display:none;">
+            <input type="text" id="manual-barcode-cage" placeholder="הקלד מספר כלוב ידנית (c-...)" />
+            <button onclick="submitManualCage()">אישור</button>
+          </div>
+      </div>
+      
+      <!-- Step 2: Packing Computers -->
+      <div id="cage-step-2" style="display:none;">
+          <div class="fast-controls">
+             <div class="locked-label" style="display:block;">🔒 אורז לתוך כלוב: <span id="lbl-active-cage"></span></div>
+          </div>
+          <div class="waiting-hint"><div class="pulse-dot"></div> ממתין לסריקת מחשבים...</div>
+          <div id="manual-wrap-pack" class="manual-input-wrap" style="display:none;">
+            <input type="text" id="manual-barcode-pack" placeholder="הקלד ברקוד מחשב..." />
+            <button onclick="submitManualPack()">אישור</button>
+          </div>
+    
+          <div class="cage-packing-panel">
+            <div class="scan-counter">נסרקו לכלוב:<br><span id="cage-count">0</span><span class="limit">/ 50</span></div>
+            <div class="pack-btns">
+                <button class="btn-pack btn-pause" id="btn-pause" onclick="togglePause()">⏸️ השהה</button>
+                <button class="btn-pack btn-resume" id="btn-resume" onclick="togglePause()">▶️ המשך</button>
+                <button class="btn-pack btn-stop" onclick="finishCagePacking()">⏹️ סיום כלוב</button>
+            </div>
+          </div>
+      </div>
+    </div>
+
+    <!-- EXAMS SCAN (Coming soon) -->
+    <div id="panel-exam" style="display:none; text-align:center; padding: 40px 10px;">
+        <div style="font-size: 4rem; margin-bottom: 10px;">🚧</div>
+        <h2 style="color:#facc15; font-weight:900; margin-bottom: 8px;">זהירות בונים בגדול!</h2>
+        <p style="color:#94a3b8; font-size: 0.95rem;">סריקת מבחנים ומחשב תגיע בפרויקט הבא.</p>
     </div>
 
   </div>
@@ -190,6 +202,7 @@
           <option value="אקספו">אקספו</option>
           <option value="בנייני האומה">בנייני האומה</option>
           <option value="שיבא">שיבא</option>
+          <option value="מכביה">מכביה</option>
           <option value="בית">בית</option>
           <option value="חוץ">חוץ</option>
         </select>
@@ -237,16 +250,15 @@
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 <script>
   let scanner = null;
-  let currentMode = 'fast';
+  let currentMode = 'area';
   let isTorchOn = false;
   let isPaused = false;
+  
+  // Cage packing state
   let cageCount = 0;
-  let fastSettingsLocked = false;
-  let lockedLocation = '';
-  let lockedCage = '';
-  let lockedStatus = '';
+  let activePackingCage = null; // Step 2 variable
+  
   let isSheetOpen = false;
-  let lastCageScan = '';
 
   // ── Scan box visual feedback ─────────────────────────────────────────
   let failTimer = null;
@@ -279,13 +291,21 @@
   function showManualInput() {
     if (manualShown) return;
     manualShown = true;
-    const wrapId = currentMode === 'full' ? 'manual-wrap-full' : 'manual-wrap';
+    
+    let wrapId;
+    if (currentMode === 'area') wrapId = 'manual-wrap-area';
+    else if (currentMode === 'cage') {
+        wrapId = activePackingCage ? 'manual-wrap-pack' : 'manual-wrap-cage';
+    } else {
+        return; // exam mode has no manual input
+    }
+    
     const el = document.getElementById(wrapId);
     if (el) el.style.display = 'flex';
   }
 
   function hideManualInput() {
-    ['manual-wrap', 'manual-wrap-full'].forEach(id => {
+    ['manual-wrap-area', 'manual-wrap-cage', 'manual-wrap-pack'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
@@ -315,13 +335,38 @@
   // ── Mode switching ────────────────────────────────────────────────────
   function setMode(mode) {
     currentMode = mode;
-    lastCageScan = '';
-    ['fast','full','cage'].forEach(m => {
+    ['area','cage','exam'].forEach(m => {
       document.getElementById('btn-' + m).classList.toggle('active', m === mode);
       document.getElementById('panel-' + m).style.display = m === mode ? 'block' : 'none';
     });
-    if (mode !== 'cage') document.getElementById('cage-card-area').innerHTML = '';
+    
+    // Reset cage flow
+    if (mode === 'cage') {
+        activePackingCage = null;
+        document.getElementById('cage-step-1').style.display = 'block';
+        document.getElementById('cage-step-2').style.display = 'none';
+        resumeCameraIfPaused();
+    }
+    
+    // Exam mode handles camera pausing
+    if (mode === 'exam') {
+        pauseCameraIfRunning();
+        document.querySelector('.camera-wrap').style.display = 'none';
+    } else {
+        document.querySelector('.camera-wrap').style.display = 'block';
+        resumeCameraIfPaused();
+    }
+    
     resetFailTimer();
+  }
+  
+  function pauseCameraIfRunning() {
+      if (scanner && scanner.getState() === 2) { scanner.pause(); } // 2 is SCANNING
+  }
+  function resumeCameraIfPaused() {
+      if (scanner && scanner.getState() === 3 && currentMode !== 'exam' && !isPaused && !isSheetOpen) { 
+          scanner.resume(); 
+      }
   }
 
   // ── Camera ────────────────────────────────────────────────────────────
@@ -351,45 +396,91 @@
 
   // ── Scan dispatcher ───────────────────────────────────────────────────
   function onScan(code) {
-    if (isPaused) {
-        showToast('⚠️ הסורק מושהה. לחץ על המשך כדי לסרוק.', true);
+    if (isPaused || currentMode === 'exam') {
+        if (isPaused) showToast('⚠️ הסורק מושהה. לחץ על המשך כדי לסרוק.', true);
         return;
     }
     const clean = code.trim();
-    if (currentMode === 'cage') onCageScan(clean);
-    else if (currentMode === 'fast') onFastScan(clean);
-    else onFullScan(clean);
+    if (currentMode === 'area') onAreaScan(clean);
+    else if (currentMode === 'cage') {
+        if (!activePackingCage) onIdentifyCageScan(clean);
+        else onPackComputerScan(clean);
+    }
   }
 
-  // ── FAST SCAN ─────────────────────────────────────────────────────────
+  // ── AREA SCAN (Option 1) ─────────────────────────────────────────────
+  function onAreaScan(barcode) {
+    if (isSheetOpen) return;
+    scanner.pause();
+    fetch('/api/process-scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ barcode })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) throw new Error(data.error);
+      onScanSuccess_visual();
+      openSheet(data.computer, !data.exists);
+    })
+    .catch(err => {
+      setScanBoxState('fail');
+      showToast('שגיאה: ' + err.message, true);
+      scanner.resume();
+      resetFailTimer();
+    });
+  }
+
+  function submitManualArea() {
+    const val = document.getElementById('manual-barcode-area').value.trim();
+    if (val) { document.getElementById('manual-barcode-area').value = ''; onAreaScan(val); }
+  }
+
+  // ── CAGE SCAN (Option 2) ─────────────────────────────────────────────
+  
+  // Step 1: Scan the cage's own barcode
+  function onIdentifyCageScan(barcode) {
+      // Typically cages start with c_ or similar, but we accept anything the user scans
+      if (navigator.vibrate) navigator.vibrate(60);
+      onScanSuccess_visual();
+      
+      activePackingCage = barcode;
+      cageCount = 0;
+      
+      document.getElementById('lbl-active-cage').textContent = activePackingCage;
+      document.getElementById('cage-count').textContent = '0';
+      document.getElementById('cage-count').style.color = '#60a5fa';
+      
+      // Transition UI to Step 2
+      document.getElementById('cage-step-1').style.display = 'none';
+      document.getElementById('cage-step-2').style.display = 'block';
+      showToast(`✓ כלוב ${barcode} הוגדר! התחל לסרוק מחשבים.`);
+      hideManualInput();
+      resetFailTimer();
+  }
+  
   let fastCooldown = false;
-  function onFastScan(barcode) {
+  
+  // Step 2: Scan a computer to pack into the active cage
+  function onPackComputerScan(barcode) {
     if (fastCooldown) return;
     fastCooldown = true;
     setTimeout(() => fastCooldown = false, 1500);
 
-    // If settings are NOT locked yet, handle it like a FULL scan to prompt for cage/location.
-    if (!fastSettingsLocked) {
-        onFullScan(barcode);
-        return;
-    }
-
-    // Otherwise, fast scan using locked settings
     fetch('/api/fast-scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ barcode, location: lockedLocation, cage_number: lockedCage, cage_name: lockedCage, status: lockedStatus })
+      // Update cage ONLY. Status implicitly 'תקין' in backend if not provided, or keeps old. Location not changed.
+      body: JSON.stringify({ barcode, cage_number: activePackingCage, cage_name: activePackingCage })
     })
     .then(r => r.json())
     .then(data => {
       if (data.success) {
         onScanSuccess_visual();
         
-        // Counter logic
         cageCount++;
         document.getElementById('cage-count').textContent = cageCount;
         
-        // Check for 50 limit confetti
         if (cageCount === 50) {
             confetti({
               particleCount: 150,
@@ -399,10 +490,9 @@
             });
             showToast(`🎉 כלוב מלא! (50 מחשבים)`);
             document.getElementById('cage-count').style.color = '#22c55e';
-            // Auto pause
             if (!isPaused) togglePause();
         } else {
-            showToast(`${data.is_new ? '🆕' : '✓'} ${barcode}  |  ${cageCount}/50`);
+            showToast(`${data.is_new ? '🆕' : '✓'} ${barcode} לחץ בכלוב  |  ${cageCount}/50`);
         }
         
         resetFailTimer();
@@ -428,55 +518,31 @@
       }
   }
 
-  function finishCage() {
-      if (confirm('לסיים סריקת כלוב זה ולפתוח כלוב חדש?')) {
+  function finishCagePacking() {
+      if (confirm('לסיים סריקת כלוב זה ולפתוח חלון לכלוב חדש?')) {
+          activePackingCage = null;
           cageCount = 0;
-          fastSettingsLocked = false;
-          lockedLocation = '';
-          lockedCage = '';
-          lockedStatus = '';
           
-          document.getElementById('cage-count').textContent = cageCount;
-          document.getElementById('cage-count').style.color = '#60a5fa';
-          document.getElementById('fast-unlocked-hint').style.display = 'block';
-          document.getElementById('fast-locked-label').style.display = 'none';
+          document.getElementById('cage-step-1').style.display = 'block';
+          document.getElementById('cage-step-2').style.display = 'none';
           
-          showToast('המונה אופס. סרוק מחשב ראשון להגדרת כלוב חדש.');
+          showToast('הסתיים. סרוק ברקוד של כלוב חדש.');
           if (isPaused) togglePause();
+          resetFailTimer();
+          hideManualInput();
       }
   }
 
-  function submitManual() {
-    const val = document.getElementById('manual-barcode').value.trim();
-    if (val) { document.getElementById('manual-barcode').value = ''; onFastScan(val); }
+  function submitManualCage() {
+    const val = document.getElementById('manual-barcode-cage').value.trim();
+    if (val) { document.getElementById('manual-barcode-cage').value = ''; onIdentifyCageScan(val); }
   }
-  function submitManualFull() {
-    const val = document.getElementById('manual-barcode-full').value.trim();
-    if (val) { document.getElementById('manual-barcode-full').value = ''; onFullScan(val); }
+  function submitManualPack() {
+    const val = document.getElementById('manual-barcode-pack').value.trim();
+    if (val) { document.getElementById('manual-barcode-pack').value = ''; onPackComputerScan(val); }
   }
 
-  // ── FULL SCAN ─────────────────────────────────────────────────────────
-  function onFullScan(barcode) {
-    if (isSheetOpen) return;
-    scanner.pause();
-    fetch('/api/process-scan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ barcode })
-    })
-    .then(r => r.json())
-    .then(data => {
-      if (data.error) throw new Error(data.error);
-      onScanSuccess_visual();
-      openSheet(data.computer, !data.exists);
-    })
-    .catch(err => {
-      setScanBoxState('fail');
-      showToast('שגיאה: ' + err.message, true);
-      scanner.resume();
-      resetFailTimer();
-    });
-  }
+  // Area Scan Form Handling
 
   function openSheet(computer, isNew) {
     isSheetOpen = true;
@@ -523,76 +589,14 @@
       if (res.success) {
         document.getElementById('sheet-overlay').classList.remove('show');
         isSheetOpen = false;
-        
-        // FAST MODE LOCKING LOGIC
-        if (currentMode === 'fast' && !fastSettingsLocked) {
-            fastSettingsLocked = true;
-            lockedLocation = data.location;
-            lockedCage = data.cage_number;
-            lockedStatus = data.status;
-            
-            document.getElementById('fast-unlocked-hint').style.display = 'none';
-            document.getElementById('fast-locked-label').style.display = 'block';
-            document.getElementById('lbl-cage').textContent = lockedCage || 'לא צוין';
-            document.getElementById('lbl-loc').textContent = lockedLocation || 'לא צוין';
-            
-            cageCount = 1; // Since we just scanned the first one!
-            document.getElementById('cage-count').textContent = cageCount;
-            showToast(`✓ הגדרות ננעלו! המשך לסרוק בטיל... (1/50)`);
-        } else {
-            showToast('✓ נשמר!');
-        }
-
+        showToast('✓ נשמר!');
         setTimeout(() => { scanner.resume(); resetFailTimer(); }, 300);
       } else { showToast('שגיאה בשמירה', true); }
     })
     .catch(() => showToast('שגיאת חיבור', true));
   }
 
-  // ── CAGE SCAN ─────────────────────────────────────────────────────────
-  let cageCooldown = false;
-  function onCageScan(cageId) {
-    if (cageCooldown || cageId === lastCageScan) return;
-    cageCooldown = true; lastCageScan = cageId;
-    setTimeout(() => cageCooldown = false, 2500);
-    if (navigator.vibrate) navigator.vibrate(60);
-    onScanSuccess_visual();
-
-    fetch('/api/cage/' + encodeURIComponent(cageId))
-    .then(r => r.json())
-    .then(data => {
-      if (data.error) throw new Error(data.error);
-      renderCageCard(data, cageId);
-      resetFailTimer();
-    })
-    .catch(err => { setScanBoxState('fail'); showToast('שגיאה: ' + err.message, true); });
-  }
-
-  function renderCageCard(data, cageId) {
-    const cage = data.cage || {};
-    const statuses = data.status_counts || {};
-    const computers = data.computers || [];
-    let statsHtml = Object.entries(statuses).map(([s,c]) => `<div class="cage-stat"><span>${c}</span> ${s}</div>`).join('');
-    if (!statsHtml) statsHtml = '<div class="cage-stat"><span>0</span> מחשבים</div>';
-    let listHtml = computers.slice(0,20).map(c =>
-      `<div class="cage-list-item"><span>${c.barcode}</span><span style="color:${c.status==='תקול'?'#f87171':'#86efac'}">${c.status||'—'}</span></div>`
-    ).join('') || '<div style="text-align:center;color:#475569;padding:8px;">כלוב ריק</div>';
-
-    document.getElementById('cage-card-area').innerHTML = `
-      <div class="cage-card">
-        <div class="cage-title">📦 כלוב ${cage.cage_id||cageId} ${cage.name?'— '+cage.name:''}</div>
-        ${cage.location?`<div style="color:#64748b;font-size:0.78rem;margin-bottom:8px;">📍 ${cage.location}</div>`:''}
-        <div class="cage-stats"><div class="cage-stat">סה"כ <span>${data.total||0}</span></div>${statsHtml}</div>
-        <div class="cage-list">${listHtml}</div>
-        <button class="btn-use-cage" onclick="useCageInFastMode('${cage.cage_id||cageId}')">⚡ מצב מהיר עם כלוב זה</button>
-      </div>`;
-  }
-
-  function useCageInFastMode(cageId) {
-    document.getElementById('fast-cage').value = cageId;
-    setMode('fast');
-    showToast('✓ כלוב ' + cageId + ' נבחר!');
-  }
+  // ── NO CAGE INFO TABS HERE ANYMORE ──────────────────────────────────────
 
   // ── Restore settings ──────────────────────────────────────────────────
   window.addEventListener('load', () => {
@@ -608,8 +612,9 @@
   // Manual input: submit on Enter
   document.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
-      if (document.activeElement.id === 'manual-barcode') submitManual();
-      if (document.activeElement.id === 'manual-barcode-full') submitManualFull();
+      if (document.activeElement.id === 'manual-barcode-area') submitManualArea();
+      if (document.activeElement.id === 'manual-barcode-cage') submitManualCage();
+      if (document.activeElement.id === 'manual-barcode-pack') submitManualPack();
     }
   });
 </script>
