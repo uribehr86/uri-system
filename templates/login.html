@@ -132,7 +132,11 @@
                     </button>
                 </div>
             </div>
-            <button type="submit" class="btn-login">🔓 כניסה</button>
+            <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-bottom: 24px;">
+                <input type="checkbox" id="rememberMe" style="width: 16px; height: 16px; cursor: pointer;" />
+                <label for="rememberMe" style="margin-bottom: 0; cursor: pointer;">זכור אותי במכשיר זה</label>
+            </div>
+            <button type="submit" class="btn-login" onclick="saveCredentials()">🔓 כניסה</button>
             <div class="hint">
                 עובד חדש? <a href="{{ url_for('register') }}">לחץ כאן להרשמה</a>
             </div>
@@ -165,6 +169,32 @@
         toggleBtn.innerText = isPassword ? '👓' : '👁️';
         toggleBtn.dataset.manual = isPassword ? 'true' : '';
     });
+
+    // --- Remember Me Logic ---
+    const usernameInput = document.getElementById('username');
+    const rememberMeCheckbox = document.getElementById('rememberMe');
+
+    // Load saved credentials on page load
+    window.addEventListener('load', () => {
+        const savedUser = localStorage.getItem('uri_saved_user');
+        const savedPass = localStorage.getItem('uri_saved_pass');
+        if (savedUser && savedPass) {
+            usernameInput.value = savedUser;
+            passwordInput.value = savedPass;
+            rememberMeCheckbox.checked = true;
+        }
+    });
+
+    // Save credentials when submit button is clicked
+    function saveCredentials() {
+        if (rememberMeCheckbox.checked) {
+            localStorage.setItem('uri_saved_user', usernameInput.value);
+            localStorage.setItem('uri_saved_pass', passwordInput.value);
+        } else {
+            localStorage.removeItem('uri_saved_user');
+            localStorage.removeItem('uri_saved_pass');
+        }
+    }
 </script>
 </body>
 </html>
