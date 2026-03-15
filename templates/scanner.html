@@ -186,9 +186,9 @@
           <div class="cage-packing-panel">
             <div class="scan-counter">נסרקו לכלוב:<br><span id="cage-count">0</span><span class="limit">/ 50</span></div>
             <div class="pack-btns">
-                <button class="btn-pack btn-pause" id="btn-pause" onclick="togglePause()">⏸️ השהה</button>
-                <button class="btn-pack btn-resume" id="btn-resume" onclick="togglePause()">▶️ המשך</button>
-                <button class="btn-pack btn-stop" onclick="finishCagePacking()">⏹️ סיום כלוב</button>
+                <button class="btn-pack btn-pause" id="btn-pause" onclick="togglePause()" style="flex:1; padding: 15px 10px;">⏸️ השהה</button>
+                <button class="btn-pack btn-resume" id="btn-resume" onclick="togglePause()" style="flex:1; padding: 15px 10px;">▶️ המשך</button>
+                <button class="btn-pack btn-stop" onclick="finishCagePacking()" style="flex:1.5; padding: 15px 10px; font-size: 0.95rem;">⏹️ סיום ושמירה</button>
             </div>
           </div>
       </div>
@@ -595,7 +595,7 @@
   }
 
   function finishCagePacking() {
-      if (confirm('לסיים סריקת כלוב זה ולפתוח חלון לכלוב חדש?')) {
+      if (confirm('לסיים סריקת כלוב זה? כל המחשבים שנסרקו כבר נשמרו במערכת בהצלחה.')) {
           activePackingCage = null;
           cageCount = 0;
           
