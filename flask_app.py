@@ -522,28 +522,18 @@ def process_scan():
         cur.execute("SELECT * FROM computers WHERE barcode = %s ORDER BY id DESC LIMIT 1", (barcode,))
         computer = cur.fetchone()
         
-        # תמיד ליצור שורה חדשה (חוק שלישי)
-        now_str = datetime.now().strftime('%d/%m/%Y %H:%M')
-        
         if computer:
+            # Update the existing record instead of inserting a duplicate
             cur.execute("""
-                INSERT INTO computers (barcode, case_number, cage_number, cage_name, status, location, scan_time, notes, exam_appeal) 
-                VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s, %s) 
+                UPDATE computers 
+                SET scan_time = NOW()
+                WHERE id = %s
                 RETURNING *
-            """, (
-                barcode, 
-                computer.get('case_number'), 
-                computer.get('cage_number'), 
-                computer.get('cage_name'), 
-                computer.get('status', 'תקין'), 
-                computer.get('location'), 
-                computer.get('notes'),
-                computer.get('exam_appeal')
-            ))
+            """, (computer['id'],))
             new_computer = cur.fetchone()
             conn.commit()
             cur.close()
-            # מחזירים כאילו זה קיים כדי שהטופס יתמלא במידע הקודם, אבל עם ה-ID של השורה החדשה!
+            # מחזירים את המידע הקיים כדי שהטופס יתמלא נכון
             return {"exists": True, "computer": new_computer}
         else:
             # Create completely new record
@@ -760,17 +750,22 @@ def api_fast_scan():
         computer = cur.fetchone()
 
         old_val = dict(computer) if computer else None
-        
-        # תמיד פותח שורה חדשה לפי בקשת המשתמש (חוק שלישי)
-        notes_val = old_val.get('notes') if old_val else None
-        
-        cur.execute("""
-            INSERT INTO computers (barcode, location, cage_number, cage_name, status, scan_time, notes)
-            VALUES (%s, %s, %s, %s, %s, NOW(), %s)
-            RETURNING *
-        """, (barcode, location, cage_number, cage_name, status, notes_val))
-        
-        new_computer = cur.fetchone()
+
+        if old_val:
+            cur.execute("""
+                UPDATE computers 
+                SET location = %s, cage_number = %s, cage_name = %s, status = %s, scan_time = NOW()
+                WHERE id = %s
+                RETURNING *
+            """, (location, cage_number, cage_name, status, old_val['id']))
+            new_computer = cur.fetchone()
+        else:
+            cur.execute("""
+                INSERT INTO computers (barcode, location, cage_number, cage_name, status, scan_time)
+                VALUES (%s, %s, %s, %s, %s, NOW())
+                RETURNING *
+            """, (barcode, location, cage_number, cage_name, status))
+            new_computer = cur.fetchone()
 
         # תיעוד היסטוריה
         cur.execute("""
