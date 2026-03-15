@@ -130,6 +130,19 @@
         background: rgba(255, 255, 255, 0.08);
         color: var(--text);
     }
+
+    /* Mobile Table Optimization */
+    @media (max-width: 768px) {
+        .hide-mobile {
+            display: none !important;
+        }
+        table {
+            min-width: 100%;
+        }
+        th, td {
+            padding: 8px 6px;
+        }
+    }
 </style>
 
 <div class="page-header">
@@ -222,13 +235,13 @@
             <thead>
                 <tr>
                     <th class="col-chk"><input type="checkbox" id="selectAll" onclick="toggleAll(this)"></th>
-                    <th style="width: 30px;">#</th>
+                    <th class="hide-mobile" style="width: 30px;">#</th>
                     <th>
                         <a href="{{ url_for('computers', sort='barcode', dir='asc' if sort != 'barcode' or direction == 'desc' else 'desc', q=search, status=status_filter, cage_q=cage_search) }}" style="color:inherit; text-decoration:none;">
                             מחשב {% if sort == 'barcode' %}{{ '🔼' if direction == 'asc' else '🔽' }}{% endif %}
                         </a>
                     </th>
-                    <th>
+                    <th class="hide-mobile">
                         <a href="{{ url_for('computers', sort='case_number', dir='asc' if sort != 'case_number' or direction == 'desc' else 'desc', q=search, status=status_filter, cage_q=cage_search) }}" style="color:inherit; text-decoration:none;">
                             תיק {% if sort == 'case_number' %}{{ '🔼' if direction == 'asc' else '🔽' }}{% endif %}
                         </a>
@@ -238,7 +251,7 @@
                             כלוב {% if sort == 'cage_number' %}{{ '🔼' if direction == 'asc' else '🔽' }}{% endif %}
                         </a>
                     </th>
-                    <th>
+                    <th class="hide-mobile">
                         <a href="{{ url_for('computers', sort='status', dir='asc' if sort != 'status' or direction == 'desc' else 'desc', q=search, status=status_filter, cage_q=cage_search) }}" style="color:inherit; text-decoration:none;">
                             סטטוס {% if sort == 'status' %}{{ '🔼' if direction == 'asc' else '🔽' }}{% endif %}
                         </a>
@@ -249,12 +262,12 @@
                         </a>
                     </th>
                     <th>הערות</th>
-                    <th>
+                    <th class="hide-mobile">
                         <a href="{{ url_for('computers', sort='exam_appeal', dir='asc' if sort != 'exam_appeal' or direction == 'desc' else 'desc', q=search, status=status_filter, cage_q=cage_search) }}" style="color:inherit; text-decoration:none;">
                             מבחן\ערעור {% if sort == 'exam_appeal' %}{{ '🔼' if direction == 'asc' else '🔽' }}{% endif %}
                         </a>
                     </th>
-                    <th>סורק אחרון</th>
+                    <th class="hide-mobile">סורק אחרון</th>
                     <th style="text-align: left; width: 60px;">פעולות</th>
                 </tr>
             </thead>
@@ -263,9 +276,9 @@
                 <tr data-id="{{ c.id }}">
                     <td class="col-chk"><input type="checkbox" class="row-chk" value="{{ c.id }}"
                             onchange="updateBatchBar()"></td>
-                    <td style="color:var(--muted); font-size:.7rem;">{{ loop.index }}</td>
+                    <td class="hide-mobile" style="color:var(--muted); font-size:.7rem;">{{ loop.index }}</td>
                     <td><code style="color:var(--accent2); font-weight: 700;">{{ c.barcode }}</code></td>
-                    <td>{{ c.case_number or '—' }}</td>
+                    <td class="hide-mobile">{{ c.case_number or '—' }}</td>
                     <td>
                         {% set display_cage = c.cage_number or c.cage_name %}
                         {% if display_cage and display_cage|trim != '' %}
@@ -274,7 +287,7 @@
                         —
                         {% endif %}
                     </td>
-                    <td>
+                    <td class="hide-mobile">
                         {% if c.status == 'תקין' %}
                         <span style="color:#4ade80; font-weight:700;">✓ תקין</span>
                         {% elif c.status == 'תקול' %}
@@ -290,8 +303,8 @@
                         title="{{ c.notes or '' }}">
                         {{ c.notes or '—' }}
                     </td>
-                    <td>{{ c.exam_appeal or '—' }}</td>
-                    <td style="color:var(--muted); font-size:0.85rem;">{{ c.last_technician or 'לא ידוע' }}</td>
+                    <td class="hide-mobile">{{ c.exam_appeal or '—' }}</td>
+                    <td class="hide-mobile" style="color:var(--muted); font-size:0.85rem;">{{ c.last_technician or 'לא ידוע' }}</td>
                     <td style="white-space:nowrap; text-align: left;">
                         <a href="{{ url_for('edit_computer', cid=c.id) }}"
                             style="text-decoration:none; margin-left:8px;" title="עריכה">✏️</a>
