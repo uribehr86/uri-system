@@ -169,6 +169,22 @@
             border-radius: 30px;
             border: 1px solid var(--border);
             flex-shrink: 0;
+            position: relative;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #22c55e;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #22c55e;
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
         }
 
         .user-badge .info {
@@ -520,7 +536,8 @@
             }
 
             .user-badge {
-                padding: 4px 8px;
+                padding: 4px 10px;
+                gap: 8px;
             }
 
             .user-badge .role {
@@ -528,7 +545,12 @@
             }
 
             .user-badge .name {
+                display: block;
                 font-size: 0.75rem;
+                max-width: 80px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
 
             /* Show icon only on mobile */
@@ -706,7 +728,7 @@
 <body class="no-sidebar">
     {% if session.get('user_id') %}
     <header class="top-nav">
-        <a href="{{ url_for('portal') }}" class="brand"><span>🖥️</span> System</a>
+        <a href="{{ url_for('portal') }}" class="brand"><span>🖥️</span> URI System</a>
 
         <div class="nav-links">
             <a href="{{ url_for('computers') }}"
@@ -715,12 +737,13 @@
         </div>
 
         <div class="user-badge">
+            <div class="status-dot" title="Online"></div>
             <div class="info">
                 {% if session.get('role') == 'admin' %}
                 <span class="name">{{ session.get('username') }}</span>
                 <span class="role">🔑 מנהל</span>
                 {% else %}
-                <span class="name">{{ session.get('username') or 'טכנאי מחובר' }}</span>
+                <span class="name">{{ session.get('username') or 'טכנאי' }}</span>
                 <span class="role">👤 טכנאי</span>
                 {% endif %}
             </div>
