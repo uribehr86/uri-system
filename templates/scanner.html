@@ -560,11 +560,28 @@
 
   // Area Scan Form Handling
 
+  // -- Keep track of last used settings --
+  let lastAreaSettings = {
+      location: '',
+      cage: '',
+      status: 'תקין',
+      exam: ''
+  };
+
   function openSheet(computer, isNew) {
     isSheetOpen = true;
     if (failTimer) clearTimeout(failTimer);
     hideManualInput();
     
+    // Check if it's not new and was scanned recently (basic rescan warning)
+    if (!isNew && computer.last_technician) {
+        if (!confirm(`המחשב הזה כבר נסרק לאחרונה ע"י ${computer.last_technician}.\nהאם אתה בטוח שברצונך לסרוק ולעדכן אותו שוב?`)) {
+            isSheetOpen = false;
+            scanner.resume();
+            return;
+        }
+    }
+
     let titleHtml = (isNew ? '<span class="badge-new">חדש</span>' : '') +
       'מחשב: <span id="sheet-barcode">' + computer.barcode + '</span>';
       
@@ -575,12 +592,14 @@
     document.getElementById('sheet-title').innerHTML = titleHtml;
     
     document.getElementById('sheet-id').value = computer.id;
-    document.getElementById('sh-location').value = computer.location || '';
-    document.getElementById('sh-cage').value = computer.cage_number || '';
-    document.getElementById('sh-status').value = computer.status || 'תקין';
+    // Use last saved settings or computer's current settings
+    document.getElementById('sh-location').value = lastAreaSettings.location || computer.location || '';
+    document.getElementById('sh-cage').value = lastAreaSettings.cage || computer.cage_number || '';
+    document.getElementById('sh-status').value = lastAreaSettings.status || computer.status || 'תקין';
     document.getElementById('sh-case').value = computer.case_number || '';
-    document.getElementById('sh-exam').value = computer.exam_appeal || '';
+    document.getElementById('sh-exam').value = lastAreaSettings.exam || computer.exam_appeal || '';
     document.getElementById('sh-notes').value = computer.notes || '';
+    
     document.getElementById('sheet-overlay').classList.add('show');
   }
 
@@ -602,6 +621,13 @@
       exam_appeal: document.getElementById('sh-exam').value,
       notes: document.getElementById('sh-notes').value
     };
+    
+    // Save settings for next scan
+    lastAreaSettings.location = data.location;
+    lastAreaSettings.cage = data.cage_number;
+    lastAreaSettings.status = data.status;
+    lastAreaSettings.exam = data.exam_appeal;
+
     fetch('/api/update-computer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -612,7 +638,7 @@
       if (res.success) {
         document.getElementById('sheet-overlay').classList.remove('show');
         isSheetOpen = false;
-        showToast('✓ נשמר!');
+        showToast('✓ נשמר! המשך לסרוק...');
         setTimeout(() => { scanner.resume(); resetFailTimer(); }, 300);
       } else { showToast('שגיאה בשמירה', true); }
     })

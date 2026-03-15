@@ -519,9 +519,16 @@
                 gap: 6px;
             }
 
-            .user-badge .role,
-            .user-badge .name {
+            .user-badge {
+                padding: 4px 8px;
+            }
+
+            .user-badge .role {
                 display: none;
+            }
+
+            .user-badge .name {
+                font-size: 0.75rem;
             }
 
             /* Show icon only on mobile */
@@ -699,11 +706,11 @@
 <body class="no-sidebar">
     {% if session.get('user_id') %}
     <header class="top-nav">
-        <a href="{{ url_for('portal') }}" class="brand"><span>🖥️</span> URI System</a>
+        <a href="{{ url_for('portal') }}" class="brand"><span>🖥️</span> System</a>
 
         <div class="nav-links">
             <a href="{{ url_for('computers') }}"
-                class="{{ 'active' if request.endpoint in ['computers','dashboard','add_computer','edit_computer'] }}">📊 לוח בקרה ומלאי</a>
+                class="{{ 'active' if request.endpoint in ['computers','dashboard','add_computer','edit_computer'] }}">📊 מלאי</a>
             <a href="{{ url_for('export_computers') }}">📤 ייצוא</a>
         </div>
 
@@ -713,7 +720,7 @@
                 <span class="name">{{ session.get('username') }}</span>
                 <span class="role">🔑 מנהל</span>
                 {% else %}
-                <span class="name">טכנאי מחובר</span>
+                <span class="name">{{ session.get('username') or 'טכנאי מחובר' }}</span>
                 <span class="role">👤 טכנאי</span>
                 {% endif %}
             </div>
