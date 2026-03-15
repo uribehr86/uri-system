@@ -639,7 +639,7 @@
     const techName = (computer.last_technician || "").trim();
     const myName = (currentTechnician || "").trim();
     
-    if (!isNew && techName && techName !== myName) {
+    if (!isNew && techName && techName !== myName && techName !== "לא ידוע") {
         let warnMsg = `המחשב הזה כבר נסרק לאחרונה ע"י ${techName}`;
         if (computer.last_scan_time) warnMsg += ` ב-${computer.last_scan_time}`;
         warnMsg += `.\nהאם אתה בטוח שברצונך לסרוק ולעדכן אותו שוב?`;
