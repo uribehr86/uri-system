@@ -194,11 +194,10 @@
       </div>
     </div>
 
-    <!-- EXAMS SCAN (Coming soon) -->
-    <div id="panel-exam" style="display:none; text-align:center; padding: 40px 10px;">
-        <div style="font-size: 4rem; margin-bottom: 10px;">🚧</div>
-        <h2 style="color:#facc15; font-weight:900; margin-bottom: 8px;">זהירות בונים בגדול!</h2>
-        <p style="color:#94a3b8; font-size: 0.95rem;">סריקת מבחנים ומחשב תגיע בפרויקט הבא.</p>
+    <!-- EXAMS SCAN -->
+    <div id="panel-exam" style="display:none;">
+      <div class="cage-scan-hint" style="font-weight:700; color:#fff;">סרוק את קוד ה-QR מדף הנבחן כדי לעדכן נוכחות</div>
+      <div class="waiting-hint"><div class="pulse-dot"></div> ממתין לסריקת דף נבחן...</div>
     </div>
 
   </div>
@@ -434,9 +433,20 @@
 
   // ── Scan dispatcher ───────────────────────────────────────────────────
   function onScan(code) {
-    if (isPaused || isSheetOpen || currentMode === 'exam') {
+    if (isPaused || isSheetOpen) {
         if (isPaused && !isSheetOpen) showToast('⚠️ הסורק מושהה. לחץ על המשך כדי לסרוק.', true);
         return;
+    }
+
+    if (currentMode === 'exam') {
+        if (code.includes('/examinee/scan/')) {
+            showToast('✓ קוד זוהה! מעביר למסך נוכחות...');
+            window.location.href = code;
+            return;
+        } else {
+            showToast('❌ קוד לא תקין למערכת המבחנים', true);
+            return;
+        }
     }
 
     const clean = cleanBarcode(code);
@@ -639,14 +649,14 @@
     const techName = (computer.last_technician || "").trim();
     const myName = (currentTechnician || "").trim();
     
-    if (!isNew && techName && techName !== myName && techName !== "לא ידוע") {
-        let warnMsg = `המחשב הזה כבר נסרק לאחרונה ע"י ${techName}`;
+    if (!isNew) {
+        let warnMsg = `המחשב הזה כבר נסרק במערכת.`;
+        if (techName) warnMsg = `המחשב הזה כבר נסרק לאחרונה ע"י ${techName}`;
         if (computer.last_scan_time) warnMsg += ` ב-${computer.last_scan_time}`;
-        warnMsg += `.\nהאם אתה בטוח שברצונך לסרוק ולעדכן אותו שוב?`;
+        warnMsg += `.\nהאם אתה בטוח שברצונך לעדכן אותו שוב?`;
         
         if (!confirm(warnMsg)) {
             isSheetOpen = false;
-            // Extend cooldown so it doesn't immediately scan again
             lastScanTime = Date.now(); 
             setTimeout(() => { scanner.resume(); resetFailTimer(); }, 300);
             return;

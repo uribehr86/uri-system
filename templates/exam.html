@@ -79,7 +79,7 @@
                     <td>
                         {% set display_cage = computer.cage_number or computer.cage_name %}
                         {% if display_cage and display_cage|trim != '' %}
-                        <span class="badge" style="background-color: {{ get_cage_color(display_cage) }}; color: #000; font-weight: 800; padding: 6px 12px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">{{ display_cage }}</span>
+                        <span class="badge-cage" data-bgcolor="{{ get_cage_color(display_cage) }}">{{ display_cage }}</span>
                         {% else %}
                         —
                         {% endif %}

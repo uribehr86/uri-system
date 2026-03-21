@@ -154,6 +154,9 @@
 <div class="page-header">
     <h1>📊 לוח בקרה ומלאי</h1>
     <div>
+        <button id="syncSheetsBtn" class="btn btn-ghost" style="margin-left: 8px; border: 1px solid var(--accent2);">
+            <span style="font-size: 1.1rem;">📅</span> סנכרון ל-Sheets
+        </button>
         <a href="{{ url_for('scanner') }}" class="btn btn-blue" style="margin-left: 8px; font-weight: bold; font-size: 1rem;"><span style="font-size: 1.2rem;">📸</span> סריקה מהירה</a>
         <a href="{{ url_for('add_computer') }}" class="btn btn-green">➕ הוסף מחשב</a>
     </div>
@@ -293,7 +296,7 @@
                     <td>
                         {% set display_cage = c.cage_number or c.cage_name %}
                         {% if display_cage and display_cage|trim != '' %}
-                        <span class="badge" style="background-color: {{ get_cage_color(display_cage) }}; color: #000; font-weight: 800; padding: 6px 12px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">{{ display_cage }}</span>
+                        <span class="badge-cage" data-bgcolor="{{ get_cage_color(display_cage) }}">{{ display_cage }}</span>
                         {% else %}
                         —
                         {% endif %}
@@ -318,7 +321,9 @@
                     <td style="color: var(--accent2); font-weight: 600; font-size: 0.9rem; line-height: 1.2;">
                         {{ c.last_technician or '—' }}
                     </td>
-                    <td class="hide-mobile" style="color:var(--muted); font-size:0.75rem;">{{ c.last_seen or '—' }}</td>
+                    <td class="hide-mobile" style="color:var(--muted); font-size:0.75rem;">
+                        {{ c.last_seen.strftime('%d/%m/%Y %H:%M') if c.last_seen else '—' }}
+                    </td>
                     <td style="white-space:nowrap; text-align: left;">
                         <a href="{{ url_for('edit_computer', cid=c.id) }}"
                             style="text-decoration:none; margin-left:8px;" title="עריכה">✏️</a>
@@ -445,5 +450,32 @@
                 else alert("שגיאה במחיקה: " + data.error);
             });
     }
+
+    document.getElementById('syncSheetsBtn').addEventListener('click', function() {
+        const btn = this;
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '⌛ מסנכרן...';
+
+        fetch('/api/sync-to-sheets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            if (data.success) {
+                alert("✅ " + data.message);
+            } else {
+                alert("❌ שגיאה: " + data.error);
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            alert("❌ שגיאת תקשורת: " + err);
+        });
+    });
 </script>
 {% endblock %}

@@ -8,14 +8,21 @@ from functools import wraps
 from datetime import datetime
 import json
 import io
+import base64
+import qrcode
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
+import google.generativeai as genai
+from google_sheets_sync import sync_inventory_to_sheets
 
 # טעינת הגדרות
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'uri_system_2026')
+
+# Initialize Google AI (Gemini)
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Initialize Connection Pool
 db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
@@ -34,7 +41,7 @@ def get_db_connection():
         # Get connection from pool
         return db_pool.getconn()
     except Exception as e:
-        print(f"[ERROR] שגיאה: לא ניתן לקבל חיבור מהמאגר. {e}")
+        print(f"[ERROR] Error: database connection pool could not be obtained. {e}")
         return None
 
 def release_db_connection(conn):
@@ -193,7 +200,7 @@ def login():
                 'username': "אורי מנהל מערכת",
                 'role': 'admin'
             })
-            print(f"[OK] משתמש {username} התחבר החיבור מהיר (hardcoded)")
+            print(f"[OK] User {username} logged in (hardcoded fallback)")
             return redirect(url_for('portal'))
             
         # Check database
@@ -215,7 +222,7 @@ def login():
                         'username': user['username'],
                         'role': user['role']
                     })
-                    print(f"[OK] משתמש {username} התחבר דרך DB")
+                    print(f"[OK] User {username} logged in via DB")
                     return redirect(url_for('portal'))
                 else:
                     flash("שם משתמש או סיסמה שגויים", "danger")
@@ -419,9 +426,9 @@ def edit_computer(cid):
             
             cur.execute("""
                 UPDATE computers 
-                SET case_number=%s, cage_number=%s, status=%s, location=%s, exam_appeal=%s, notes=%s
+                SET case_number=%s, cage_number=%s, status=%s, location=%s, exam_appeal=%s, notes=%s, last_technician=%s
                 WHERE id=%s
-            """, (data['case_number'], data['cage_number'], data['status'], data['location'], data['exam_appeal'], data['notes'], cid))
+            """, (data['case_number'], data['cage_number'], data['status'], data['location'], data['exam_appeal'], data['notes'], session.get('username'), cid))
             
             cur.execute("""
                 INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
@@ -529,10 +536,10 @@ def process_scan():
             # Update the existing record instead of inserting a duplicate
             cur.execute("""
                 UPDATE computers 
-                SET scan_time = NOW()
+                SET scan_time = NOW(), last_technician = %s
                 WHERE id = %s
                 RETURNING *
-            """, (computer['id'],))
+            """, (session.get('username'), computer['id'],))
             new_computer = cur.fetchone()
             
             # Fetch last technician and time
@@ -548,10 +555,10 @@ def process_scan():
         else:
             # Create completely new record
             cur.execute("""
-                INSERT INTO computers (barcode, status, scan_time, notes) 
-                VALUES (%s, 'תקין', NOW(), %s) 
+                INSERT INTO computers (barcode, status, scan_time, notes, last_technician) 
+                VALUES (%s, 'תקין', NOW(), %s, %s) 
                 RETURNING *
-            """, (barcode, None))
+            """, (barcode, None, session.get('username')))
             new_computer = cur.fetchone()
             conn.commit()
             cur.close()
@@ -586,6 +593,10 @@ def api_update_computer():
                 updates.append(f"{key} = %s")
                 params.append(data[key])
         
+        # Always update last_technician on scan update
+        updates.append("last_technician = %s")
+        params.append(session.get('username'))
+
         if updates:
             params.append(cid)
             cur.execute(f"UPDATE computers SET {', '.join(updates)} WHERE id = %s", params)
@@ -608,6 +619,50 @@ def api_update_computer():
         
     except Exception as e:
         print(f"Error in api_update_computer: {e}")
+        return {"error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
+# ── AI ASSISTANT (GEMINI) ───────────────────────────────────────────
+@app.route('/api/ai-chat', methods=['POST'])
+@login_required
+def api_ai_chat():
+    data = request.json
+    user_msg = data.get('message', '').strip()
+    if not user_msg:
+        return {"error": "No message provided"}, 400
+
+    conn = get_db_connection()
+    if not conn: return {"error": "DB connection failed"}, 500
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        # Fetch stats for context
+        cur.execute("SELECT COUNT(*) as total FROM computers")
+        total = cur.fetchone()['total']
+        
+        cur.execute("SELECT status, COUNT(*) as count FROM computers GROUP BY status")
+        status_stats = cur.fetchall()
+        status_desc = ", ".join([f"{row['status']}: {row['count']}" for row in status_stats])
+        
+        # Build system context
+        system_prompt = f"""
+        אתה עוזר ה-AI של מערכת URI לניהול מלאי מחשבים. 
+        הנתונים הנוכחיים במערכת הם:
+        - סה"כ מחשבים: {total}
+        - סטטוסים: {status_desc}
+        
+        ענה למשתמש בעברית בצורה עוזרת, מקצועית וקצרה. 
+        אם המשתמש שואל על המצב, השתמש בנתונים שלעיל.
+        משתמש נוכחי: {session.get('username')}
+        """
+        
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content([system_prompt, user_msg])
+        
+        return {"response": response.text}
+        
+    except Exception as e:
+        print(f"AI Error: {e}")
         return {"error": str(e)}, 500
     finally:
         release_db_connection(conn)
@@ -685,6 +740,22 @@ def api_batch_delete():
         return {"success": False, "error": str(e)}, 500
     finally:
         release_db_connection(conn)
+
+
+# ── API: Google Sheets Sync ──────────────────────────────────────────
+@app.route('/api/sync-to-sheets', methods=['POST'])
+@login_required
+def api_sync_to_sheets():
+    """
+    Manual trigger for Google Sheets sync.
+    """
+    # Only admin or experienced technicians should sync
+    # For now, allow all logged in users as requested "connect table"
+    success, message = sync_inventory_to_sheets()
+    if success:
+        return {"success": True, "message": message}
+    else:
+        return {"success": False, "error": message}, 500
 
 
 # ── API: שליפת מידע כלוב ──────────────────────────────────────────────
@@ -1136,6 +1207,126 @@ def export_computers():
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
+# ── EXAMINEE ATTENDANCE SYSTEM ──────────────────────────────────────
+
+@app.route('/examinee/print/<token>')
+def examinee_print(token):
+    conn = get_db_connection()
+    if not conn: return "DB Connection Error", 500
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT * FROM examinees WHERE token = %s", (token,))
+        ex = cur.fetchone()
+        if not ex: return "Examinee not found", 404
+        
+        # Generate QR Code
+        # We point it to the scan URL. We need the current host.
+        # For simplicity, we use the request.host_url
+        scan_url = f"{request.host_url.rstrip('/')}/examinee/scan/{token}"
+        
+        qr = qrcode.QRCode(version=1, box_size=10, border=1)
+        qr.add_data(scan_url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        buffered = io.BytesIO()
+        img.save(buffered, format="PNG")
+        qr_base64 = base64.b64encode(buffered.getvalue()).decode()
+        qr_url = f"data:image/png;base64,{qr_base64}"
+        
+        return render_template('examinee_login_page.html', 
+                             exam_name=ex['exam_name'],
+                             classroom=ex['classroom'],
+                             seat_number=ex['seat_number'],
+                             full_name=ex['full_name'],
+                             id_number=ex['id_number'],
+                             extra_time=ex['extra_time'],
+                             username=ex['username'],
+                             password=ex['password'],
+                             qr_code_url=qr_url)
+    finally:
+        release_db_connection(conn)
+
+@app.route('/examinee/scan/<token>')
+@login_required
+def examinee_scan(token):
+    conn = get_db_connection()
+    if not conn: return "DB Connection Error", 500
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT * FROM examinees WHERE token = %s", (token,))
+        ex = cur.fetchone()
+        if not ex: return "Examinee not found", 404
+        
+        return render_template('examinee_scan_ui.html', examinee=ex)
+    finally:
+        release_db_connection(conn)
+
+@app.route('/api/examinee/update', methods=['POST'])
+@login_required
+def api_examinee_update():
+    data = request.json
+    token = data.get('token')
+    if not token: return {"success": False, "error": "Missing token"}, 400
+    
+    conn = get_db_connection()
+    if not conn: return {"success": False, "error": "DB Error"}, 500
+    try:
+        cur = conn.cursor()
+        
+        updates = []
+        params = []
+        
+        if 'is_present' in data:
+            updates.append("is_present = %s")
+            params.append(int(data['is_present']))
+            
+        if 'laptop_number' in data:
+            updates.append("laptop_number = %s")
+            params.append(data['laptop_number'])
+            
+        if 'laptop_status' in data:
+            updates.append("laptop_status = %s")
+            params.append(data['laptop_status'])
+            
+        if 'notes' in data:
+            updates.append("notes = %s")
+            params.append(data['notes'])
+            
+        if updates:
+            updates.append("scan_time = NOW()")
+            updates.append("scanner_technician = %s")
+            params.append(session.get('username'))
+            
+            params.append(token)
+            cur.execute(f"UPDATE examinees SET {', '.join(updates)} WHERE token = %s", params)
+            conn.commit()
+            return {"success": True}
+        
+        return {"success": False, "error": "No updates provided"}, 400
+    except Exception as e:
+        return {"success": False, "error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
+@app.route('/attendance')
+@login_required
+def attendance_dashboard():
+    conn = get_db_connection()
+    if not conn: return "DB Connection Error", 500
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT * FROM examinees ORDER BY classroom, seat_number::int")
+        examinees = cur.fetchall()
+        
+        # Stats
+        cur.execute("SELECT COUNT(*) as total, SUM(CASE WHEN is_present = 1 THEN 1 ELSE 0 END) as present FROM examinees")
+        stats = cur.fetchone()
+        
+        return render_template('attendance_dashboard.html', examinees=examinees, stats=stats)
+    finally:
+        release_db_connection(conn)
 
 
 if __name__ == '__main__':

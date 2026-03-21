@@ -412,6 +412,16 @@
             color: #58a6ff;
         }
 
+        /* Badge-cage for cage labels */
+        .badge-cage {
+            color: #000;
+            font-weight: 800;
+            padding: 6px 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            display: inline-block;
+        }
+
         /* ── Form ── */
         .form-group {
             margin-bottom: 18px;
@@ -733,6 +743,8 @@
         <div class="nav-links">
             <a href="{{ url_for('computers') }}"
                 class="{{ 'active' if request.endpoint in ['computers','dashboard','add_computer','edit_computer'] }}">📊 מלאי</a>
+            <a href="{{ url_for('attendance_dashboard') }}"
+                class="{{ 'active' if request.endpoint == 'attendance_dashboard' }}">📝 נוכחות בחינות</a>
             <a href="{{ url_for('export_computers') }}">📤 ייצוא</a>
         </div>
 
@@ -843,6 +855,12 @@
                 }
             });
         }
+        // Apply dynamic background colors from data-bgcolor
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('[data-bgcolor]').forEach(el => {
+                el.style.backgroundColor = el.getAttribute('data-bgcolor');
+            });
+        });
     </script>
 </body>
 

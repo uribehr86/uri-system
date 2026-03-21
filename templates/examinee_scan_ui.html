@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>סריקת נוכחות - {{ examinee.full_name }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --accent: #3b82f6;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .card {
+            background-color: var(--surface);
+            border-radius: 20px;
+            padding: 25px;
+            width: 100%;
+            max-width: 450px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .header h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            color: var(--accent);
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 100px 1fr;
+            gap: 12px;
+            margin-bottom: 30px;
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 12px;
+        }
+        .label { color: var(--muted); font-size: 0.9rem; }
+        .value { font-weight: 600; }
+
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 0.9rem; }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.2);
+            color: white;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        
+        .presence-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+        .toggle-btn {
+            flex: 1;
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            text-align: center;
+            font-weight: 800;
+            transition: all 0.2s;
+            background: rgba(255,255,255,0.05);
+            color: var(--muted);
+        }
+        .toggle-btn.active[data-val="1"] {
+            background-color: rgba(34,197,94,0.2);
+            border-color: var(--success);
+            color: var(--success);
+        }
+        .toggle-btn.active[data-val="0"] {
+            background-color: rgba(239,68,68,0.2);
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .save-btn {
+            width: 100%;
+            padding: 16px;
+            border-radius: 12px;
+            border: none;
+            background: var(--accent);
+            color: white;
+            font-weight: 700;
+            font-size: 1.1rem;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: transform 0.1s;
+        }
+        .save-btn:active { transform: scale(0.98); }
+        
+        .success-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15,23,42,0.9);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        .success-overlay i { font-size: 5rem; color: var(--success); margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="header">
+            <i class="fas fa-user-check" style="font-size: 2rem; margin-bottom: 10px; color: var(--accent);"></i>
+            <h1>נוכחות ותקינות</h1>
+            <div style="color: var(--muted); font-size: 0.8rem; margin-top: 5px;">{{ examinee.exam_name }}</div>
+        </div>
+
+        <div class="info-grid">
+            <div class="label">נבחן/ת:</div>
+            <div class="value">{{ examinee.full_name }}</div>
+            <div class="label">ת.ז:</div>
+            <div class="value">{{ examinee.id_number }}</div>
+            <div class="label">מיקום:</div>
+            <div class="value">{{ examinee.classroom }} | כיסא {{ examinee.seat_number }}</div>
+            <div class="label">יוזר:</div>
+            <div class="value">{{ examinee.username }}</div>
+        </div>
+
+        <label>סטטוס נוכחות:</label>
+        <div class="presence-toggle">
+            <div class="toggle-btn {{ 'active' if examinee.is_present == 1 else '' }}" data-val="1">נוכח (1)</div>
+            <div class="toggle-btn {{ 'active' if examinee.is_present == 0 else '' }}" data-val="0">לא נוכח (0)</div>
+        </div>
+
+        <div class="form-group">
+            <label>מספר מחשב (לעדכון במקרה של החלפה):</label>
+            <input type="text" id="laptop-no" value="{{ examinee.laptop_number }}">
+        </div>
+
+        <div class="form-group">
+            <label>מצב מחשב:</label>
+            <select id="laptop-status">
+                <option value="תקין" {{ 'selected' if examinee.laptop_status == 'תקין' else '' }}>תקין</option>
+                <option value="תקול" {{ 'selected' if examinee.laptop_status == 'תקול' else '' }}>תקול</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>הערות / פירוט תקלה:</label>
+            <textarea id="notes" rows="3">{{ examinee.notes or '' }}</textarea>
+        </div>
+
+        <button class="save-btn" onclick="save()">שמור עדכון</button>
+    </div>
+
+    <div id="success-overlay" class="success-overlay">
+        <i class="fas fa-circle-check"></i>
+        <h2>הנתונים נשמרו בהצלחה</h2>
+        <p>ניתן לסגור את החלון</p>
+    </div>
+
+    <script>
+        let isPresent = {{ examinee.is_present }};
+        
+        document.querySelectorAll('.toggle-btn').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                isPresent = parseInt(btn.dataset.val);
+            };
+        });
+
+        function save() {
+            const data = {
+                token: '{{ examinee.token }}',
+                is_present: isPresent,
+                laptop_number: document.getElementById('laptop-no').value,
+                laptop_status: document.getElementById('laptop-status').value,
+                notes: document.getElementById('notes').value
+            };
+
+            fetch('/api/examinee/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    document.getElementById('success-overlay').style.display = 'flex';
+                } else {
+                    alert('שגיאה בשמירה: ' + res.error);
+                }
+            })
+            .catch(err => alert('שגיאת תקשורת: ' + err));
+        }
+    </script>
+</body>
+</html>

@@ -148,6 +148,12 @@
             <p>ניהול ומעקב אחר מחשבים בסטטוס ערעור או מבחן.</p>
         </a>
 
+        <a href="{{ url_for('attendance_dashboard') }}" class="portal-card" style="border-color: var(--success);">
+            <div class="icon-wrapper" style="color: var(--success)">📋</div>
+            <h3>ניהול נוכחות נבחנים</h3>
+            <p>מעקב נוכחות בשידור חי, ניהול תקלות והחלפת מחשבים בזמן בחינה.</p>
+        </a>
+
         {% if session.get('role') == 'admin' or session.get('user') == 'admin_uri' %}
         <a href="{{ url_for('manage_users') }}" class="portal-card" style="border-color: rgba(218, 54, 51, 0.3);">
             <div class="icon-wrapper" style="color: var(--danger)">⚙️</div>
