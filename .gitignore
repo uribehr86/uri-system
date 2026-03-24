@@ -3,6 +3,7 @@ venv/
 .venv/
 env/
 .env/
+venv_new/
 
 # Python cache
 __pycache__/
@@ -16,6 +17,7 @@ __pycache__/
 
 # Environment variables
 .env
+service_account.json
 
 # IDE settings
 .vscode/

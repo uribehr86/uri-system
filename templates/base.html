@@ -743,8 +743,10 @@
         <div class="nav-links">
             <a href="{{ url_for('computers') }}"
                 class="{{ 'active' if request.endpoint in ['computers','dashboard','add_computer','edit_computer'] }}">📊 מלאי</a>
-            <a href="{{ url_for('attendance_dashboard') }}"
-                class="{{ 'active' if request.endpoint == 'attendance_dashboard' }}">📝 נוכחות בחינות</a>
+            <a href="{{ url_for('scanner') }}"
+                class="{{ 'active' if request.endpoint == 'scanner' }}">📱 סורק</a>
+            <a href="{{ url_for('history_page') }}"
+                class="{{ 'active' if request.endpoint == 'history_page' }}">🕒 היסטוריה</a>
             <a href="{{ url_for('export_computers') }}">📤 ייצוא</a>
         </div>
 

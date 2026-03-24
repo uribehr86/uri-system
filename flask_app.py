@@ -3,6 +3,7 @@ import psycopg2
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
 import os
+import threading
 from dotenv import load_dotenv
 from functools import wraps
 from datetime import datetime
@@ -20,6 +21,8 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'uri_system_2026')
+from datetime import timedelta
+app.permanent_session_lifetime = timedelta(days=30)
 
 # Initialize Google AI (Gemini)
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
@@ -200,6 +203,7 @@ def login():
                 'username': "אורי מנהל מערכת",
                 'role': 'admin'
             })
+            session.permanent = True
             print(f"[OK] User {username} logged in (hardcoded fallback)")
             return redirect(url_for('portal'))
             
@@ -222,6 +226,7 @@ def login():
                         'username': user['username'],
                         'role': user['role']
                     })
+                    session.permanent = True
                     print(f"[OK] User {username} logged in via DB")
                     return redirect(url_for('portal'))
                 else:
@@ -326,17 +331,12 @@ def computers():
         
         # Free search across multiple fields
         if search:
-            base_where += """ AND (
-                barcode = %s OR 
-                case_number = %s OR 
-                cage_number = %s OR 
-                cage_name ILIKE %s OR
-                location ILIKE %s OR 
-                notes ILIKE %s OR 
-                exam_appeal ILIKE %s
-            )"""
-            s = f"%{search}%"
-            params.extend([search, search, search, s, s, s, s])
+            # Normalize search term if it's purely digits (barcode-like)
+            norm_search = re.sub(r'^0+(?=\d)', '', search)
+            base_where += " AND (barcode ILIKE %s OR barcode ILIKE %s OR case_number ILIKE %s OR location ILIKE %s OR notes ILIKE %s OR exam_appeal ILIKE %s)"
+            search_val = f"%{search}%"
+            norm_val = f"%{norm_search}%"
+            params.extend([search_val, norm_val, search_val, search_val, search_val, search_val])
             
         # Dedicated cage search
         if cage_search:
@@ -395,10 +395,18 @@ def add_computer():
         if not conn: return "DB connection failed", 500
         try:
             cur = conn.cursor()
+            barcode = re.sub(r'^0+(?=\d)', '', data['barcode'].strip())
+            
+            # Check for existing barcode
+            cur.execute("SELECT id FROM computers WHERE barcode = %s", (barcode,))
+            if cur.fetchone():
+                flash(f"שגיאה: מחשב עם ברקוד {barcode} כבר קיים במערכת!", "danger")
+                return redirect(url_for('add_computer'))
+
             cur.execute("""
-                INSERT INTO computers (barcode, case_number, cage_number, status, location, exam_appeal, notes, scan_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
-            """, (data['barcode'], data['case_number'], data['cage_number'], data['status'], data['location'], data['exam_appeal'], data['notes']))
+                INSERT INTO computers (barcode, case_number, cage_number, status, location, exam_appeal, notes, scan_time, last_technician)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), %s)
+            """, (barcode, data['case_number'], data['cage_number'], data['status'], data['location'], data['exam_appeal'], data['notes'], session.get('username')))
             conn.commit()
             cur.close()
             flash("מחשב נוסף בהצלחה!", "success")
@@ -550,6 +558,9 @@ def process_scan():
             
             conn.commit()
             cur.close()
+            # Trigger Google Sheets sync in background
+            threading.Thread(target=sync_inventory_to_sheets).start()
+            
             # מחזירים את המידע הקיים כדי שהטופס יתמלא נכון
             return {"exists": True, "computer": new_computer}
         else:
@@ -562,6 +573,9 @@ def process_scan():
             new_computer = cur.fetchone()
             conn.commit()
             cur.close()
+            # Trigger Google Sheets sync in background
+            threading.Thread(target=sync_inventory_to_sheets).start()
+            
             return {"exists": False, "computer": new_computer}
             
     except Exception as e:
@@ -614,6 +628,9 @@ def api_update_computer():
             
             conn.commit()
             cur.close()
+            # Trigger Google Sheets sync in background
+            threading.Thread(target=sync_inventory_to_sheets).start()
+            
             return {"success": True}
         return {"success": False, "message": "No fields to update"}
         
@@ -840,10 +857,10 @@ def api_fast_scan():
             notes_val = old_val.get('notes') or ""
             cur.execute("""
                 UPDATE computers 
-                SET location = %s, cage_number = %s, cage_name = %s, status = %s, scan_time = NOW()
+                SET location = %s, cage_number = %s, cage_name = %s, status = %s, scan_time = NOW(), last_technician = %s
                 WHERE id = %s
                 RETURNING *
-            """, (location, cage_number, cage_name, status, old_val['id']))
+            """, (location, cage_number, cage_name, status, technician, old_val['id']))
             new_computer = cur.fetchone()
             
             # Fetch last technician and time
@@ -854,10 +871,10 @@ def api_fast_scan():
                 last_scan_time = hist['timestamp'].strftime("%d/%m/%Y %H:%M") if hist['timestamp'] else ""
         else:
             cur.execute("""
-                INSERT INTO computers (barcode, location, cage_number, cage_name, status, scan_time)
-                VALUES (%s, %s, %s, %s, %s, NOW())
+                INSERT INTO computers (barcode, location, cage_number, cage_name, status, scan_time, last_technician)
+                VALUES (%s, %s, %s, %s, %s, NOW(), %s)
                 RETURNING *
-            """, (barcode, location, cage_number, cage_name, status))
+            """, (barcode, location, cage_number, cage_name, status, technician))
             new_computer = cur.fetchone()
 
         # תיעוד היסטוריה
@@ -921,22 +938,6 @@ def admin_approve_delete():
     finally:
         release_db_connection(conn)
 
-@app.route('/fix-db')
-def fix_db():
-    conn = get_db_connection()
-    if conn:
-        try:
-            cur = conn.cursor()
-            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-            conn.commit()
-            cur.close()
-            return "DB fixed successfully! You can now visit /manage-users"
-        except Exception as e:
-            return f"Error: {e}"
-        finally:
-            release_db_connection(conn)
-    return "Failed to connect"
-
 @app.route('/manage-users')
 @login_required
 def manage_users():
@@ -962,18 +963,13 @@ def manage_users():
             pending.append({
                 'computer_number': p['computer_number'],
                 'cage_number': p['cage_number'] or 'לא ידוע',
-                'scanned_by': 'טכנאי' # Could join with history for exact user if needed
+                'scanned_by': 'טכנאי'
             })
             
         cur.close()
         return render_template('manage_users.html', users=users, pending=pending)
     finally:
         release_db_connection(conn)
-
-
-# ════════════════════════════════════════════════════════════════
-# CAGE MANAGEMENT
-# ════════════════════════════════════════════════════════════════
 
 @app.route('/cages')
 @login_required
@@ -982,7 +978,6 @@ def cages_page():
     if not conn: return "DB Error", 500
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        # Get all cages with computer counts and status breakdowns
         cur.execute("""
             SELECT
                 c.cage_id, c.name, c.location, c.notes,
@@ -996,338 +991,91 @@ def cages_page():
             ORDER BY computer_count DESC
         """)
         cages = cur.fetchall()
-
-        # Also include cages that exist in computers but not in cages table
-        cur.execute("""
-            SELECT cage_number as cage_id, COUNT(*) as computer_count
-            FROM computers
-            WHERE cage_number IS NOT NULL AND cage_number != ''
-            AND cage_number NOT IN (SELECT cage_id FROM cages)
-            GROUP BY cage_number
-            ORDER BY computer_count DESC
-        """)
-        implicit_cages = cur.fetchall()
-        for ic in implicit_cages:
-            cages.append({**dict(ic), 'name': None, 'location': None, 'notes': None, 'ok_count': 0, 'broken_count': 0, 'other_count': 0})
-
         cur.close()
         return render_template('cages.html', cages=cages)
     except Exception as e:
-        print(f"Error in cages_page: {e}")
         return f"<h1>Error: {e}</h1>", 500
     finally:
         release_db_connection(conn)
 
-
 @app.route('/api/cage/save', methods=['POST'])
 @login_required
 def api_save_cage():
-    """Create or update a cage record"""
     data = request.json
     cage_id = data.get('cage_id', '').strip()
     existing_id = data.get('existing_id', '').strip()
-    if not cage_id:
-        return {'success': False, 'error': 'cage_id is required'}, 400
-
+    if not cage_id: return {'success': False, 'error': 'cage_id is required'}, 400
     conn = get_db_connection()
     if not conn: return {'success': False, 'error': 'DB Error'}, 500
     try:
         cur = conn.cursor()
         if existing_id:
-            cur.execute("""
-                UPDATE cages SET name=%s, location=%s, notes=%s, updated_at=NOW()
-                WHERE cage_id=%s
-            """, (data.get('name',''), data.get('location',''), data.get('notes',''), existing_id))
+            cur.execute("UPDATE cages SET name=%s, location=%s, notes=%s, updated_at=NOW() WHERE cage_id=%s", 
+                        (data.get('name',''), data.get('location',''), data.get('notes',''), existing_id))
         else:
-            cur.execute("""
-                INSERT INTO cages (cage_id, name, location, notes)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (cage_id) DO UPDATE
-                SET name=EXCLUDED.name, location=EXCLUDED.location, notes=EXCLUDED.notes, updated_at=NOW()
-            """, (cage_id, data.get('name',''), data.get('location',''), data.get('notes','')))
+            cur.execute("INSERT INTO cages (cage_id, name, location, notes) VALUES (%s, %s, %s, %s) ON CONFLICT (cage_id) DO UPDATE SET name=EXCLUDED.name, location=EXCLUDED.location, notes=EXCLUDED.notes, updated_at=NOW()", 
+                        (cage_id, data.get('name',''), data.get('location',''), data.get('notes','')))
         conn.commit()
         cur.close()
         return {'success': True}
-    except Exception as e:
-        print(f"Error saving cage: {e}")
-        return {'success': False, 'error': str(e)}, 500
-    finally:
-        release_db_connection(conn)
-
-
-# ════════════════════════════════════════════════════════════════
-# SCAN DASHBOARD — LIVE STATS
-# ════════════════════════════════════════════════════════════════
+    finally: release_db_connection(conn)
 
 @app.route('/scan-dashboard')
 @login_required
 def scan_dashboard():
     return render_template('scan_dashboard.html')
 
-
 @app.route('/api/scan-stats')
 @login_required
 def api_scan_stats():
-    """Returns today's scan stats for the live dashboard"""
     conn = get_db_connection()
     if not conn: return {'error': 'DB Error'}, 500
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
-
-        # Scans today (via history)
-        cur.execute("""
-            SELECT COUNT(*) as cnt FROM inventory_history
-            WHERE timestamp::date = CURRENT_DATE
-            AND change_type IN ('Fast Scan', 'Update via Scan')
-        """)
+        cur.execute("SELECT COUNT(*) as cnt FROM inventory_history WHERE timestamp::date = CURRENT_DATE AND change_type IN ('Fast Scan', 'Update via Scan')")
         today_total = cur.fetchone()['cnt']
-
-        # Total computers
         cur.execute("SELECT COUNT(*) as cnt FROM computers")
         total_computers = cur.fetchone()['cnt']
-
-        # Broken count
         cur.execute("SELECT COUNT(*) as cnt FROM computers WHERE status = 'תקול'")
         broken = cur.fetchone()['cnt']
-
-        # Per worker today
-        cur.execute("""
-            SELECT technician, COUNT(*) as count, MAX(timestamp) as last_scan
-            FROM inventory_history
-            WHERE timestamp::date = CURRENT_DATE
-            AND change_type IN ('Fast Scan', 'Update via Scan')
-            AND technician IS NOT NULL
-            GROUP BY technician
-            ORDER BY count DESC
-        """)
+        cur.execute("SELECT technician, COUNT(*) as count, MAX(timestamp) as last_scan FROM inventory_history WHERE timestamp::date = CURRENT_DATE AND change_type IN ('Fast Scan', 'Update via Scan') GROUP BY technician ORDER BY count DESC")
         workers = [dict(r) for r in cur.fetchall()]
-
-        # Hourly (today)
-        cur.execute("""
-            SELECT EXTRACT(HOUR FROM timestamp) as hour, COUNT(*) as cnt
-            FROM inventory_history
-            WHERE timestamp::date = CURRENT_DATE
-            AND change_type IN ('Fast Scan', 'Update via Scan')
-            GROUP BY hour
-            ORDER BY hour
-        """)
-        hourly = {int(r['hour']): r['cnt'] for r in cur.fetchall()}
-
         cur.close()
-        return {
-            'today_total': today_total,
-            'total_computers': total_computers,
-            'broken': broken,
-            'workers': workers,
-            'hourly': hourly
-        }
-    except Exception as e:
-        print(f"Error in api_scan_stats: {e}")
-        return {'error': str(e)}, 500
-    finally:
-        release_db_connection(conn)
-
-
-# ════════════════════════════════════════════════════════════════
-# EXCEL EXPORT
-# ════════════════════════════════════════════════════════════════
+        return {'today_total': today_total, 'total_computers': total_computers, 'broken': broken, 'workers': workers}
+    finally: release_db_connection(conn)
 
 @app.route('/export/computers')
 @login_required
 def export_computers():
-    """Export computers to Excel with optional filters"""
-    location_filter = request.args.get('location', '')
-    cage_filter = request.args.get('cage', '')
-    status_filter = request.args.get('status', '')
-
     conn = get_db_connection()
     if not conn: return 'DB Error', 500
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        query = "SELECT barcode, cage_number, cage_name, location, status, case_number, exam_appeal, notes, scan_time FROM computers WHERE 1=1"
-        params = []
-        if location_filter:
-            query += " AND location = %s"; params.append(location_filter)
-        if cage_filter:
-            query += " AND (cage_number = %s OR cage_name = %s)"; params.extend([cage_filter, cage_filter])
-        if status_filter:
-            query += " AND status = %s"; params.append(status_filter)
-        query += " ORDER BY cage_number, barcode"
-        cur.execute(query, params)
+        cur.execute("SELECT barcode, cage_number, cage_name, location, status, case_number, exam_appeal, notes, scan_time FROM computers ORDER BY cage_number, barcode")
         rows = cur.fetchall()
         cur.close()
-    finally:
-        release_db_connection(conn)
-
-    # Build Excel
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = 'מחשבים'
-    ws.sheet_view.rightToLeft = True
-
-    headers = ['ברקוד', 'כלוב', 'שם כלוב', 'מיקום', 'סטטוס', 'מספר תיק', 'מבחן/ערעור', 'הערות', 'נסרק לאחרונה']
-    header_fill = PatternFill(start_color='1E3A5F', end_color='1E3A5F', fill_type='solid')
-    header_font = Font(color='FFFFFF', bold=True, size=11)
-
-    for col_num, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col_num, value=header)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal='center')
-
-    status_colors = {'תקול': 'FFCCCC', 'בתיקון': 'FFF3CC', 'תקין': 'CCFFCC'}
-    for row_num, row in enumerate(rows, 2):
-        values = [
-            row.get('barcode',''), row.get('cage_number',''), row.get('cage_name',''),
-            row.get('location',''), row.get('status',''), row.get('case_number',''),
-            row.get('exam_appeal',''), row.get('notes',''),
-            str(row.get('scan_time',''))[0:16] if row.get('scan_time') else ''  # type: ignore
-        ]
-        for col_num, val in enumerate(values, 1):
-            cell = ws.cell(row=row_num, column=col_num, value=val)
-            status = row.get('status','')
-            if status in status_colors:
-                cell.fill = PatternFill(start_color=status_colors[status], end_color=status_colors[status], fill_type='solid')  # type: ignore
-
-    # Auto column widths
-    for col in ws.columns:
-        max_len = max((len(str(c.value or '')) for c in col), default=10)
-        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
-
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-
-    fname = f"computers_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-    return send_file(buf, as_attachment=True, download_name=fname,
-                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-
+        
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = 'מחשבים'
+        ws.sheet_view.rightToLeft = True
+        headers = ['ברקוד', 'כלוב', 'שם כלוב', 'מיקום', 'סטטוס', 'מספר תיק', 'מבחן/ערעור', 'הערות', 'נסרק לאחרונה']
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_num, value=header)
+            cell.font = Font(bold=True)
+        for row_num, row in enumerate(rows, 2):
+            values = [row.get('barcode',''), row.get('cage_number',''), row.get('cage_name',''), row.get('location',''), row.get('status',''), row.get('case_number',''), row.get('exam_appeal',''), row.get('notes',''), str(row.get('scan_time',''))[0:16] if row.get('scan_time') else '']
+            for col_num, val in enumerate(values, 1): ws.cell(row=row_num, column=col_num, value=val)
+        buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+        return send_file(buf, as_attachment=True, download_name=f"inventory_{datetime.now().strftime('%Y%m%d')}.xlsx", mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    finally: release_db_connection(conn)
 
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# ── EXAMINEE ATTENDANCE SYSTEM ──────────────────────────────────────
-
-@app.route('/examinee/print/<token>')
-def examinee_print(token):
-    conn = get_db_connection()
-    if not conn: return "DB Connection Error", 500
-    try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT * FROM examinees WHERE token = %s", (token,))
-        ex = cur.fetchone()
-        if not ex: return "Examinee not found", 404
-        
-        # Generate QR Code
-        # We point it to the scan URL. We need the current host.
-        # For simplicity, we use the request.host_url
-        scan_url = f"{request.host_url.rstrip('/')}/examinee/scan/{token}"
-        
-        qr = qrcode.QRCode(version=1, box_size=10, border=1)
-        qr.add_data(scan_url)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
-        
-        buffered = io.BytesIO()
-        img.save(buffered, format="PNG")
-        qr_base64 = base64.b64encode(buffered.getvalue()).decode()
-        qr_url = f"data:image/png;base64,{qr_base64}"
-        
-        return render_template('examinee_login_page.html', 
-                             exam_name=ex['exam_name'],
-                             classroom=ex['classroom'],
-                             seat_number=ex['seat_number'],
-                             full_name=ex['full_name'],
-                             id_number=ex['id_number'],
-                             extra_time=ex['extra_time'],
-                             username=ex['username'],
-                             password=ex['password'],
-                             qr_code_url=qr_url)
-    finally:
-        release_db_connection(conn)
-
-@app.route('/examinee/scan/<token>')
-@login_required
-def examinee_scan(token):
-    conn = get_db_connection()
-    if not conn: return "DB Connection Error", 500
-    try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT * FROM examinees WHERE token = %s", (token,))
-        ex = cur.fetchone()
-        if not ex: return "Examinee not found", 404
-        
-        return render_template('examinee_scan_ui.html', examinee=ex)
-    finally:
-        release_db_connection(conn)
-
-@app.route('/api/examinee/update', methods=['POST'])
-@login_required
-def api_examinee_update():
-    data = request.json
-    token = data.get('token')
-    if not token: return {"success": False, "error": "Missing token"}, 400
-    
-    conn = get_db_connection()
-    if not conn: return {"success": False, "error": "DB Error"}, 500
-    try:
-        cur = conn.cursor()
-        
-        updates = []
-        params = []
-        
-        if 'is_present' in data:
-            updates.append("is_present = %s")
-            params.append(int(data['is_present']))
-            
-        if 'laptop_number' in data:
-            updates.append("laptop_number = %s")
-            params.append(data['laptop_number'])
-            
-        if 'laptop_status' in data:
-            updates.append("laptop_status = %s")
-            params.append(data['laptop_status'])
-            
-        if 'notes' in data:
-            updates.append("notes = %s")
-            params.append(data['notes'])
-            
-        if updates:
-            updates.append("scan_time = NOW()")
-            updates.append("scanner_technician = %s")
-            params.append(session.get('username'))
-            
-            params.append(token)
-            cur.execute(f"UPDATE examinees SET {', '.join(updates)} WHERE token = %s", params)
-            conn.commit()
-            return {"success": True}
-        
-        return {"success": False, "error": "No updates provided"}, 400
-    except Exception as e:
-        return {"success": False, "error": str(e)}, 500
-    finally:
-        release_db_connection(conn)
-
-@app.route('/attendance')
-@login_required
-def attendance_dashboard():
-    conn = get_db_connection()
-    if not conn: return "DB Connection Error", 500
-    try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT * FROM examinees ORDER BY classroom, seat_number::int")
-        examinees = cur.fetchall()
-        
-        # Stats
-        cur.execute("SELECT COUNT(*) as total, SUM(CASE WHEN is_present = 1 THEN 1 ELSE 0 END) as present FROM examinees")
-        stats = cur.fetchone()
-        
-        return render_template('attendance_dashboard.html', examinees=examinees, stats=stats)
-    finally:
-        release_db_connection(conn)
-
+# --- End of Routes ---
 
 if __name__ == '__main__':
     print("\n[START] URI SYSTEM IS LIVE! (HTTPS ENABLED FOR MOBILE SCANNER)")

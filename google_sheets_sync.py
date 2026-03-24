@@ -5,6 +5,7 @@ from psycopg2.extras import RealDictCursor
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+import json
 
 # טעינת משתני סביבה
 load_dotenv()
@@ -18,9 +19,36 @@ def get_db_connection():
         print(f"שגיאה בחיבור ל-DB: {e}")
         return None
 
+def update_worksheet(sh, name, header, rows):
+    """עדכון גיליון ספציפי בתוך הקובץ"""
+    try:
+        # פתיחת הגיליון או יצירתו אם לא קיים
+        try:
+            worksheet = sh.worksheet(name)
+        except gspread.WorksheetNotFound:
+            worksheet = sh.add_worksheet(title=name, rows="100", cols="10")
+        
+        data_to_write = [header]
+        data_to_write.extend(rows)
+
+        # עדכון הגיליון
+        worksheet.clear()
+        # gspread 6.x uses values first, then range
+        worksheet.update(data_to_write, 'A1')
+        
+        # עיצוב כותרת
+        worksheet.format("A1:" + chr(ord('A') + len(header) - 1) + "1", {
+            "textFormat": {"bold": True},
+            "backgroundColor": {"red": 0.8, "green": 0.9, "blue": 1.0}
+        })
+        return True
+    except Exception as e:
+        print(f"שגיאה בעדכון גיליון {name}: {e}")
+        return False
+
 def sync_inventory_to_sheets():
     """
-    מסנכרן את טבלת ה-computers ממסד הנתונים לגיליון Google Sheets.
+    מסנכרן את נתוני המערכת לגיליון Google Sheets עם מספר טאבים.
     """
     spreadsheet_id = os.getenv('GOOGLE_SHEETS_ID')
     service_account_file = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
@@ -39,56 +67,66 @@ def sync_inventory_to_sheets():
         ]
         creds = Credentials.from_service_account_file(service_account_file, scopes=scopes)
         client = gspread.authorize(creds)
-        
-        # פתיחת הגיליון
         sh = client.open_by_key(spreadsheet_id)
-        worksheet = sh.get_worksheet(0) # הגיליון הראשון
 
-        # 2. שליפת נתונים מה-DB
+        # 2. חיבור ל-DB
         conn = get_db_connection()
         if not conn:
             return False, "לא ניתן להתחבר למסד הנתונים."
-            
         cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        # --- טאב 1: מלאי כללי ---
         cur.execute("""
             SELECT barcode, case_number, cage_number, status, location, exam_appeal, notes, scan_time
-            FROM computers
-            ORDER BY scan_time DESC
+            FROM computers ORDER BY scan_time DESC NULLS LAST
         """)
-        rows = cur.fetchall()
+        inv_rows = cur.fetchall()
+        inv_header = ["ברקוד", "מספר תיק", "מספר כלוב", "סטטוס", "מיקום", "מבחן/ערעור", "הערות", "נצפה לאחרונה"]
+        inv_data = []
+        for r in inv_rows:
+            inv_data.append([r['barcode'], r['case_number'] or '', r['cage_number'] or '', r['status'] or '', 
+                             r['location'] or '', r['exam_appeal'] or '', r['notes'] or '', 
+                             r['scan_time'].strftime("%d/%m/%Y %H:%M") if r['scan_time'] else ''])
+        update_worksheet(sh, "מלאי כללי", inv_header, inv_data)
+
+        # --- טאב 2: מבחן וערעור ---
+        cur.execute("""
+            SELECT barcode, case_number, exam_appeal, status, location, scan_time
+            FROM computers 
+            WHERE exam_appeal IS NOT NULL AND TRIM(exam_appeal) != ''
+            ORDER BY scan_time DESC NULLS LAST
+        """)
+        exam_rows = cur.fetchall()
+        exam_header = ["ברקוד", "מספר תיק", "מבחן/ערעור", "סטטוס", "מיקום", "נצפה לאחרונה"]
+        exam_data = []
+        for r in exam_rows:
+            exam_data.append([r['barcode'], r['case_number'] or '', r['exam_appeal'] or '', r['status'] or '', 
+                              r['location'] or '', r['scan_time'].strftime("%d/%m/%Y %H:%M") if r['scan_time'] else ''])
+        update_worksheet(sh, "מבחן-ערעור", exam_header, exam_data)
+
+        # --- טאב 3: היסטוריית שינויים ---
+        cur.execute("""
+            SELECT h.timestamp, c.barcode, h.technician, h.change_type, h.new_value
+            FROM inventory_history h
+            LEFT JOIN computers c ON h.computer_id = c.id
+            ORDER BY h.timestamp DESC LIMIT 200
+        """)
+        hist_rows = cur.fetchall()
+        hist_header = ["זמן", "ברקוד", "טכנאי", "סוג שינוי", "פירוט"]
+        hist_data = []
+        for r in hist_rows:
+            hist_data.append([r['timestamp'].strftime("%d/%m/%Y %H:%M") if r['timestamp'] else '',
+                              r['barcode'] or 'נמחק', r['technician'] or '', r['change_type'] or '',
+                              str(r['new_value'])])
+        update_worksheet(sh, "היסטוריה", hist_header, hist_data)
+
         cur.close()
         conn.close()
 
-        # 3. עיצוב הנתונים עבור ה-Sheets (כותרות וערכים)
-        header = ["ברקוד", "מספר תיק", "מספר כלוב", "סטטוס", "מיקום", "מבחן/ערעור", "הערות", "נצפה לאחרונה"]
-        data_to_write = [header]
-        
-        for row in rows:
-            data_to_write.append([
-                row['barcode'],
-                row['case_number'] or '',
-                row['cage_number'] or '',
-                row['status'] or '',
-                row['location'] or '',
-                row['exam_appeal'] or '',
-                row['notes'] or '',
-                str(row['scan_time']) if row['scan_time'] else ''
-            ])
-
-        # 4. עדכון הגיליון בפעולה אחת
-        worksheet.clear()
-        worksheet.update('A1', data_to_write)
-        
-        # עיצוב כותרת (בולד וצבע רקע)
-        worksheet.format("A1:H1", {
-            "textFormat": {"bold": True},
-            "backgroundColor": {"red": 0.8, "green": 0.9, "blue": 1.0}
-        })
-
-        return True, f"הסנכרון הושלם! {len(rows)} מחשבים עודכנו בגיליון."
+        return True, "הסנכרון הושלם בהצלחה עבור כל הגיליונות!"
 
     except Exception as e:
-        print(f"שגיאת סנכרון: {e}")
+        print(f"שגיאת סנכרון כללית: {e}")
         return False, f"שגיאה בתהליך הסנכרון: {str(e)}"
 
 if __name__ == "__main__":
