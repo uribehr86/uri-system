@@ -78,17 +78,41 @@ def sync_inventory_to_sheets():
 
         # --- טאב 1: מלאי כללי ---
         cur.execute("""
-            SELECT barcode, case_number, cage_number, status, location, exam_appeal, notes, scan_time
-            FROM computers ORDER BY scan_time DESC NULLS LAST
+            SELECT c.barcode, c.case_number, c.cage_number, c.status, c.location, c.exam_appeal, c.notes, c.scan_time,
+                   h.technician, h.change_type, h.old_value, h.new_value
+            FROM computers c
+            LEFT JOIN (
+                SELECT DISTINCT ON (computer_id) computer_id, technician, change_type, old_value, new_value
+                FROM inventory_history
+                ORDER BY computer_id, timestamp DESC
+            ) h ON c.id = h.computer_id
+            ORDER BY c.scan_time DESC NULLS LAST
         """)
         inv_rows = cur.fetchall()
-        inv_header = ["מחשב", "מספר תיק", "מספר כלוב", "סטטוס", "מיקום", "מבחן/ערעור", "הערות", "נצפה לאחרונה"]
+        inv_header = ["מחשב", "מספר תיק", "מספר כלוב", "סטטוס", "מיקום", "מבחן/ערעור", "הערות", "טכנאי", "פעולה אחרונה", "נצפה לאחרונה"]
         inv_data = []
         for r in inv_rows:
-            inv_data.append([r['barcode'], r['case_number'] or '', r['cage_number'] or '', r['status'] or '', 
-                             r['location'] or '', r['exam_appeal'] or '', r['notes'] or '', 
-                             r['scan_time'].strftime("%d/%m/%Y %H:%M") if r['scan_time'] else ''])
-        update_worksheet(sh, "מלאי כללי", inv_header, inv_data)
+            # Prepare entry for summarize_history helper
+            entry = {
+                'old_value': r['old_value'],
+                'new_value': r['new_value'],
+                'change_type': r['change_type']
+            }
+            last_action = summarize_history(entry) if r['change_type'] else ''
+            
+            inv_data.append([
+                r['barcode'], 
+                r['case_number'] or '', 
+                r['cage_number'] or '', 
+                r['status'] or '', 
+                r['location'] or '', 
+                r['exam_appeal'] or '', 
+                r['notes'] or '', 
+                r['technician'] or '',
+                last_action,
+                r['scan_time'].strftime("%d/%m/%Y %H:%M") if r['scan_time'] else ''
+            ])
+        update_worksheet(sh, "מלאי מחשבים", inv_header, inv_data)
 
         # --- טאב 2: מבחן וערעור ---
         cur.execute("""
