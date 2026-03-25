@@ -118,7 +118,9 @@ def sync_inventory_to_sheets():
         cur.execute("""
             SELECT barcode, case_number, exam_appeal, status, location, scan_time
             FROM computers 
-            WHERE exam_appeal IS NOT NULL AND TRIM(exam_appeal) != ''
+            WHERE exam_appeal IS NOT NULL 
+              AND TRIM(exam_appeal) != '' 
+              AND LOWER(TRIM(exam_appeal)) != 'none'
             ORDER BY scan_time DESC NULLS LAST
         """)
         exam_rows = cur.fetchall()
@@ -157,6 +159,29 @@ def sync_inventory_to_sheets():
                 format_history(r['new_value'])
             ])
         update_worksheet(sh, "היסטוריה", hist_header, hist_data)
+
+        # --- טאב 4: סיכום סטטיסטי ---
+        cur.execute("""
+            SELECT 
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE status = 'תקין') as ok,
+                COUNT(*) FILTER (WHERE status = 'תקול') as faulty,
+                COUNT(*) FILTER (WHERE status = 'בתיקון') as repairing,
+                COUNT(*) FILTER (WHERE status = 'מאוחסן') as stored
+            FROM computers
+        """)
+        stats = cur.fetchone()
+        
+        summary_header = ["קטגוריה", "כמות"]
+        summary_data = [
+            ["סה\"כ מחשבים במערכת", stats['total']],
+            ["✅ תקין", stats['ok']],
+            ["❌ תקול", stats['faulty']],
+            ["🔧 בתיקון", stats['repairing']],
+            ["📦 מאוחסן", stats['stored']]
+        ]
+        
+        update_worksheet(sh, "סיכום", summary_header, summary_data)
 
         cur.close()
         conn.close()
