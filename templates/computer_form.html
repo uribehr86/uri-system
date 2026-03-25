@@ -10,7 +10,7 @@
     <form method="POST">
         <div class="form-grid">
             <div class="form-group">
-                <label for="barcode">ברקוד מחשב *</label>
+                <label for="barcode">מחשב *</label>
                 <input type="text" id="barcode" name="barcode" class="form-control"
                     value="{{ computer.barcode if computer else '' }}" required {{ 'readonly' if action=='edit' else ''
                     }} />

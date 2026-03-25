@@ -15,6 +15,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 import google.generativeai as genai
 from google_sheets_sync import sync_inventory_to_sheets
+from utils import format_history, summarize_history
 
 # טעינת הגדרות
 load_dotenv()
@@ -66,115 +67,13 @@ def utility_processor():
         return f"hsl({hue}, 70%, 65%)"
     return dict(get_cage_color=get_cage_color)
 
-import json
-import ast
-
 @app.template_filter('format_history')
 def format_history_filter(val_str):
-    if not val_str:
-        return ""
-    try:
-        val = json.loads(val_str)
-    except:
-        try:
-            val = ast.literal_eval(str(val_str))
-        except:
-            return val_str
-            
-    if not isinstance(val, dict):
-        return str(val)
-        
-    tmap = {
-        'status': 'סטטוס',
-        'location': 'מיקום',
-        'cage_number': 'כלוב',
-        'cage_name': 'שם כלוב',
-        'case_number': 'תיק',
-        'notes': 'הערות',
-        'exam_appeal': 'מבחן/ערעור',
-        'barcode': 'ברקוד'
-    }
-    
-    parts = []
-    for k, v in val.items():
-        if k in ['id', 'computer_id', 'scan_time', 'created_at'] or v is None:
-            continue
-        parts.append(f"{tmap.get(k, k)}: {v}")
-        
-    return " | ".join(str(p) for p in parts) if parts else "פעולת מערכת"
+    return format_history(val_str)
 
 @app.template_filter('summarize_history')
 def summarize_history_filter(entry):
-    if not entry:
-        return ""
-    
-    def parse_val(v_str) -> dict:
-        if not v_str: return {}
-        if isinstance(v_str, dict): return v_str
-        try:
-            res = json.loads(v_str)
-            if isinstance(res, dict):
-                return res
-        except:
-            pass
-        try:
-            res = ast.literal_eval(v_str) if v_str else {}
-            if isinstance(res, dict):
-                return res
-        except:
-            pass
-        return {}
-
-    old = parse_val(entry.get('old_value'))
-    new = parse_val(entry.get('new_value'))
-    
-    if not isinstance(old, dict):
-        old = {}
-    if not isinstance(new, dict):
-        new = {}
-    
-    # Check for cage movements
-    old_cage = old.get('cage_number') or old.get('cage_name')
-    new_cage = new.get('cage_number') or new.get('cage_name')
-    
-    if old_cage and new_cage and str(old_cage).strip() != str(new_cage).strip():
-        return f"העביר מכלוב {old_cage} לכלוב {new_cage}"
-    
-    if old_cage and not new_cage:
-        # Check if it was moved to home or test
-        loc = new.get('location', '')
-        if 'בית' in str(loc) or 'בדיקה' in str(loc):
-            return f"לקח מכלוב {old_cage} (עבודה מהבית/בדיקה)"
-        return f"לקח מכלוב {old_cage}"
-        
-    # Default behavior: list what changed if not a simple cage move
-    tmap = {
-        'status': 'סטטוס',
-        'location': 'מיקום',
-        'cage_number': 'כלוב',
-        'case_number': 'תיק',
-        'notes': 'הערות',
-        'exam_appeal': 'מבחן/ערעור'
-    }
-    
-    changes = []
-    # If it's a "Fast Scan" or "Update", we can see what's in 'new' that's different from 'old'
-    for k, v in new.items():
-        if k in ['id', 'computer_id', 'scan_time', 'barcode'] or v is None:
-            continue
-        old_v = old.get(k)
-        if str(old_v) != str(v):
-            changes.append(f"{tmap.get(k, k)}: {v}")
-            
-    if changes:
-        return "שינוי: " + " | ".join(str(c) for c in changes)
-    
-    # If no changes detected in common fields, describe by change type
-    ctype = entry.get('change_type', 'פעולה')
-    if ctype == 'Fast Scan' and not old:
-        return f"נוסף מחשב חדש"
-        
-    return ctype
+    return summarize_history(entry)
 
 def login_required(f):
     @wraps(f)
@@ -323,7 +222,9 @@ def computers():
         stats = cur.fetchall()
         stats_dict = {row['status']: row['count'] for row in stats}
         faulty_count = stats_dict.get('תקול', 0)
-        not_in_cage_count = 0 
+        # Count computers with no cage assigned
+        cur.execute("SELECT COUNT(*) as count FROM computers WHERE (cage_number IS NULL OR TRIM(cage_number) = '') AND (cage_name IS NULL OR TRIM(cage_name) = '')")
+        not_in_cage_count = cur.fetchone()['count']
         
         # Base query for computers and count of total matching records
         base_where = " WHERE 1=1"
@@ -400,7 +301,7 @@ def add_computer():
             # Check for existing barcode
             cur.execute("SELECT id FROM computers WHERE barcode = %s", (barcode,))
             if cur.fetchone():
-                flash(f"שגיאה: מחשב עם ברקוד {barcode} כבר קיים במערכת!", "danger")
+                flash(f"שגיאה: מחשב {barcode} כבר קיים במערכת!", "danger")
                 return redirect(url_for('add_computer'))
 
             cur.execute("""

@@ -6,6 +6,7 @@ import os
 from dotenv import load_dotenv
 from datetime import datetime
 import json
+from utils import format_history, summarize_history
 
 # טעינת משתני סביבה
 load_dotenv()
@@ -81,7 +82,7 @@ def sync_inventory_to_sheets():
             FROM computers ORDER BY scan_time DESC NULLS LAST
         """)
         inv_rows = cur.fetchall()
-        inv_header = ["ברקוד", "מספר תיק", "מספר כלוב", "סטטוס", "מיקום", "מבחן/ערעור", "הערות", "נצפה לאחרונה"]
+        inv_header = ["מחשב", "מספר תיק", "מספר כלוב", "סטטוס", "מיקום", "מבחן/ערעור", "הערות", "נצפה לאחרונה"]
         inv_data = []
         for r in inv_rows:
             inv_data.append([r['barcode'], r['case_number'] or '', r['cage_number'] or '', r['status'] or '', 
@@ -97,7 +98,7 @@ def sync_inventory_to_sheets():
             ORDER BY scan_time DESC NULLS LAST
         """)
         exam_rows = cur.fetchall()
-        exam_header = ["ברקוד", "מספר תיק", "מבחן/ערעור", "סטטוס", "מיקום", "נצפה לאחרונה"]
+        exam_header = ["מחשב", "מספר תיק", "מבחן/ערעור", "סטטוס", "מיקום", "נצפה לאחרונה"]
         exam_data = []
         for r in exam_rows:
             exam_data.append([r['barcode'], r['case_number'] or '', r['exam_appeal'] or '', r['status'] or '', 
@@ -106,18 +107,31 @@ def sync_inventory_to_sheets():
 
         # --- טאב 3: היסטוריית שינויים ---
         cur.execute("""
-            SELECT h.timestamp, c.barcode, h.technician, h.change_type, h.new_value
+            SELECT h.timestamp, c.barcode, h.technician, h.change_type, h.old_value, h.new_value
             FROM inventory_history h
             LEFT JOIN computers c ON h.computer_id = c.id
             ORDER BY h.timestamp DESC LIMIT 200
         """)
         hist_rows = cur.fetchall()
-        hist_header = ["זמן", "ברקוד", "טכנאי", "סוג שינוי", "פירוט"]
+        hist_header = ["זמן", "טכנאי", "מחשב", "סוג שינוי", "תיאור פעולה", "לפני", "אחרי"]
         hist_data = []
         for r in hist_rows:
-            hist_data.append([r['timestamp'].strftime("%d/%m/%Y %H:%M") if r['timestamp'] else '',
-                              r['barcode'] or 'נמחק', r['technician'] or '', r['change_type'] or '',
-                              str(r['new_value'])])
+            # Prepare entry for summarize_history helper
+            entry = {
+                'old_value': r['old_value'],
+                'new_value': r['new_value'],
+                'change_type': r['change_type']
+            }
+            
+            hist_data.append([
+                r['timestamp'].strftime("%d/%m/%Y %H:%M") if r['timestamp'] else '',
+                r['technician'] or '',
+                r['barcode'] or 'מחשב',
+                r['change_type'] or '',
+                summarize_history(entry),
+                format_history(r['old_value']),
+                format_history(r['new_value'])
+            ])
         update_worksheet(sh, "היסטוריה", hist_header, hist_data)
 
         cur.close()
