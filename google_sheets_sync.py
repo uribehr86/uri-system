@@ -76,7 +76,8 @@ def sync_inventory_to_sheets():
             return False, "לא ניתן להתחבר למסד הנתונים."
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
-        # --- טאב 1: מלאי כללי ---
+        # --- טאב 1: מלאי מחשבים ---
+        # שליפת נתוני המלאי
         cur.execute("""
             SELECT c.barcode, c.case_number, c.cage_number, c.status, c.location, c.exam_appeal, c.notes, c.scan_time,
                    h.technician, h.change_type, h.old_value, h.new_value
@@ -90,29 +91,56 @@ def sync_inventory_to_sheets():
         """)
         inv_rows = cur.fetchall()
         inv_header = ["מחשב", "מספר תיק", "מספר כלוב", "סטטוס", "מיקום", "מבחן/ערעור", "הערות", "טכנאי", "פעולה אחרונה", "נצפה לאחרונה"]
-        inv_data = []
+        
+        inv_data = [inv_header]
         for r in inv_rows:
-            # Prepare entry for summarize_history helper
-            entry = {
-                'old_value': r['old_value'],
-                'new_value': r['new_value'],
-                'change_type': r['change_type']
-            }
+            entry = {'old_value': r['old_value'], 'new_value': r['new_value'], 'change_type': r['change_type']}
             last_action = summarize_history(entry) if r['change_type'] else ''
-            
             inv_data.append([
-                r['barcode'], 
-                r['case_number'] or '', 
-                r['cage_number'] or '', 
-                r['status'] or '', 
-                r['location'] or '', 
-                r['exam_appeal'] or '', 
-                r['notes'] or '', 
-                r['technician'] or '',
-                last_action,
+                r['barcode'], r['case_number'] or '', r['cage_number'] or '', r['status'] or '', 
+                r['location'] or '', r['exam_appeal'] or '', r['notes'] or '', 
+                r['technician'] or '', last_action,
                 r['scan_time'].strftime("%d/%m/%Y %H:%M") if r['scan_time'] else ''
             ])
-        update_worksheet(sh, "מלאי מחשבים", inv_header, inv_data)
+            
+        # חישוב סטטיסטיקות עבור עמודה K
+        cur.execute("""
+            SELECT 
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE status = 'תקין') as ok,
+                COUNT(*) FILTER (WHERE status = 'תקול') as faulty,
+                COUNT(*) FILTER (WHERE status = 'בתיקון') as repairing,
+                COUNT(*) FILTER (WHERE status = 'מאוחסן') as stored
+            FROM computers
+        """)
+        stats = cur.fetchone()
+        
+        summary_data = [
+            ["--- סיכום מלאי ---", ""],
+            ["סה\"כ מחשבים במערכת", stats['total']],
+            ["✅ תקין", stats['ok']],
+            ["❌ תקול", stats['faulty']],
+            ["🔧 בתיקון", stats['repairing']],
+            ["📦 מאוחסן", stats['stored']]
+        ]
+
+        try:
+            worksheet = sh.worksheet("מלאי מחשבים")
+        except gspread.WorksheetNotFound:
+            worksheet = sh.add_worksheet(title="מלאי מחשבים", rows="1000", cols="15")
+        
+        worksheet.clear()
+        # עדכון הטבלה המרכזית ב-A1
+        worksheet.update(inv_data, 'A1')
+        # עדכון הסיכום ב-K1
+        worksheet.update(summary_data, 'K1')
+        
+        # עיצוב הכותרות
+        worksheet.format("A1:J1", {
+            "textFormat": {"bold": True},
+            "backgroundColor": {"red": 0.8, "green": 0.9, "blue": 1.0}
+        })
+        worksheet.format("K1:L1", {"textFormat": {"bold": True, "fontSize": 11}})
 
         # --- טאב 2: מבחן וערעור ---
         cur.execute("""
@@ -159,29 +187,6 @@ def sync_inventory_to_sheets():
                 format_history(r['new_value'])
             ])
         update_worksheet(sh, "היסטוריה", hist_header, hist_data)
-
-        # --- טאב 4: סיכום סטטיסטי ---
-        cur.execute("""
-            SELECT 
-                COUNT(*) as total,
-                COUNT(*) FILTER (WHERE status = 'תקין') as ok,
-                COUNT(*) FILTER (WHERE status = 'תקול') as faulty,
-                COUNT(*) FILTER (WHERE status = 'בתיקון') as repairing,
-                COUNT(*) FILTER (WHERE status = 'מאוחסן') as stored
-            FROM computers
-        """)
-        stats = cur.fetchone()
-        
-        summary_header = ["קטגוריה", "כמות"]
-        summary_data = [
-            ["סה\"כ מחשבים במערכת", stats['total']],
-            ["✅ תקין", stats['ok']],
-            ["❌ תקול", stats['faulty']],
-            ["🔧 בתיקון", stats['repairing']],
-            ["📦 מאוחסן", stats['stored']]
-        ]
-        
-        update_worksheet(sh, "סיכום", summary_header, summary_data)
 
         cur.close()
         conn.close()
