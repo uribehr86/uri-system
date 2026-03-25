@@ -79,27 +79,18 @@ def sync_inventory_to_sheets():
         # --- טאב 1: מלאי מחשבים ---
         # שליפת נתוני המלאי
         cur.execute("""
-            SELECT c.barcode, c.case_number, c.cage_number, c.status, c.location, c.exam_appeal, c.notes, c.scan_time,
-                   h.technician, h.change_type, h.old_value, h.new_value
-            FROM computers c
-            LEFT JOIN (
-                SELECT DISTINCT ON (computer_id) computer_id, technician, change_type, old_value, new_value
-                FROM inventory_history
-                ORDER BY computer_id, timestamp DESC
-            ) h ON c.id = h.computer_id
-            ORDER BY c.scan_time DESC NULLS LAST
+            SELECT barcode, case_number, cage_number, status, location, exam_appeal, notes, scan_time
+            FROM computers 
+            ORDER BY scan_time DESC NULLS LAST
         """)
         inv_rows = cur.fetchall()
-        inv_header = ["מחשב", "מספר תיק", "מספר כלוב", "סטטוס", "מיקום", "מבחן/ערעור", "הערות", "טכנאי", "פעולה אחרונה", "נצפה לאחרונה"]
+        inv_header = ["מחשב", "מספר תיק", "מספר כלוב", "סטטוס", "מיקום", "מבחן/ערעור", "הערות", "נצפה לאחרונה"]
         
         inv_data = [inv_header]
         for r in inv_rows:
-            entry = {'old_value': r['old_value'], 'new_value': r['new_value'], 'change_type': r['change_type']}
-            last_action = summarize_history(entry) if r['change_type'] else ''
             inv_data.append([
                 r['barcode'], r['case_number'] or '', r['cage_number'] or '', r['status'] or '', 
                 r['location'] or '', r['exam_appeal'] or '', r['notes'] or '', 
-                r['technician'] or '', last_action,
                 r['scan_time'].strftime("%d/%m/%Y %H:%M") if r['scan_time'] else ''
             ])
             
@@ -136,7 +127,7 @@ def sync_inventory_to_sheets():
         worksheet.update(summary_data, 'K1')
         
         # עיצוב הכותרות
-        worksheet.format("A1:J1", {
+        worksheet.format("A1:H1", {
             "textFormat": {"bold": True},
             "backgroundColor": {"red": 0.8, "green": 0.9, "blue": 1.0}
         })
