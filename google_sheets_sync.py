@@ -11,14 +11,25 @@ from utils import format_history, summarize_history
 # טעינת משתני סביבה
 load_dotenv()
 
+import sqlite3
+
 def get_db_connection():
-    """חיבור למסד הנתונים PostgreSQL"""
+    """חיבור למסד הנתונים PostgreSQL עם Fallback ל-SQLite מקומי"""
     db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
     try:
-        return psycopg2.connect(db_url)
+        # ניסיון חיבור לענן
+        conn = psycopg2.connect(db_url)
+        return conn, False # False = NOT SQLite
     except Exception as e:
-        print(f"שגיאה בחיבור ל-DB: {e}")
-        return None
+        print(f"שגיאה בחיבור לענן (מנסה מקומי): {e}")
+        try:
+            # ניסיון חיבור מקומי
+            conn = sqlite3.connect('system_data.db')
+            conn.row_factory = sqlite3.Row
+            return conn, True # True = IS SQLite
+        except Exception as e2:
+            print(f"שגיאה קריטית בחיבור למסד נתונים: {e2}")
+            return None, False
 
 def update_worksheet(sh, name, header, rows):
     """עדכון גיליון ספציפי בתוך הקובץ"""
@@ -71,31 +82,56 @@ def sync_inventory_to_sheets():
         sh = client.open_by_key(spreadsheet_id)
 
         # 2. חיבור ל-DB
-        conn = get_db_connection()
-        if not conn:
+        res = get_db_connection()
+        if not res or not res[0]:
             return False, "לא ניתן להתחבר למסד הנתונים."
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        conn, is_sqlite = res
+        
+        cur_factory = None if is_sqlite else RealDictCursor
+        cur = conn.cursor() if is_sqlite else conn.cursor(cursor_factory=RealDictCursor)
+
+        def safe_execute(query, params=None):
+            if is_sqlite:
+                query = query.replace('%s', '?')
+                # FILTER (WHERE ...) is not supported in basic SQLite
+                if "FILTER (WHERE" in query:
+                    # Specific rewrite for the stats query
+                    query = """
+                        SELECT 
+                            COUNT(*) as total,
+                            SUM(CASE WHEN status = 'תקין' THEN 1 ELSE 0 END) as ok,
+                            SUM(CASE WHEN status = 'תקול' THEN 1 ELSE 0 END) as faulty,
+                            SUM(CASE WHEN status = 'בתיקון' THEN 1 ELSE 0 END) as repairing,
+                            SUM(CASE WHEN status = 'מאוחסן' THEN 1 ELSE 0 END) as stored
+                        FROM computers
+                    """
+            if params:
+                cur.execute(query, params)
+            else:
+                cur.execute(query)
 
         # --- טאב 1: מלאי מחשבים ---
         # שליפת נתוני המלאי
-        cur.execute("""
-            SELECT barcode, case_number, cage_number, status, location, exam_appeal, notes, scan_time
+        q_inv = """
+            SELECT barcode, case_number, cage_number, status, location, specs, project, exam_appeal, notes, scan_time
             FROM computers 
-            ORDER BY scan_time DESC NULLS LAST
-        """)
+            ORDER BY scan_time DESC
+        """
+        safe_execute(q_inv)
         inv_rows = cur.fetchall()
-        inv_header = ["מחשב", "מספר תיק", "מספר כלוב", "סטטוס", "מיקום", "מבחן/ערעור", "הערות", "נצפה לאחרונה"]
+        inv_header = ["מחשב", "מספר תיק", "מספר כלוב", "סטטוס", "מיקום", "מפרט", "פרויקט", "מבחן/ערעור", "הערות", "נצפה לאחרונה"]
         
         inv_data = [inv_header]
         for r in inv_rows:
             inv_data.append([
                 r['barcode'], r['case_number'] or '', r['cage_number'] or '', r['status'] or '', 
-                r['location'] or '', r['exam_appeal'] or '', r['notes'] or '', 
-                r['scan_time'].strftime("%d/%m/%Y %H:%M") if r['scan_time'] else ''
+                r['location'] or '', r['specs'] or '', r['project'] or '', 
+                r['exam_appeal'] or '', r['notes'] or '', 
+                r['scan_time'].strftime("%d/%m/%Y %H:%M") if r['scan_time'] and not isinstance(r['scan_time'], str) else str(r['scan_time'] or '')
             ])
             
         # חישוב סטטיסטיקות עבור עמודה K
-        cur.execute("""
+        q_stats = """
             SELECT 
                 COUNT(*) as total,
                 COUNT(*) FILTER (WHERE status = 'תקין') as ok,
@@ -103,7 +139,8 @@ def sync_inventory_to_sheets():
                 COUNT(*) FILTER (WHERE status = 'בתיקון') as repairing,
                 COUNT(*) FILTER (WHERE status = 'מאוחסן') as stored
             FROM computers
-        """)
+        """
+        safe_execute(q_stats)
         stats = cur.fetchone()
         
         summary_data = [
@@ -123,40 +160,61 @@ def sync_inventory_to_sheets():
         worksheet.clear()
         # עדכון הטבלה המרכזית ב-A1
         worksheet.update(inv_data, 'A1')
-        # עדכון הסיכום ב-K1
-        worksheet.update(summary_data, 'K1')
-        
         # עיצוב הכותרות
-        worksheet.format("A1:H1", {
+        worksheet.format("A1:J1", {
             "textFormat": {"bold": True},
             "backgroundColor": {"red": 0.8, "green": 0.9, "blue": 1.0}
         })
-        worksheet.format("K1:L1", {"textFormat": {"bold": True, "fontSize": 11}})
+
+        # --- טאבים לפי פרויקט ---
+        safe_execute("SELECT DISTINCT project FROM computers WHERE project IS NOT NULL AND TRIM(project) != ''")
+        projects = [row['project'] for row in cur.fetchall()]
+        
+        for project_name in projects:
+            q_proj = """
+                SELECT barcode, case_number, cage_number, status, location, specs, notes, scan_time
+                FROM computers 
+                WHERE project = %s
+                ORDER BY scan_time DESC
+            """
+            safe_execute(q_proj, (project_name,))
+            p_rows = cur.fetchall()
+            p_header = ["מחשב", "מספר תיק", "מספר כלוב", "סטטוס", "מיקום", "מפרט", "הערות", "נצפה לאחרונה"]
+            p_data = []
+            for r in p_rows:
+                p_data.append([r['barcode'], r['case_number'] or '', r['cage_number'] or '', r['status'] or '', 
+                               r['location'] or '', r['specs'] or '', r['notes'] or '',
+                               r['scan_time'].strftime("%d/%m/%Y %H:%M") if r['scan_time'] and not isinstance(r['scan_time'], str) else str(r['scan_time'] or '')])
+            
+            # Create/Update worksheet for this project
+            update_worksheet(sh, f"פרויקט-{project_name}", p_header, p_data)
 
         # --- טאב 2: מבחן וערעור ---
-        cur.execute("""
+        q_exam = """
             SELECT barcode, case_number, exam_appeal, status, location, scan_time
             FROM computers 
             WHERE exam_appeal IS NOT NULL 
               AND TRIM(exam_appeal) != '' 
               AND LOWER(TRIM(exam_appeal)) != 'none'
-            ORDER BY scan_time DESC NULLS LAST
-        """)
+            ORDER BY scan_time DESC
+        """
+        safe_execute(q_exam)
         exam_rows = cur.fetchall()
         exam_header = ["מחשב", "מספר תיק", "מבחן/ערעור", "סטטוס", "מיקום", "נצפה לאחרונה"]
         exam_data = []
         for r in exam_rows:
             exam_data.append([r['barcode'], r['case_number'] or '', r['exam_appeal'] or '', r['status'] or '', 
-                              r['location'] or '', r['scan_time'].strftime("%d/%m/%Y %H:%M") if r['scan_time'] else ''])
+                              r['location'] or '', r['scan_time'].strftime("%d/%m/%Y %H:%M") if r['scan_time'] and not isinstance(r['scan_time'], str) else str(r['scan_time'] or '')])
         update_worksheet(sh, "מבחן-ערעור", exam_header, exam_data)
 
         # --- טאב 3: היסטוריית שינויים ---
-        cur.execute("""
+        q_hist = """
             SELECT h.timestamp, c.barcode, h.technician, h.change_type, h.old_value, h.new_value
             FROM inventory_history h
             LEFT JOIN computers c ON h.computer_id = c.id
             ORDER BY h.timestamp DESC LIMIT 200
-        """)
+        """
+        safe_execute(q_hist)
         hist_rows = cur.fetchall()
         hist_header = ["זמן", "טכנאי", "מחשב", "סוג שינוי", "תיאור פעולה", "לפני", "אחרי"]
         hist_data = []
@@ -168,8 +226,14 @@ def sync_inventory_to_sheets():
                 'change_type': r['change_type']
             }
             
+            ts = r['timestamp']
+            if ts and not isinstance(ts, str):
+                ts_str = ts.strftime("%d/%m/%Y %H:%M")
+            else:
+                ts_str = str(ts or '')
+
             hist_data.append([
-                r['timestamp'].strftime("%d/%m/%Y %H:%M") if r['timestamp'] else '',
+                ts_str,
                 r['technician'] or '',
                 r['barcode'] or 'מחשב',
                 r['change_type'] or '',

@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 import psycopg2
+import sqlite3
+
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
 import os
@@ -22,6 +24,7 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'uri_system_2026')
+
 from datetime import timedelta
 app.permanent_session_lifetime = timedelta(days=30)
 
@@ -38,19 +41,85 @@ except Exception as e:
     db_pool = None
 
 # פונקציה לחיבור לענן עם "הגנת תקיעה" ושימוש ב-Pool
+IS_LOCAL_MODE = (db_pool is None)
+
+
+class SafeCursor:
+    """Wrapper for cursor to handle %s -> ? translation for SQLite"""
+    def __init__(self, cursor, is_sqlite=False):
+        self.cursor = cursor
+        self.is_sqlite = is_sqlite
+
+    def execute(self, query, params=None):
+        if self.is_sqlite and params:
+            # Handle list for IN clauses and basic %s replacements
+            if "IN (" in query and isinstance(params, (list, tuple)):
+                # This is a bit tricky, but common in this app
+                pass # Already handled by placeholders in most cases
+            query = query.replace('%s', '?')
+            # Handle ILIKE -> LIKE for SQLite (SQLite LIKE is case-insensitive usually, but ILIKE is Postgres specific)
+            query = query.replace('ILIKE', 'LIKE')
+            # Handle NOW() -> datetime('now')
+            query = query.replace('NOW()', "datetime('now', 'localtime')")
+            # Handle NULLS LAST (SQLite supports it in newer versions, but let's be safe)
+            # query = query.replace('NULLS LAST', '') 
+        
+        try:
+            if params:
+                return self.cursor.execute(query, params)
+            else:
+                return self.cursor.execute(query)
+        except Exception as e:
+            print(f"[DB ERROR] Query: {query}")
+            print(f"[DB ERROR] Params: {params}")
+            raise e
+
+    def fetchone(self): return self.cursor.fetchone()
+    def fetchall(self): return self.cursor.fetchall()
+    def close(self): return self.cursor.close()
+    def __getattr__(self, name): return getattr(self.cursor, name)
+
 def get_db_connection():
+    global IS_LOCAL_MODE
     if not db_pool:
-        return None
+        # Fallback to SQLite if pool failed
+        try:
+            conn = sqlite3.connect('system_data.db', check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            IS_LOCAL_MODE = True
+            return conn
+        except Exception as e:
+            print(f"[CRITICAL] SQLite connection failed: {e}")
+            return None
+    
     try:
-        # Get connection from pool
-        return db_pool.getconn()
+        # Attempt Postgres from pool
+        conn = db_pool.getconn()
+        IS_LOCAL_MODE = False
+        return conn
     except Exception as e:
-        print(f"[ERROR] Error: database connection pool could not be obtained. {e}")
-        return None
+        print(f"[FALLBACK] Cloud DB Error: {e}. Switching to Local SQLite.")
+        try:
+            conn = sqlite3.connect('system_data.db', check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            IS_LOCAL_MODE = True
+            return conn
+        except Exception as e2:
+            print(f"[CRITICAL] All DB connections failed: {e2}")
+            return None
+
+def get_safe_cursor(conn):
+    if IS_LOCAL_MODE:
+        return SafeCursor(conn.cursor(), is_sqlite=True)
+    else:
+        return conn.cursor(cursor_factory=RealDictCursor)
 
 def release_db_connection(conn):
-    if db_pool and conn:
+    if IS_LOCAL_MODE:
+        if conn: conn.close()
+    elif db_pool and conn:
         db_pool.putconn(conn)
+
 
 @app.teardown_appcontext
 def close_db(error):
@@ -65,7 +134,8 @@ def utility_processor():
         val = sum(ord(c) for c in str(cage))
         hue = (val * 137) % 360
         return f"hsl({hue}, 70%, 65%)"
-    return dict(get_cage_color=get_cage_color)
+    return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE)
+
 
 @app.template_filter('format_history')
 def format_history_filter(val_str):
@@ -110,7 +180,7 @@ def login():
         conn = get_db_connection()
         if conn:
             try:
-                cur = conn.cursor(cursor_factory=RealDictCursor)
+                cur = get_safe_cursor(conn)
                 cur.execute("SELECT * FROM users WHERE username = %s AND password = %s", (username, password))
                 user = cur.fetchone()
                 
@@ -153,7 +223,7 @@ def register():
         conn = get_db_connection()
         if conn:
             try:
-                cur = conn.cursor(cursor_factory=RealDictCursor)
+                cur = get_safe_cursor(conn)
                 # Check if exists
                 cur.execute("SELECT * FROM users WHERE username = %s", (username,))
                 if cur.fetchone():
@@ -204,7 +274,10 @@ def computers():
         'status': 'status',
         'location': 'location',
         'scan_time': 'scan_time',
-        'exam_appeal': 'exam_appeal'
+        'scan_time': 'scan_time',
+        'exam_appeal': 'exam_appeal',
+        'specs': 'specs',
+        'project': 'project'
     }
     sort_col = allowed_sorts.get(sort, 'scan_time')
     sort_dir = 'ASC' if direction == 'asc' else 'DESC'
@@ -212,7 +285,7 @@ def computers():
     conn = get_db_connection()
     if not conn: return "<h1>⚠️ המערכת לא מצליחה להתחבר לענן. בדוק חיבור אינטרנט.</h1>"
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = get_safe_cursor(conn)
         
         # Dashboard Stats
         cur.execute("SELECT COUNT(*) as total FROM computers")
@@ -255,7 +328,7 @@ def computers():
         total_pages = (total_matching + per_page - 1) // per_page
             
         # Query results for current page
-        query = "SELECT id, barcode, case_number, cage_name, cage_number, location, status, exam_appeal, notes, last_technician, scan_time as last_seen FROM computers"
+        query = "SELECT id, barcode, case_number, cage_name, cage_number, location, status, exam_appeal, specs, project, notes, last_technician, scan_time as last_seen FROM computers"
         query += base_where
         
         # Order by logic
@@ -295,7 +368,7 @@ def add_computer():
         conn = get_db_connection()
         if not conn: return "DB connection failed", 500
         try:
-            cur = conn.cursor()
+            cur = get_safe_cursor(conn)
             barcode = re.sub(r'^0+(?=\d)', '', data['barcode'].strip())
             
             # Check for existing barcode
@@ -304,10 +377,12 @@ def add_computer():
                 flash(f"שגיאה: מחשב {barcode} כבר קיים במערכת!", "danger")
                 return redirect(url_for('add_computer'))
 
+            project = data.get('project', '').strip()
+
             cur.execute("""
-                INSERT INTO computers (barcode, case_number, cage_number, status, location, exam_appeal, notes, scan_time, last_technician)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), %s)
-            """, (barcode, data['case_number'], data['cage_number'], data['status'], data['location'], data['exam_appeal'], data['notes'], session.get('username')))
+                INSERT INTO computers (barcode, case_number, cage_number, status, location, exam_appeal, specs, project, notes, scan_time, last_technician)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s)
+            """, (barcode, data['case_number'], data['cage_number'], data['status'], data['location'], data['exam_appeal'], data['specs'], project, data['notes'], session.get('username')))
             conn.commit()
             cur.close()
             flash("מחשב נוסף בהצלחה!", "success")
@@ -327,17 +402,19 @@ def edit_computer(cid):
     conn = get_db_connection()
     if not conn: return "DB connection failed", 500
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = get_safe_cursor(conn)
         if request.method == 'POST':
             data = request.form
             cur.execute("SELECT * FROM computers WHERE id = %s", (cid,))
             old_val = cur.fetchone()
             
+            project = data.get('project', '').strip()
+
             cur.execute("""
                 UPDATE computers 
-                SET case_number=%s, cage_number=%s, status=%s, location=%s, exam_appeal=%s, notes=%s, last_technician=%s
+                SET case_number=%s, cage_number=%s, status=%s, location=%s, exam_appeal=%s, specs=%s, project=%s, notes=%s, last_technician=%s
                 WHERE id=%s
-            """, (data['case_number'], data['cage_number'], data['status'], data['location'], data['exam_appeal'], data['notes'], session.get('username'), cid))
+            """, (data['case_number'], data['cage_number'], data['status'], data['location'], data['exam_appeal'], data['specs'], project, data['notes'], session.get('username'), cid))
             
             cur.execute("""
                 INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
@@ -367,7 +444,7 @@ def delete_computer(cid):
     conn = get_db_connection()
     if not conn: return "DB connection failed", 500
     try:
-        cur = conn.cursor()
+        cur = get_safe_cursor(conn)
         # Only admin_uri can hard delete
         if session.get('user') == 'admin_uri':
             cur.execute("DELETE FROM computers WHERE id = %s", (cid,))
@@ -395,7 +472,7 @@ def exam_page():
     conn = get_db_connection()
     if not conn: return redirect(url_for('dashboard'))
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = get_safe_cursor(conn)
         cur.execute("SELECT * FROM computers WHERE exam_appeal IS NOT NULL AND TRIM(exam_appeal) != ''")
         computers = cur.fetchall()
         cur.close()
@@ -411,7 +488,7 @@ def history_page():
     conn = get_db_connection()
     if not conn: return redirect(url_for('dashboard'))
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = get_safe_cursor(conn)
         cur.execute("""
             SELECT h.*, c.barcode 
             FROM inventory_history h
@@ -421,7 +498,21 @@ def history_page():
         """)
         history = cur.fetchall()
         cur.close()
-        return render_template('history.html', history=history)
+        
+        # Safe processing for templates
+        processed_history = []
+        for h in history:
+            h_dict = dict(h)
+            ts = h_dict['timestamp']
+            if ts and isinstance(ts, str):
+                try:
+                    # SQLite default format
+                    h_dict['timestamp'] = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
+                except:
+                    pass
+            processed_history.append(h_dict)
+
+        return render_template('history.html', history=processed_history)
     finally:
         release_db_connection(conn)
 
@@ -436,7 +527,7 @@ def process_scan():
     conn = get_db_connection()
     if not conn: return {"error": "DB connection failed"}, 500
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = get_safe_cursor(conn)
         # Check if computer exists
         cur.execute("SELECT * FROM computers WHERE barcode = %s ORDER BY id DESC LIMIT 1", (barcode,))
         computer = cur.fetchone()
@@ -447,15 +538,22 @@ def process_scan():
                 UPDATE computers 
                 SET scan_time = NOW(), last_technician = %s
                 WHERE id = %s
-                RETURNING *
             """, (session.get('username'), computer['id'],))
-            new_computer = cur.fetchone()
+            
+            # Fetch the updated record (SQLite doesn't support RETURNING)
+            cur.execute("SELECT * FROM computers WHERE id = %s", (computer['id'],))
+            new_computer = dict(cur.fetchone())
             
             # Fetch last technician and time
             cur.execute("SELECT technician, timestamp FROM inventory_history WHERE computer_id = %s ORDER BY timestamp DESC LIMIT 1", (new_computer['id'],))
             hist = cur.fetchone()
             new_computer['last_technician'] = hist['technician'] if hist and hist['technician'] else "לא ידוע"
-            new_computer['last_scan_time'] = hist['timestamp'].strftime("%d/%m/%Y %H:%M") if hist and hist['timestamp'] else ""
+            
+            ts = hist['timestamp'] if hist else None
+            if ts and not isinstance(ts, str):
+                new_computer['last_scan_time'] = ts.strftime("%d/%m/%Y %H:%M")
+            else:
+                new_computer['last_scan_time'] = str(ts or '')
             
             conn.commit()
             cur.close()
@@ -469,9 +567,17 @@ def process_scan():
             cur.execute("""
                 INSERT INTO computers (barcode, status, scan_time, notes, last_technician) 
                 VALUES (%s, 'תקין', NOW(), %s, %s) 
-                RETURNING *
             """, (barcode, None, session.get('username')))
-            new_computer = cur.fetchone()
+            
+            last_id = cur.lastrowid if hasattr(cur, 'lastrowid') else None
+            if last_id:
+                cur.execute("SELECT * FROM computers WHERE id = %s", (last_id,))
+                new_computer = dict(cur.fetchone())
+            else:
+                # Fallback if lastrowid fails
+                cur.execute("SELECT * FROM computers WHERE barcode = %s ORDER BY id DESC LIMIT 1", (barcode,))
+                new_computer = dict(cur.fetchone())
+
             conn.commit()
             cur.close()
             # Trigger Google Sheets sync in background
@@ -495,7 +601,7 @@ def api_update_computer():
     conn = get_db_connection()
     if not conn: return {"error": "DB connection failed"}, 500
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = get_safe_cursor(conn)
         # Get old values for history
         cur.execute("SELECT * FROM computers WHERE id = %s", (cid,))
         old_val = cur.fetchone()
@@ -503,10 +609,11 @@ def api_update_computer():
         # Update
         updates = []
         params = []
-        for key in ['case_number', 'cage_number', 'status', 'location', 'exam_appeal', 'notes']:
+        for key in ['case_number', 'cage_number', 'status', 'location', 'exam_appeal', 'specs', 'project', 'notes']:
             if key in data:
+                val = data[key]
                 updates.append(f"{key} = %s")
-                params.append(data[key])
+                params.append(val)
         
         # Always update last_technician on scan update
         updates.append("last_technician = %s")
@@ -553,7 +660,7 @@ def api_ai_chat():
     conn = get_db_connection()
     if not conn: return {"error": "DB connection failed"}, 500
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = get_safe_cursor(conn)
         # Fetch stats for context
         cur.execute("SELECT COUNT(*) as total FROM computers")
         total = cur.fetchone()['total']
@@ -599,11 +706,11 @@ def api_batch_update():
     conn = get_db_connection()
     if not conn: return {"success": False, "error": "DB connection failed"}, 500
     try:
-        cur = conn.cursor()
+        cur = get_safe_cursor(conn)
         
         set_clauses = []
         params = []
-        for key in ['location', 'cage_number', 'cage_name', 'status', 'exam_appeal', 'notes']:
+        for key in ['location', 'cage_number', 'cage_name', 'status', 'exam_appeal', 'specs', 'project', 'ministry', 'notes']:
             if key in updates:
                 set_clauses.append(f"{key} = %s")
                 params.append(updates[key])
@@ -647,7 +754,7 @@ def api_batch_delete():
     conn = get_db_connection()
     if not conn: return {"success": False, "error": "DB connection failed"}, 500
     try:
-        cur = conn.cursor()
+        cur = get_safe_cursor(conn)
         placeholders = ','.join(['%s'] * len(ids))
         cur.execute(f"DELETE FROM computers WHERE id IN ({placeholders})", ids)
         conn.commit()
@@ -684,7 +791,7 @@ def api_get_cage(cage_id):
     conn = get_db_connection()
     if not conn: return {"error": "DB connection failed"}, 500
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = get_safe_cursor(conn)
 
         # שליפת פרטי הכלוב (אם קיים בטבלת cages)
         cur.execute("SELECT * FROM cages WHERE cage_id = %s", (cage_id,))
@@ -692,7 +799,7 @@ def api_get_cage(cage_id):
 
         # שליפת מחשבים בכלוב זה
         cur.execute("""
-            SELECT id, barcode, status, location, scan_time, notes
+            SELECT id, barcode, status, location, specs, scan_time, notes
             FROM computers
             WHERE cage_number = %s OR cage_name = %s
             ORDER BY scan_time DESC NULLS LAST
@@ -738,12 +845,15 @@ def api_fast_scan():
     cage_number = data.get('cage_number', '')
     cage_name  = data.get('cage_name', cage_number)
     status     = data.get('status', 'תקין')
+    specs      = data.get('specs', '')
+    project    = data.get('project', '')
+    ministry   = data.get('ministry', '') or get_ministry_for_project(project)
     technician = session.get('username', 'לא ידוע')
 
     conn = get_db_connection()
     if not conn: return {"success": False, "error": "DB connection failed"}, 500
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = get_safe_cursor(conn)
 
         # בדיקה אם מחשב קיים
         cur.execute("SELECT * FROM computers WHERE barcode = %s ORDER BY id DESC LIMIT 1", (barcode,))
@@ -758,10 +868,10 @@ def api_fast_scan():
             notes_val = old_val.get('notes') or ""
             cur.execute("""
                 UPDATE computers 
-                SET location = %s, cage_number = %s, cage_name = %s, status = %s, scan_time = NOW(), last_technician = %s
+                SET location = %s, cage_number = %s, cage_name = %s, status = %s, specs = %s, project = %s, ministry = %s, scan_time = NOW(), last_technician = %s
                 WHERE id = %s
                 RETURNING *
-            """, (location, cage_number, cage_name, status, technician, old_val['id']))
+            """, (location, cage_number, cage_name, status, specs, project, ministry, technician, old_val['id']))
             new_computer = cur.fetchone()
             
             # Fetch last technician and time
@@ -772,10 +882,10 @@ def api_fast_scan():
                 last_scan_time = hist['timestamp'].strftime("%d/%m/%Y %H:%M") if hist['timestamp'] else ""
         else:
             cur.execute("""
-                INSERT INTO computers (barcode, location, cage_number, cage_name, status, scan_time, last_technician)
-                VALUES (%s, %s, %s, %s, %s, NOW(), %s)
+                INSERT INTO computers (barcode, location, cage_number, cage_name, status, specs, project, ministry, scan_time, last_technician)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s)
                 RETURNING *
-            """, (barcode, location, cage_number, cage_name, status, technician))
+            """, (barcode, location, cage_number, cage_name, status, specs, project, ministry, technician))
             new_computer = cur.fetchone()
 
         # תיעוד היסטוריה
@@ -824,7 +934,7 @@ def admin_approve_delete():
     conn = get_db_connection()
     if not conn: return {"success": False, "error": "DB Error"}, 500
     try:
-        cur = conn.cursor()
+        cur = get_safe_cursor(conn)
         if action == 'hard_delete':
             cur.execute("DELETE FROM computers WHERE barcode = %s", (barcode,))
         elif action == 'restore':
@@ -849,7 +959,7 @@ def manage_users():
     conn = get_db_connection()
     if not conn: return "DB connection failed", 500
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = get_safe_cursor(conn)
         # 1. Fetch users
         cur.execute("SELECT username, role, timestamp FROM users ORDER BY timestamp DESC")
         users = cur.fetchall()
@@ -872,13 +982,66 @@ def manage_users():
     finally:
         release_db_connection(conn)
 
+@app.route('/api/add_user', methods=['POST'])
+@login_required
+def api_add_user():
+    # Only admin should be able to add users
+    if session.get('role') != 'admin' and session.get('user') != 'admin_uri':
+        return {"success": False, "error": "Unauthorized"}, 403
+        
+    data = request.json
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    role = data.get('role', 'technician')
+    
+    if not username or not password:
+        return {"success": False, "error": "Missing username or password"}, 400
+        
+    conn = get_db_connection()
+    if not conn: return {"success": False, "error": "DB connection failed"}, 500
+    try:
+        cur = get_safe_cursor(conn)
+        cur.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, %s)", (username, password, role))
+        conn.commit()
+        cur.close()
+        return {"success": True}
+    except Exception as e:
+        print(f"Error adding user: {e}")
+        return {"success": False, "error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
+@app.route('/api/delete_user/<username>', methods=['DELETE'])
+@login_required
+def api_delete_user(username):
+    # Only admin should be able to delete users
+    if session.get('role') != 'admin' and session.get('user') != 'admin_uri':
+        return {"success": False, "error": "Unauthorized"}, 403
+        
+    if username == 'admin_uri':
+        return {"success": False, "error": "Cannot delete super-admin"}, 400
+        
+    conn = get_db_connection()
+    if not conn: return {"success": False, "error": "DB connection failed"}, 500
+    try:
+        cur = get_safe_cursor(conn)
+        cur.execute("DELETE FROM users WHERE username = %s", (username,))
+        conn.commit()
+        cur.close()
+        return {"success": True}
+    except Exception as e:
+        print(f"Error deleting user: {e}")
+        return {"success": False, "error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
 @app.route('/cages')
 @login_required
 def cages_page():
     conn = get_db_connection()
     if not conn: return "DB Error", 500
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = get_safe_cursor(conn)
         cur.execute("""
             SELECT
                 c.cage_id, c.name, c.location, c.notes,
@@ -909,7 +1072,7 @@ def api_save_cage():
     conn = get_db_connection()
     if not conn: return {'success': False, 'error': 'DB Error'}, 500
     try:
-        cur = conn.cursor()
+        cur = get_safe_cursor(conn)
         if existing_id:
             cur.execute("UPDATE cages SET name=%s, location=%s, notes=%s, updated_at=NOW() WHERE cage_id=%s", 
                         (data.get('name',''), data.get('location',''), data.get('notes',''), existing_id))
@@ -932,7 +1095,7 @@ def api_scan_stats():
     conn = get_db_connection()
     if not conn: return {'error': 'DB Error'}, 500
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = get_safe_cursor(conn)
         cur.execute("SELECT COUNT(*) as cnt FROM inventory_history WHERE timestamp::date = CURRENT_DATE AND change_type IN ('Fast Scan', 'Update via Scan')")
         today_total = cur.fetchone()['cnt']
         cur.execute("SELECT COUNT(*) as cnt FROM computers")
@@ -951,7 +1114,7 @@ def export_computers():
     conn = get_db_connection()
     if not conn: return 'DB Error', 500
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = get_safe_cursor(conn)
         cur.execute("SELECT barcode, cage_number, cage_name, location, status, case_number, exam_appeal, notes, scan_time FROM computers ORDER BY cage_number, barcode")
         rows = cur.fetchall()
         cur.close()

@@ -121,6 +121,7 @@
   <div class="mode-bar">
     <button class="mode-btn active" onclick="setMode('area')" id="btn-area">🌍 סריקת שטח</button>
     <button class="mode-btn" onclick="setMode('cage')" id="btn-cage">📦 סריקת כלוב</button>
+    <button class="mode-btn" onclick="setMode('project')" id="btn-project">📂 סריקת פרויקט</button>
     <button class="mode-btn" onclick="setMode('exam')" id="btn-exam">🎓 סריקת מבחנים</button>
   </div>
 
@@ -252,6 +253,20 @@
         <label>מבחן/ערעור</label>
         <input type="text" id="sh-exam" placeholder="פרטים...">
       </div>
+      <div class="form-field-scan">
+        <label>מפרט (Specs)</label>
+        <input type="text" id="sh-specs" placeholder="למשל: 16GB RAM">
+      </div>
+    </div>
+    <div class="form-row-scan">
+      <div class="form-field-scan">
+        <label>פרויקט</label>
+        <input type="text" id="sh-project" placeholder="שם פרויקט..." oninput="updateShMinistry(this.value)">
+      </div>
+      <div class="form-field-scan">
+        <label>משרד</label>
+        <input type="text" id="sh-ministry" placeholder="משויך אוטומטית...">
+      </div>
     </div>
     <div class="form-row-scan">
       <div class="form-field-scan">
@@ -283,6 +298,27 @@
   // Cage packing state
   let cageCount = 0;
   let activePackingCage = null; // Step 2 variable
+  
+  // Project session state
+  let projectCount = 0;
+  let activeProject = null;
+  let activeMinistry = null;
+
+  const projectMap = {
+      "רופאים": "משרד הבריאות",
+      "שיניים": "משרד הבריאות",
+      "משרד המשפטים": "משרד המשפטים",
+      "משרד העבודה": "משרד העבודה",
+      "משרד החינוך": "משרד החינוך"
+  };
+
+  function getMinistry(val) {
+      if (projectMap[val]) return projectMap[val];
+      for (const [p, m] of Object.entries(projectMap)) {
+          if (val.includes(p) || p.includes(val)) return m;
+      }
+      return "";
+  }
 
   // ── Scan box visual feedback ─────────────────────────────────────────
   let failTimer = null;
@@ -320,6 +356,8 @@
     if (currentMode === 'area') wrapId = 'manual-wrap-area';
     else if (currentMode === 'cage') {
         wrapId = activePackingCage ? 'manual-wrap-pack' : 'manual-wrap-cage';
+    } else if (currentMode === 'project') {
+        wrapId = activeProject ? 'manual-wrap-pack' : 'manual-wrap-project';
     } else {
         return; // exam mode has no manual input
     }
@@ -329,7 +367,7 @@
   }
 
   function hideManualInput() {
-    ['manual-wrap-area', 'manual-wrap-cage', 'manual-wrap-pack'].forEach(id => {
+    ['manual-wrap-area', 'manual-wrap-cage', 'manual-wrap-pack', 'manual-wrap-project'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
@@ -366,10 +404,20 @@
   // ── Mode switching ────────────────────────────────────────────────────
   function setMode(mode) {
     currentMode = mode;
-    ['area','cage','exam'].forEach(m => {
-      document.getElementById('btn-' + m).classList.toggle('active', m === mode);
-      document.getElementById('panel-' + m).style.display = m === mode ? 'block' : 'none';
+    ['area','cage','project','exam'].forEach(m => {
+      const btn = document.getElementById('btn-' + m);
+      if (btn) btn.classList.toggle('active', m === mode);
+      const pan = document.getElementById('panel-' + m);
+      if (pan) pan.style.display = m === mode ? 'block' : 'none';
     });
+    
+    // Reset session states if necessary or just UI
+    if (mode === 'project') {
+        if (!activeProject) {
+            document.getElementById('project-step-1').style.display = 'block';
+            document.getElementById('project-step-2').style.display = 'none';
+        }
+    }
     
     // Reset cage flow
     if (mode === 'cage') {
@@ -464,6 +512,10 @@
     else if (currentMode === 'cage') {
         if (!activePackingCage) onIdentifyCageScan(clean);
         else onPackComputerScan(clean);
+    }
+    else if (currentMode === 'project') {
+        if (!activeProject) onIdentifyProjectScan(clean);
+        else onPackProjectComputerScan(clean);
     }
   }
 
@@ -627,7 +679,70 @@
   function submitManualPack() {
     const val = document.getElementById('manual-barcode-pack').value;
     const clean = cleanBarcode(val);
-    if (clean) { document.getElementById('manual-barcode-pack').value = ''; onPackComputerScan(clean); }
+    if (clean) { 
+        document.getElementById('manual-barcode-pack').value = ''; 
+        if (currentMode === 'cage') onPackComputerScan(clean);
+        else if (currentMode === 'project') onPackProjectComputerScan(clean);
+    }
+  }
+
+  // Project session functions
+  function onIdentifyProjectScan(project) {
+      onScanSuccess_visual();
+      activeProject = project;
+      activeMinistry = getMinistry(project);
+      projectCount = 0;
+      
+      document.getElementById('lbl-active-project').textContent = activeProject;
+      document.getElementById('lbl-active-ministry').textContent = activeMinistry || 'לא ידוע';
+      document.getElementById('project-count').textContent = '0';
+      
+      document.getElementById('project-step-1').style.display = 'none';
+      document.getElementById('project-step-2').style.display = 'block';
+      showToast(`✓ פרויקט ${project} מזוהה!`);
+      resetFailTimer();
+  }
+
+  function onPackProjectComputerScan(barcode) {
+      if (fastCooldown) return;
+      fastCooldown = true;
+      setTimeout(() => fastCooldown = false, 1500);
+
+      fetch('/api/fast-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barcode, project: activeProject, ministry: activeMinistry })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          onScanSuccess_visual();
+          projectCount++;
+          document.getElementById('project-count').textContent = projectCount;
+          showToast(`✓ ${barcode} צורף לפרויקט ${activeProject}`);
+          resetFailTimer();
+        } else {
+          setScanBoxState('fail');
+          showToast('שגיאה: ' + (data.error || 'לא ידוע'), true);
+        }
+      })
+      .catch(() => { setScanBoxState('fail'); showToast('שגיאת חיבור', true); });
+  }
+
+  function finishProjectSession() {
+      if (confirm('לסיים עבודה על פרויקט זה?')) {
+          activeProject = null;
+          activeMinistry = null;
+          document.getElementById('project-step-1').style.display = 'block';
+          document.getElementById('project-step-2').style.display = 'none';
+          showToast('פרויקט נסגר.');
+          resetFailTimer();
+      }
+  }
+
+  function submitManualProject() {
+      const val = document.getElementById('manual-barcode-project').value;
+      if (val) { document.getElementById('manual-barcode-project').value = ''; onIdentifyProjectScan(val); }
   }
 
   // Area Scan Form Handling
@@ -637,7 +752,10 @@
       location: '',
       cage: '',
       status: 'תקין',
-      exam: ''
+      exam: '',
+      specs: '',
+      project: '',
+      ministry: ''
   };
 
   function openSheet(computer, isNew) {
@@ -681,6 +799,9 @@
     document.getElementById('sh-status').value = lastAreaSettings.status || computer.status || 'תקין';
     document.getElementById('sh-case').value = computer.case_number || '';
     document.getElementById('sh-exam').value = lastAreaSettings.exam || computer.exam_appeal || '';
+    document.getElementById('sh-specs').value = lastAreaSettings.specs || computer.specs || '';
+    document.getElementById('sh-project').value = lastAreaSettings.project || computer.project || '';
+    document.getElementById('sh-ministry').value = lastAreaSettings.ministry || computer.ministry || '';
     document.getElementById('sh-notes').value = computer.notes || '';
     
     document.getElementById('sheet-overlay').classList.add('show');
@@ -693,6 +814,10 @@
     setTimeout(() => { scanner.resume(); resetFailTimer(); }, 300);
   }
 
+  function updateShMinistry(val) {
+      document.getElementById('sh-ministry').value = getMinistry(val);
+  }
+
   function saveFullScan() {
     const data = {
       id: document.getElementById('sheet-id').value,
@@ -702,6 +827,9 @@
       status: document.getElementById('sh-status').value,
       case_number: document.getElementById('sh-case').value,
       exam_appeal: document.getElementById('sh-exam').value,
+      specs: document.getElementById('sh-specs').value,
+      project: document.getElementById('sh-project').value,
+      ministry: document.getElementById('sh-ministry').value,
       notes: document.getElementById('sh-notes').value
     };
     
@@ -710,6 +838,9 @@
     lastAreaSettings.cage = data.cage_number;
     lastAreaSettings.status = data.status;
     lastAreaSettings.exam = data.exam_appeal;
+    lastAreaSettings.specs = data.specs;
+    lastAreaSettings.project = data.project;
+    lastAreaSettings.ministry = data.ministry;
 
     fetch('/api/update-computer', {
       method: 'POST',
@@ -751,6 +882,7 @@
     if (e.key === 'Enter') {
       if (document.activeElement.id === 'manual-barcode-area') submitManualArea();
       if (document.activeElement.id === 'manual-barcode-cage') submitManualCage();
+      if (document.activeElement.id === 'manual-barcode-project') submitManualProject();
       if (document.activeElement.id === 'manual-barcode-pack') submitManualPack();
     }
   });

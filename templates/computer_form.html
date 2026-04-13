@@ -45,6 +45,23 @@
                 <input type="text" id="exam_appeal" name="exam_appeal" class="form-control"
                     value="{{ computer.exam_appeal if computer else '' }}" />
             </div>
+            <div class="form-group">
+                <label for="specs">מפרט (Specs)</label>
+                <input type="text" id="specs" name="specs" class="form-control"
+                    value="{{ computer.specs if computer else '' }}" placeholder="למשל: 16GB RAM, Dell 2018" />
+            </div>
+            <div class="form-group">
+                <label for="project">📂 פרויקט</label>
+                <input type="text" id="project" name="project" class="form-control" list="project-list"
+                    value="{{ computer.project if computer else '' }}" />
+                <datalist id="project-list">
+                    <option value="רופאים">
+                    <option value="שיניים">
+                    <option value="משרד המשפטים">
+                    <option value="משרד העבודה">
+                    <option value="משרד החינוך">
+                </datalist>
+            </div>
         </div>
         <div class="form-group" style="margin-top: 20px;">
             <label for="notes">הערות</label>
@@ -59,4 +76,5 @@
         </div>
     </form>
 </div>
+
 {% endblock %}

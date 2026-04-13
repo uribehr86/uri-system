@@ -154,9 +154,6 @@
 <div class="page-header">
     <h1>📊 לוח בקרה ומלאי</h1>
     <div>
-        <button id="syncSheetsBtn" class="btn btn-ghost" style="margin-left: 8px; border: 1px solid var(--accent2);">
-            <span style="font-size: 1.1rem;">📅</span> סנכרון ל-Sheets
-        </button>
         <a href="{{ url_for('scanner') }}" class="btn btn-blue" style="margin-left: 8px; font-weight: bold; font-size: 1rem;"><span style="font-size: 1.2rem;">📸</span> סריקה מהירה</a>
         <a href="{{ url_for('add_computer') }}" class="btn btn-green">➕ הוסף מחשב</a>
     </div>
@@ -190,6 +187,10 @@
         
         <input type="text" name="cage_q" class="form-control" placeholder="📦 חיפוש לפי כלוב..."
             style="padding: 10px 14px; max-width:160px;" value="{{ cage_search }}" />
+
+        <input type="text" name="project_q" class="form-control" placeholder="📂 חיפוש פרויקט..."
+            style="padding: 10px 14px; max-width:160px;" value="{{ project_search or '' }}" />
+
 
         <select name="status" class="form-control" style="padding: 10px 14px; max-width:140px;">
             <option value="">כל הסטטוסים</option>
@@ -229,6 +230,8 @@
             <option value="תקול">תקול</option>
             <option value="בתיקון">בתיקון</option>
         </select>
+
+        <input type="text" id="batchProject" placeholder="עדכן פרויקט..." style="width: 120px;">
 
         <button class="btn btn-blue" style="padding: 6px 12px;" onclick="applyBatchUpdates()">שמור שינויים</button>
 
@@ -270,6 +273,12 @@
                             מיקום {% if sort == 'location' %}{{ '🔼' if direction == 'asc' else '🔽' }}{% endif %}
                         </a>
                     </th>
+                    <th>
+                        <a href="{{ url_for('computers', sort='specs', dir='asc' if sort != 'specs' or direction == 'desc' else 'desc', q=search, status=status_filter, cage_q=cage_search) }}" style="color:inherit; text-decoration:none;">
+                            מפרט {% if sort == 'specs' %}{{ '🔼' if direction == 'asc' else '🔽' }}{% endif %}
+                        </a>
+                    </th>
+                    <th>פרויקט</th>
                     <th>הערות</th>
                     <th class="hide-mobile">
                         <a href="{{ url_for('computers', sort='exam_appeal', dir='asc' if sort != 'exam_appeal' or direction == 'desc' else 'desc', q=search, status=status_filter, cage_q=cage_search) }}" style="color:inherit; text-decoration:none;">
@@ -313,6 +322,8 @@
                         {% endif %}
                     </td>
                     <td>{{ c.location or '—' }}</td>
+                    <td style="color:var(--accent2); font-weight:600;">{{ c.specs or '—' }}</td>
+                    <td style="color:var(--accent); font-weight:700;">{{ c.project or '—' }}</td>
                     <td style="color:var(--muted); max-width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
                         title="{{ c.notes or '' }}">
                         {{ c.notes or '—' }}
@@ -406,6 +417,7 @@
         const loc = document.getElementById('batchLocation').value;
         const cage = document.getElementById('batchCage').value.trim();
         const stat = document.getElementById('batchStatus').value;
+        const proj = document.getElementById('batchProject').value.trim();
 
         if (loc) updates.location = loc;
         if (cage) {
@@ -413,6 +425,7 @@
             updates.cage_name = cage; // Usually matching in this app
         }
         if (stat) updates.status = stat;
+        if (proj) updates.project = proj;
 
         if (Object.keys(updates).length === 0) {
             alert("אנא בחר שדה לעדכון (מיקום / כלוב / סטטוס)");
@@ -451,31 +464,5 @@
             });
     }
 
-    document.getElementById('syncSheetsBtn').addEventListener('click', function() {
-        const btn = this;
-        const originalText = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '⌛ מסנכרן...';
-
-        fetch('/api/sync-to-sheets', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        })
-        .then(r => r.json())
-        .then(data => {
-            btn.disabled = false;
-            btn.innerHTML = originalText;
-            if (data.success) {
-                alert("✅ " + data.message);
-            } else {
-                alert("❌ שגיאה: " + data.error);
-            }
-        })
-        .catch(err => {
-            btn.disabled = false;
-            btn.innerHTML = originalText;
-            alert("❌ שגיאת תקשורת: " + err);
-        });
-    });
 </script>
 {% endblock %}
