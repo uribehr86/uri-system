@@ -325,7 +325,7 @@
                     <td style="color:var(--accent2); font-weight:600;">{{ c.specs or '—' }}</td>
                     <td style="color:var(--accent); font-weight:700;">{{ c.project or '—' }}</td>
                     <td style="max-width:220px;">
-                        <div style="color:var(--muted); max-height:4.5em; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; word-wrap:break-word; white-space:pre-wrap;"
+                        <div style="color:var(--muted); max-height:4.5em; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:3; line-clamp:3; -webkit-box-orient:vertical; word-wrap:break-word; white-space:pre-wrap;"
                              title="{{ c.notes or '' }}">
                             {{ c.notes or '—' }}
                         </div>
