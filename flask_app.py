@@ -854,41 +854,74 @@ def api_fast_scan():
     if not conn: return {"success": False, "error": "DB connection failed"}, 500
     try:
         cur = get_safe_cursor(conn)
-
-        # בדיקה אם מחשב קיים
         cur.execute("SELECT * FROM computers WHERE barcode = %s ORDER BY id DESC LIMIT 1", (barcode,))
         computer = cur.fetchone()
 
         old_val = dict(computer) if computer else None
-
         last_technician = "לא ידוע"
         notes_val = ""
 
         if old_val:
             notes_val = old_val.get('notes') or ""
-            cur.execute("""
-                UPDATE computers 
-                SET location = %s, cage_number = %s, cage_name = %s, status = %s, specs = %s, project = %s, ministry = %s, scan_time = NOW(), last_technician = %s
-                WHERE id = %s
-                RETURNING *
-            """, (location, cage_number, cage_name, status, specs, project, ministry, technician, old_val['id']))
+            fields_to_update = []
+            params = []
+            
+            for key in ['location', 'cage_number', 'cage_name', 'status', 'specs', 'project', 'ministry', 'exam_appeal']:
+                if key in data:
+                    fields_to_update.append(f"{key} = %s")
+                    params.append(data[key])
+            
+            # Special auto-ministry logic
+            if 'project' in data and 'ministry' not in data:
+                project_name = data['project']
+                ministry = ''
+                if 'רופאי' in project_name or 'שיניים' in project_name: ministry = 'משרד הבריאות'
+                elif 'משפטים' in project_name: ministry = 'משרד המשפטים'
+                elif 'עבודה' in project_name: ministry = 'משרד העבודה'
+                elif 'חינוך' in project_name: ministry = 'משרד החינוך'
+                fields_to_update.append("ministry = %s")
+                params.append(ministry)
+                
+            fields_to_update.extend(["scan_time = NOW()", "last_technician = %s"])
+            params.extend([technician, old_val['id']])
+            
+            query = f"UPDATE computers SET {', '.join(fields_to_update)} WHERE id = %s RETURNING *"
+            cur.execute(query, params)
             new_computer = cur.fetchone()
             
-            # Fetch last technician and time
             cur.execute("SELECT technician, timestamp FROM inventory_history WHERE computer_id = %s ORDER BY timestamp DESC LIMIT 1", (new_computer['id'],))
             hist = cur.fetchone()
             if hist and hist['technician']:
                 last_technician = hist['technician']
                 last_scan_time = hist['timestamp'].strftime("%d/%m/%Y %H:%M") if hist['timestamp'] else ""
         else:
-            cur.execute("""
-                INSERT INTO computers (barcode, location, cage_number, cage_name, status, specs, project, ministry, scan_time, last_technician)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s)
-                RETURNING *
-            """, (barcode, location, cage_number, cage_name, status, specs, project, ministry, technician))
+            fields = ['barcode', 'scan_time', 'last_technician']
+            params = [barcode, technician]
+            
+            for key in ['location', 'cage_number', 'cage_name', 'status', 'specs', 'project', 'ministry', 'exam_appeal']:
+                if key in data:
+                    fields.append(key)
+                    params.append(data[key])
+                    
+            if 'project' in data and 'ministry' not in data:
+                fields.append('ministry')
+                project_name = data['project']
+                ministry = ''
+                if 'רופאי' in project_name or 'שיניים' in project_name: ministry = 'משרד הבריאות'
+                elif 'משפטים' in project_name: ministry = 'משרד המשפטים'
+                elif 'עבודה' in project_name: ministry = 'משרד העבודה'
+                elif 'חינוך' in project_name: ministry = 'משרד החינוך'
+                params.append(ministry)
+                
+            if 'status' not in data:
+                fields.append('status')
+                params.append('תקין')
+                
+            placeholders = ', '.join(['%s'] * len(fields))
+            query = f"INSERT INTO computers ({', '.join(fields)}) VALUES ({placeholders}) RETURNING *"
+            cur.execute(query, params)
             new_computer = cur.fetchone()
 
-        # תיעוד היסטוריה
         cur.execute("""
             INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
             VALUES (%s, %s, 'Fast Scan', %s, %s)
@@ -905,8 +938,7 @@ def api_fast_scan():
             "success": True, 
             "barcode": barcode, 
             "is_new": old_val is None,
-            "last_technician": last_technician,
-            "last_scan_time": last_scan_time if 'last_scan_time' in locals() else "",
+            "previous_cage": old_val.get('cage_number', '') if old_val else "",
             "notes": notes_val
         }
 

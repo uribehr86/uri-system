@@ -121,7 +121,6 @@
   <div class="mode-bar">
     <button class="mode-btn active" onclick="setMode('area')" id="btn-area">🌍 סריקת שטח</button>
     <button class="mode-btn" onclick="setMode('cage')" id="btn-cage">📦 סריקת כלוב</button>
-    <button class="mode-btn" onclick="setMode('project')" id="btn-project">📂 סריקת פרויקט</button>
     <button class="mode-btn" onclick="setMode('exam')" id="btn-exam">🎓 סריקת מבחנים</button>
   </div>
 
@@ -195,10 +194,39 @@
       </div>
     </div>
 
+
+
     <!-- EXAMS SCAN -->
     <div id="panel-exam" style="display:none;">
-      <div class="cage-scan-hint" style="font-weight:700; color:#fff;">סרוק את קוד ה-QR מדף הנבחן כדי לעדכן נוכחות</div>
-      <div class="waiting-hint"><div class="pulse-dot"></div> ממתין לסריקת דף נבחן...</div>
+      <!-- Step 1: Request Exam -->
+      <div id="exam-step-1">
+          <div class="cage-scan-hint" style="font-weight:700; color:#fff;">סרוק ברקוד או הקלד מזהה מבחן כדי להתחיל לסרוק אליו מחשבים</div>
+          <div id="manual-wrap-exam" class="manual-input-wrap">
+            <input type="text" id="manual-barcode-exam" placeholder="הקלד מזהה מבחן..." />
+            <button onclick="submitManualExam()">אישור</button>
+          </div>
+      </div>
+      
+      <!-- Step 2: Packing Computers -->
+      <div id="exam-step-2" style="display:none;">
+          <div class="fast-controls">
+             <div class="locked-label" style="display:block;">🔒 מבחן פעיל: <span id="lbl-active-exam"></span></div>
+          </div>
+          <div class="waiting-hint"><div class="pulse-dot"></div> ממתין לסריקת מחשבים למבחן...</div>
+          <div id="manual-wrap-pack-exam" class="manual-input-wrap" style="display:none;">
+            <input type="text" id="manual-barcode-pack-exam" placeholder="הקלד מספר מחשב..." />
+            <button onclick="submitManualPack()">אישור</button>
+          </div>
+    
+          <div class="cage-packing-panel">
+            <div class="scan-counter">נסרקו למבחן:<br><span id="exam-count">0</span></div>
+            <div class="pack-btns">
+                <button class="btn-pack btn-pause" id="btn-pause-exam" onclick="togglePause()" style="flex:1; padding: 15px 10px;">⏸️ השהה</button>
+                <button class="btn-pack btn-resume" id="btn-resume-exam" onclick="togglePause()" style="flex:1; padding: 15px 10px;">▶️ המשך</button>
+                <button class="btn-pack btn-stop" onclick="finishExamSession()" style="flex:1.5; padding: 15px 10px; font-size: 0.95rem;">⏹️ סיום ושמירה</button>
+            </div>
+          </div>
+      </div>
     </div>
 
   </div>
@@ -299,10 +327,10 @@
   let cageCount = 0;
   let activePackingCage = null; // Step 2 variable
   
-  // Project session state
-  let projectCount = 0;
-  let activeProject = null;
-  let activeMinistry = null;
+
+  // Exam session state
+  let examCount = 0;
+  let activeExam = null;
 
   const projectMap = {
       "רופאים": "משרד הבריאות",
@@ -356,10 +384,8 @@
     if (currentMode === 'area') wrapId = 'manual-wrap-area';
     else if (currentMode === 'cage') {
         wrapId = activePackingCage ? 'manual-wrap-pack' : 'manual-wrap-cage';
-    } else if (currentMode === 'project') {
-        wrapId = activeProject ? 'manual-wrap-pack' : 'manual-wrap-project';
-    } else {
-        return; // exam mode has no manual input
+    } else if (currentMode === 'exam') {
+        wrapId = activeExam ? 'manual-wrap-pack-exam' : 'manual-wrap-exam';
     }
     
     const el = document.getElementById(wrapId);
@@ -367,7 +393,7 @@
   }
 
   function hideManualInput() {
-    ['manual-wrap-area', 'manual-wrap-cage', 'manual-wrap-pack', 'manual-wrap-project'].forEach(id => {
+    ['manual-wrap-area', 'manual-wrap-cage', 'manual-wrap-pack', 'manual-wrap-exam', 'manual-wrap-pack-exam'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
@@ -404,21 +430,14 @@
   // ── Mode switching ────────────────────────────────────────────────────
   function setMode(mode) {
     currentMode = mode;
-    ['area','cage','project','exam'].forEach(m => {
+    ['area','cage','exam'].forEach(m => {
       const btn = document.getElementById('btn-' + m);
       if (btn) btn.classList.toggle('active', m === mode);
       const pan = document.getElementById('panel-' + m);
       if (pan) pan.style.display = m === mode ? 'block' : 'none';
     });
     
-    // Reset session states if necessary or just UI
-    if (mode === 'project') {
-        if (!activeProject) {
-            document.getElementById('project-step-1').style.display = 'block';
-            document.getElementById('project-step-2').style.display = 'none';
-        }
-    }
-    
+
     // Reset cage flow
     if (mode === 'cage') {
         activePackingCage = null;
@@ -427,10 +446,13 @@
         resumeCameraIfPaused();
     }
     
-    // Exam mode handles camera pausing
     if (mode === 'exam') {
-        pauseCameraIfRunning();
-        document.querySelector('.camera-wrap').style.display = 'none';
+        if (!activeExam) {
+            document.getElementById('exam-step-1').style.display = 'block';
+            document.getElementById('exam-step-2').style.display = 'none';
+        }
+        document.querySelector('.camera-wrap').style.display = 'block';
+        resumeCameraIfPaused();
     } else {
         document.querySelector('.camera-wrap').style.display = 'block';
         resumeCameraIfPaused();
@@ -443,7 +465,7 @@
       if (scanner && scanner.getState() === 2) { scanner.pause(); } // 2 is SCANNING
   }
   function resumeCameraIfPaused() {
-      if (scanner && scanner.getState() === 3 && currentMode !== 'exam' && !isPaused && !isSheetOpen) { 
+      if (scanner && scanner.getState() === 3 && !isPaused && !isSheetOpen) { 
           scanner.resume(); 
       }
   }
@@ -487,12 +509,11 @@
     }
 
     if (currentMode === 'exam') {
-        if (code.includes('/examinee/scan/')) {
-            showToast('✓ קוד זוהה! מעביר למסך נוכחות...');
-            window.location.href = code;
+        if (!activeExam) {
+            onIdentifyExamScan(clean);
             return;
         } else {
-            showToast('❌ קוד לא תקין למערכת המבחנים', true);
+            onPackExamComputerScan(clean);
             return;
         }
     }
@@ -512,10 +533,6 @@
     else if (currentMode === 'cage') {
         if (!activePackingCage) onIdentifyCageScan(clean);
         else onPackComputerScan(clean);
-    }
-    else if (currentMode === 'project') {
-        if (!activeProject) onIdentifyProjectScan(clean);
-        else onPackProjectComputerScan(clean);
     }
   }
 
@@ -608,9 +625,9 @@
             if (data.notes) {
                 msg += ` | הערות: ${data.notes}`;
             }
-            if (!data.is_new && data.last_technician && data.last_technician !== currentTechnician) {
-                msg += ` | אחרון: ${data.last_technician}`;
-                if (data.last_scan_time) msg += ` (${data.last_scan_time})`;
+            if (!data.is_new && data.previous_cage && data.previous_cage !== activePackingCage) {
+                msg += ` | ⚠️ היה בכלוב: ${data.previous_cage}`;
+                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
             }
             showToast(msg);
         }
@@ -627,8 +644,8 @@
   function togglePause() {
       isPaused = !isPaused;
       
-      const pauseIds = ['btn-pause', 'btn-pause-area'];
-      const resumeIds = ['btn-resume', 'btn-resume-area'];
+      const pauseIds = ['btn-pause', 'btn-pause-area', 'btn-pause-exam'];
+      const resumeIds = ['btn-resume', 'btn-resume-area', 'btn-resume-exam'];
 
       if (isPaused) {
           scanner.pause();
@@ -677,33 +694,37 @@
     if (clean) { document.getElementById('manual-barcode-cage').value = ''; onIdentifyCageScan(clean); }
   }
   function submitManualPack() {
-    const val = document.getElementById('manual-barcode-pack').value;
+    let wrapId;
+    if (currentMode === 'cage') wrapId = 'manual-barcode-pack';
+    else if (currentMode === 'exam') wrapId = 'manual-barcode-pack-exam';
+    else return;
+    
+    const val = document.getElementById(wrapId).value;
     const clean = cleanBarcode(val);
     if (clean) { 
-        document.getElementById('manual-barcode-pack').value = ''; 
+        document.getElementById(wrapId).value = ''; 
         if (currentMode === 'cage') onPackComputerScan(clean);
-        else if (currentMode === 'project') onPackProjectComputerScan(clean);
+        else if (currentMode === 'exam') onPackExamComputerScan(clean);
     }
   }
 
-  // Project session functions
-  function onIdentifyProjectScan(project) {
+
+  // Exam session functions
+  function onIdentifyExamScan(exam) {
       onScanSuccess_visual();
-      activeProject = project;
-      activeMinistry = getMinistry(project);
-      projectCount = 0;
+      activeExam = exam;
+      examCount = 0;
       
-      document.getElementById('lbl-active-project').textContent = activeProject;
-      document.getElementById('lbl-active-ministry').textContent = activeMinistry || 'לא ידוע';
-      document.getElementById('project-count').textContent = '0';
+      document.getElementById('lbl-active-exam').textContent = activeExam;
+      document.getElementById('exam-count').textContent = '0';
       
-      document.getElementById('project-step-1').style.display = 'none';
-      document.getElementById('project-step-2').style.display = 'block';
-      showToast(`✓ פרויקט ${project} מזוהה!`);
+      document.getElementById('exam-step-1').style.display = 'none';
+      document.getElementById('exam-step-2').style.display = 'block';
+      showToast(`✓ מבחן ${exam} מזוהה!`);
       resetFailTimer();
   }
 
-  function onPackProjectComputerScan(barcode) {
+  function onPackExamComputerScan(barcode) {
       if (fastCooldown) return;
       fastCooldown = true;
       setTimeout(() => fastCooldown = false, 1500);
@@ -711,15 +732,15 @@
       fetch('/api/fast-scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ barcode, project: activeProject, ministry: activeMinistry })
+        body: JSON.stringify({ barcode, exam_appeal: activeExam })
       })
       .then(r => r.json())
       .then(data => {
         if (data.success) {
           onScanSuccess_visual();
-          projectCount++;
-          document.getElementById('project-count').textContent = projectCount;
-          showToast(`✓ ${barcode} צורף לפרויקט ${activeProject}`);
+          examCount++;
+          document.getElementById('exam-count').textContent = examCount;
+          showToast(`✓ ${barcode} צורף למבחן ${activeExam}`);
           resetFailTimer();
         } else {
           setScanBoxState('fail');
@@ -729,20 +750,19 @@
       .catch(() => { setScanBoxState('fail'); showToast('שגיאת חיבור', true); });
   }
 
-  function finishProjectSession() {
-      if (confirm('לסיים עבודה על פרויקט זה?')) {
-          activeProject = null;
-          activeMinistry = null;
-          document.getElementById('project-step-1').style.display = 'block';
-          document.getElementById('project-step-2').style.display = 'none';
-          showToast('פרויקט נסגר.');
+  function finishExamSession() {
+      if (confirm('לסיים עבודה על מבחן זה?')) {
+          activeExam = null;
+          document.getElementById('exam-step-1').style.display = 'block';
+          document.getElementById('exam-step-2').style.display = 'none';
+          showToast('מבחן נסגר.');
           resetFailTimer();
       }
   }
 
-  function submitManualProject() {
-      const val = document.getElementById('manual-barcode-project').value;
-      if (val) { document.getElementById('manual-barcode-project').value = ''; onIdentifyProjectScan(val); }
+  function submitManualExam() {
+      const val = document.getElementById('manual-barcode-exam').value;
+      if (val) { document.getElementById('manual-barcode-exam').value = ''; onIdentifyExamScan(val); }
   }
 
   // Area Scan Form Handling
@@ -763,15 +783,8 @@
     if (failTimer) clearTimeout(failTimer);
     hideManualInput();
     
-    // Check if it's not new and was scanned recently by SOMEONE ELSE
-    const techName = (computer.last_technician || "").trim();
-    const myName = (currentTechnician || "").trim();
-    
-    if (!isNew) {
-        let warnMsg = `המחשב הזה כבר נסרק במערכת.`;
-        if (techName) warnMsg = `המחשב הזה כבר נסרק לאחרונה ע"י ${techName}`;
-        if (computer.last_scan_time) warnMsg += ` ב-${computer.last_scan_time}`;
-        warnMsg += `.\nהאם אתה בטוח שברצונך לעדכן אותו שוב?`;
+    if (!isNew && computer.cage_number) {
+        let warnMsg = `⚠️ כפילות: מחשב זה נסרק בעבר וכבר משויך לכלוב: ${computer.cage_number}\nהאם אתה בטוח שברצונך לפתוח אותו לעריכה מחדש?`;
         
         if (!confirm(warnMsg)) {
             isSheetOpen = false;
