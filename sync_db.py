@@ -41,6 +41,9 @@ def sync():
                 status TEXT,
                 location TEXT,
                 exam_appeal TEXT,
+                specs TEXT,
+                project TEXT,
+                ministry TEXT,
                 notes TEXT,
                 scan_time TEXT
             )
@@ -52,9 +55,9 @@ def sync():
         # הכנסת נתונים
         for c in computers:
             sl_cur.execute("""
-                INSERT INTO computers (id, barcode, case_number, cage_number, cage_name, status, location, exam_appeal, notes, scan_time) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (c['id'], c['barcode'], c.get('case_number'), c.get('cage_number'), c.get('cage_name'), c['status'], c.get('location'), c.get('exam_appeal'), c.get('notes'), str(c.get('scan_time'))))
+                INSERT INTO computers (id, barcode, case_number, cage_number, cage_name, status, location, specs, project, ministry, exam_appeal, notes, scan_time) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (c['id'], c['barcode'], c.get('case_number'), c.get('cage_number'), c.get('cage_name'), c['status'], c.get('location'), c.get('specs'), c.get('project'), c.get('ministry'), c.get('exam_appeal'), c.get('notes'), str(c.get('scan_time'))))
         
         for u in users:
             sl_cur.execute("INSERT INTO users (id, username, password, role, timestamp) VALUES (?, ?, ?, ?, ?)", (u['id'], u['username'], u['password'], u['role'], str(u.get('timestamp'))))

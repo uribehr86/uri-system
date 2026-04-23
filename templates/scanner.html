@@ -185,9 +185,11 @@
     
           <div class="cage-packing-panel">
             <div class="scan-counter">נסרקו לכלוב:<br><span id="cage-count">0</span><span class="limit">/ 50</span></div>
-            <div class="pack-btns">
+            <div class="pack-btns" style="flex-wrap: wrap;">
                 <button class="btn-pack btn-pause" id="btn-pause" onclick="togglePause()" style="flex:1; padding: 15px 10px;">⏸️ השהה</button>
                 <button class="btn-pack btn-resume" id="btn-resume" onclick="togglePause()" style="flex:1; padding: 15px 10px;">▶️ המשך</button>
+                <button class="btn-pack" onclick="document.getElementById('cage-photo-input').click()" style="flex:1; padding: 15px 10px; background: #8b5cf6; color: #fff; font-size: 0.95rem;">📸 צילום</button>
+                <input type="file" id="cage-photo-input" accept="image/*" capture="environment" style="display:none;" onchange="handleCagePhoto(this)">
                 <button class="btn-pack btn-stop" onclick="finishCagePacking()" style="flex:1.5; padding: 15px 10px; font-size: 0.95rem;">⏹️ סיום ושמירה</button>
             </div>
           </div>
@@ -305,6 +307,23 @@
     <div class="sheet-btns">
       <button class="btn-cancel" onclick="closeSheet()">ביטול</button>
       <button class="btn-save" onclick="saveFullScan()">💾 שמור וסרוק הבא</button>
+    </div>
+  </div>
+</div>
+
+<!-- Photo Results Modal -->
+<div class="sheet-overlay" id="photo-results-modal" style="z-index: 1000;" onclick="if(event.target===this) this.classList.remove('show')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3 style="color:#a78bfa;">📸 תוצאות עיבוד תמונה</h3>
+    <div style="text-align: center; margin-bottom: 16px;" id="photo-results-summary">
+      <!-- Summary text injected here -->
+    </div>
+    <div style="max-height: 50vh; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 10px;" id="photo-results-list">
+      <!-- List injected here -->
+    </div>
+    <div class="sheet-btns">
+      <button class="btn-save" onclick="document.getElementById('photo-results-modal').classList.remove('show')">הבנתי, סגור</button>
     </div>
   </div>
 </div>
@@ -686,6 +705,109 @@
           resetFailTimer();
           hideManualInput();
       }
+  }
+
+  // Handle Photo Pack
+  function handleCagePhoto(input) {
+      if (!input.files || !input.files[0]) return;
+      const file = input.files[0];
+      
+      showToast("⏳ מעבד תמונה... נא להמתין", false);
+      if (!isPaused) togglePause(); // Pause scanner
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+          const img = new Image();
+          img.onload = function() {
+              // Resize image to max 1200px to speed up upload and AI processing
+              const canvas = document.createElement('canvas');
+              let width = img.width;
+              let height = img.height;
+              const max_size = 1200;
+              
+              if (width > height && width > max_size) {
+                  height = Math.round((height * max_size) / width);
+                  width = max_size;
+              } else if (height > max_size) {
+                  width = Math.round((width * max_size) / height);
+                  height = max_size;
+              }
+              
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, width, height);
+              
+              // Get compressed base64 (quality 0.7)
+              const base64Image = canvas.toDataURL('image/jpeg', 0.7);
+              
+              showToast("⏳ מנתח באמצעות AI... נא להמתין", false);
+              
+              fetch('/api/pack-cage-photo', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      cage_id: activePackingCage,
+                      image: base64Image
+                  })
+              })
+              .then(r => r.json())
+              .then(data => {
+                  input.value = ""; // Reset input
+                  if (data.success) {
+                      showPhotoResults(data);
+                  } else {
+                      showToast('שגיאה: ' + (data.error || 'לא הצלחנו לפענח את התמונה'), true);
+                      if (isPaused) togglePause(); // Resume
+                  }
+              })
+              .catch(err => {
+                  input.value = "";
+                  showToast('שגיאת תקשורת עם השרת', true);
+                  if (isPaused) togglePause();
+              });
+          };
+          img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+  }
+  
+  function showPhotoResults(data) {
+      const modal = document.getElementById('photo-results-modal');
+      const summary = document.getElementById('photo-results-summary');
+      const list = document.getElementById('photo-results-list');
+      
+      // Update counts
+      cageCount += data.success_count + data.transferred_count + data.new_count;
+      document.getElementById('cage-count').textContent = cageCount;
+      if (cageCount >= 50) document.getElementById('cage-count').style.color = '#22c55e';
+      
+      let htmlSum = `<div style="font-size: 1.1rem; font-weight: 800; margin-bottom: 8px;">זוהו ${data.total_extracted} מחשבים</div>`;
+      htmlSum += `<div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; font-size:0.85rem;">`;
+      if (data.success_count > 0) htmlSum += `<span style="background:rgba(34,197,94,0.2); color:#4ade80; padding:4px 8px; border-radius:6px;">✅ ${data.success_count} עודכנו</span>`;
+      if (data.transferred_count > 0) htmlSum += `<span style="background:rgba(234,179,8,0.2); color:#fde047; padding:4px 8px; border-radius:6px;">⚠️ ${data.transferred_count} הועברו</span>`;
+      if (data.new_count > 0) htmlSum += `<span style="background:rgba(168,85,247,0.2); color:#c084fc; padding:4px 8px; border-radius:6px;">🆕 ${data.new_count} חדשים</span>`;
+      htmlSum += `</div>`;
+      summary.innerHTML = htmlSum;
+      
+      let htmlList = '';
+      if (data.details && data.details.length > 0) {
+          data.details.forEach(d => {
+              let icon = '✅', color = '#94a3b8', extra = '';
+              if (d.status === 'transferred') { icon = '⚠️'; color = '#fde047'; extra = ` (מכלוב ${d.prev_cage})`; }
+              else if (d.status === 'new') { icon = '🆕'; color = '#c084fc'; extra = ' (מחשב חדש)'; }
+              else if (d.status === 'updated') { color = '#4ade80'; }
+              htmlList += `<div style="padding: 6px; border-bottom: 1px solid rgba(255,255,255,0.05); display:flex; align-items:center;">
+                  <span style="margin-left: 8px;">${icon}</span>
+                  <span style="font-weight: 700; color: ${color};">${d.barcode}</span>
+                  <span style="font-size: 0.75rem; color: #64748b; margin-right: auto;">${extra}</span>
+              </div>`;
+          });
+      } else {
+          htmlList = '<div style="text-align:center; padding: 20px; color:#64748b;">לא פוענחו מחשבים מהתמונה</div>';
+      }
+      list.innerHTML = htmlList;
+      modal.classList.add('show');
   }
 
   function submitManualCage() {

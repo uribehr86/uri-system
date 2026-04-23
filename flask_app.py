@@ -1116,6 +1116,139 @@ def api_save_cage():
         return {'success': True}
     finally: release_db_connection(conn)
 
+@app.route('/api/pack-cage-photo', methods=['POST'])
+@login_required
+def api_pack_cage_photo():
+    data = request.json
+    cage_id = data.get('cage_id', '').strip()
+    image_b64 = data.get('image', '')
+    
+    if not cage_id or not image_b64:
+        return {"success": False, "error": "Missing cage_id or image"}, 400
+        
+    # Extract base64 part
+    if ',' in image_b64:
+        image_b64 = image_b64.split(',', 1)[1]
+        
+    try:
+        image_data = base64.b64decode(image_b64)
+    except Exception as e:
+        return {"success": False, "error": "Invalid image data"}, 400
+
+    conn = get_db_connection()
+    if not conn: return {"success": False, "error": "DB connection failed"}, 500
+    try:
+        # Call Gemini Vision
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        prompt = "Look at the handwritten numbers written in white on the edges of the laptops in the cage. Extract all of them. Return ONLY a JSON array of strings (e.g. [\"1064\", \"366\", \"1480\"]). Do not add any markdown, comments, or other text."
+        response = model.generate_content([
+            {"mime_type": "image/jpeg", "data": image_data},
+            prompt
+        ])
+        
+        try:
+            # Clean response text just in case Gemini adds markdown
+            text = response.text.strip()
+            if text.startswith('```json'): text = text[7:]
+            if text.startswith('```'): text = text[3:]
+            if text.endswith('```'): text = text[:-3]
+            text = text.strip()
+            extracted_numbers = json.loads(text)
+            if not isinstance(extracted_numbers, list):
+                extracted_numbers = []
+        except Exception as e:
+            print(f"Gemini parse error: {e}. Raw response: {response.text}")
+            return {"success": False, "error": "Could not parse AI response as JSON list."}, 500
+            
+        cur = get_safe_cursor(conn)
+        
+        results = {
+            "success_count": 0,
+            "transferred_count": 0,
+            "new_count": 0,
+            "details": []
+        }
+        
+        technician = session.get('username', 'לא ידוע')
+        
+        # Process each extracted number
+        for barcode in extracted_numbers:
+            barcode = str(barcode).strip()
+            barcode = re.sub(r'^0+(?=\d)', '', barcode)
+            if not barcode: continue
+            
+            cur.execute("SELECT * FROM computers WHERE barcode = %s ORDER BY id DESC LIMIT 1", (barcode,))
+            computer = cur.fetchone()
+            
+            if computer:
+                old_val = dict(computer)
+                prev_cage = old_val.get('cage_number', '')
+                
+                # Check if it's already in this cage
+                is_transfer = (prev_cage and prev_cage != cage_id)
+                
+                # Update
+                cur.execute("""
+                    UPDATE computers 
+                    SET cage_number = %s, cage_name = %s, scan_time = NOW(), last_technician = %s
+                    WHERE id = %s
+                """, (cage_id, cage_id, technician, old_val['id']))
+                
+                # Log history
+                cur.execute("""
+                    INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
+                    VALUES (%s, %s, 'Photo Pack', %s, %s)
+                """, (
+                    old_val['id'],
+                    technician,
+                    json.dumps(old_val, default=str),
+                    json.dumps({"cage_number": cage_id, "cage_name": cage_id}, default=str)
+                ))
+                
+                if is_transfer:
+                    results["transferred_count"] += 1
+                    results["details"].append({"barcode": barcode, "status": "transferred", "prev_cage": prev_cage})
+                else:
+                    results["success_count"] += 1
+                    results["details"].append({"barcode": barcode, "status": "updated"})
+                    
+            else:
+                # New computer
+                cur.execute("""
+                    INSERT INTO computers (barcode, cage_number, cage_name, status, scan_time, last_technician)
+                    VALUES (%s, %s, %s, 'תקין', NOW(), %s) RETURNING id
+                """, (barcode, cage_id, cage_id, technician))
+                new_id = cur.fetchone()['id']
+                
+                cur.execute("""
+                    INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
+                    VALUES (%s, %s, 'Photo Pack (New)', %s, %s)
+                """, (
+                    new_id,
+                    technician,
+                    None,
+                    json.dumps({"cage_number": cage_id, "cage_name": cage_id, "status": "תקין"}, default=str)
+                ))
+                
+                results["new_count"] += 1
+                results["details"].append({"barcode": barcode, "status": "new"})
+                
+        conn.commit()
+        cur.close()
+        
+        # Trigger async sync
+        threading.Thread(target=sync_inventory_to_sheets).start()
+        
+        results["total_extracted"] = len(extracted_numbers)
+        results["success"] = True
+        return results
+
+    except Exception as e:
+        print(f"Error in api_pack_cage_photo: {e}")
+        return {"success": False, "error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
 @app.route('/scan-dashboard')
 @login_required
 def scan_dashboard():
