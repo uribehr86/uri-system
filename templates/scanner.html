@@ -188,8 +188,8 @@
             <div class="pack-btns" style="flex-wrap: wrap;">
                 <button class="btn-pack btn-pause" id="btn-pause" onclick="togglePause()" style="flex:1; padding: 15px 10px;">⏸️ השהה</button>
                 <button class="btn-pack btn-resume" id="btn-resume" onclick="togglePause()" style="flex:1; padding: 15px 10px;">▶️ המשך</button>
-                <button class="btn-pack" onclick="document.getElementById('cage-photo-input').click()" style="flex:1; padding: 15px 10px; background: #8b5cf6; color: #fff; font-size: 0.95rem;">📸 צילום</button>
-                <input type="file" id="cage-photo-input" accept="image/*" capture="environment" style="position:absolute; left:-9999px;" onchange="handleCagePhoto(this)">
+                <label for="cage-photo-input" class="btn-pack" style="flex:1; padding: 15px 10px; background: #8b5cf6; color: #fff; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; margin: 0; border-radius: 8px;">📸 צילום</label>
+                <input type="file" id="cage-photo-input" accept="image/*" capture="environment" style="display:none;" onchange="handleCagePhoto(this)">
                 <button class="btn-pack btn-stop" onclick="finishCagePacking()" style="flex:1.5; padding: 15px 10px; font-size: 0.95rem;">⏹️ סיום ושמירה</button>
             </div>
           </div>
