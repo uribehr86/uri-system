@@ -13,6 +13,7 @@ import json
 import io
 import base64
 import qrcode
+import re
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 import google.generativeai as genai
