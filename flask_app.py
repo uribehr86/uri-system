@@ -14,11 +14,23 @@ import io
 import base64
 import qrcode
 import re
+import traceback
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 import google.generativeai as genai
 from google_sheets_sync import sync_inventory_to_sheets
 from utils import format_history, summarize_history
+from threading import Timer
+
+_sync_timer = None
+
+def trigger_debounced_sync():
+    global _sync_timer
+    if _sync_timer is not None:
+        _sync_timer.cancel()
+    # דיליי של 5 שניות כדי לא להציף את גוגל בבקשות
+    _sync_timer = Timer(5.0, sync_inventory_to_sheets)
+    _sync_timer.start()
 
 # טעינת הגדרות
 load_dotenv()
@@ -559,7 +571,7 @@ def process_scan():
             conn.commit()
             cur.close()
             # Trigger Google Sheets sync in background
-            threading.Thread(target=sync_inventory_to_sheets).start()
+            trigger_debounced_sync()
             
             # מחזירים את המידע הקיים כדי שהטופס יתמלא נכון
             return {"exists": True, "computer": new_computer}
@@ -582,7 +594,7 @@ def process_scan():
             conn.commit()
             cur.close()
             # Trigger Google Sheets sync in background
-            threading.Thread(target=sync_inventory_to_sheets).start()
+            trigger_debounced_sync()
             
             return {"exists": False, "computer": new_computer}
             
@@ -638,7 +650,7 @@ def api_update_computer():
             conn.commit()
             cur.close()
             # Trigger Google Sheets sync in background
-            threading.Thread(target=sync_inventory_to_sheets).start()
+            trigger_debounced_sync()
             
             return {"success": True}
         return {"success": False, "message": "No fields to update"}
@@ -935,6 +947,10 @@ def api_fast_scan():
 
         conn.commit()
         cur.close()
+        
+        # טריגר לסנכרון אוטומטי (מתוזמן) עבור סריקה מהירה
+        trigger_debounced_sync()
+        
         return {
             "success": True, 
             "barcode": barcode, 
@@ -1138,9 +1154,10 @@ def api_pack_cage_photo():
 
     conn = get_db_connection()
     if not conn: return {"success": False, "error": "DB connection failed"}, 500
+    cur = None
     try:
         # Call Gemini Vision
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         prompt = "Look at the handwritten numbers written in white on the edges of the laptops in the cage. Extract all of them. Return ONLY a JSON array of strings (e.g. [\"1064\", \"366\", \"1480\"]). Do not add any markdown, comments, or other text."
         response = model.generate_content([
             {"mime_type": "image/jpeg", "data": image_data},
@@ -1238,16 +1255,24 @@ def api_pack_cage_photo():
         cur.close()
         
         # Trigger async sync
-        threading.Thread(target=sync_inventory_to_sheets).start()
+        trigger_debounced_sync()
         
         results["total_extracted"] = len(extracted_numbers)
         results["success"] = True
         return results
 
     except Exception as e:
+        if conn:
+            conn.rollback()
         print(f"Error in api_pack_cage_photo: {e}")
+        traceback.print_exc()
         return {"success": False, "error": str(e)}, 500
     finally:
+        if cur:
+            try:
+                cur.close()
+            except Exception:
+                pass
         release_db_connection(conn)
 
 @app.route('/scan-dashboard')
