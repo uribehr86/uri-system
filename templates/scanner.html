@@ -156,7 +156,7 @@
       </div>
 
       <div id="manual-wrap-area" class="manual-input-wrap" style="display:none;">
-        <input type="text" id="manual-barcode-area" placeholder="הקלד מספר מחשב ידנית..." />
+        <input type="text" id="manual-barcode-area" placeholder="הקלד מספר מחשב ידנית..." onkeypress="if(event.key==='Enter') submitManualArea()" />
         <button onclick="submitManualArea()">אישור</button>
       </div>
     </div>
@@ -167,7 +167,7 @@
       <div id="cage-step-1">
           <div class="cage-scan-hint" style="font-weight:700; color:#fff;">סרוק ברקוד של כלוב (לדוגמה: c-1) כדי להתחיל לארוז</div>
           <div id="manual-wrap-cage" class="manual-input-wrap" style="display:none;">
-            <input type="text" id="manual-barcode-cage" placeholder="הקלד מספר כלוב ידנית (c-...)" />
+            <input type="text" id="manual-barcode-cage" placeholder="הקלד מספר כלוב ידנית (c-...)" onkeypress="if(event.key==='Enter') submitManualCage()" />
             <button onclick="submitManualCage()">אישור</button>
           </div>
       </div>
@@ -179,7 +179,7 @@
           </div>
           <div class="waiting-hint"><div class="pulse-dot"></div> ממתין לסריקת מחשבים...</div>
           <div id="manual-wrap-pack" class="manual-input-wrap" style="display:none;">
-            <input type="text" id="manual-barcode-pack" placeholder="הקלד מספר מחשב..." />
+            <input type="text" id="manual-barcode-pack" placeholder="הקלד מספר מחשב..." onkeypress="if(event.key==='Enter') submitManualPack()" />
             <button onclick="submitManualPack()">אישור</button>
           </div>
     
@@ -204,7 +204,7 @@
       <div id="exam-step-1">
           <div class="cage-scan-hint" style="font-weight:700; color:#fff;">סרוק ברקוד או הקלד מזהה מבחן כדי להתחיל לסרוק אליו מחשבים</div>
           <div id="manual-wrap-exam" class="manual-input-wrap">
-            <input type="text" id="manual-barcode-exam" placeholder="הקלד מזהה מבחן..." />
+            <input type="text" id="manual-barcode-exam" placeholder="הקלד מזהה מבחן..." onkeypress="if(event.key==='Enter') submitManualExam()" />
             <button onclick="submitManualExam()">אישור</button>
           </div>
       </div>
@@ -216,7 +216,7 @@
           </div>
           <div class="waiting-hint"><div class="pulse-dot"></div> ממתין לסריקת מחשבים למבחן...</div>
           <div id="manual-wrap-pack-exam" class="manual-input-wrap" style="display:none;">
-            <input type="text" id="manual-barcode-pack-exam" placeholder="הקלד מספר מחשב..." />
+            <input type="text" id="manual-barcode-pack-exam" placeholder="הקלד מספר מחשב..." onkeypress="if(event.key==='Enter') submitManualPack()" />
             <button onclick="submitManualPack()">אישור</button>
           </div>
     
