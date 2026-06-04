@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+{% block title %}נוכחות נבחנים{% endblock %}
+{% block content %}
+<style>
+.exam-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:28px; }
+.progress-bar-wrap { background:rgba(255,255,255,0.08); border-radius:50px; height:14px; overflow:hidden; margin-top:8px; }
+.progress-bar-fill { height:100%; border-radius:50px; background:linear-gradient(90deg,#238636,#3fb950); transition:width 0.8s ease; }
+.examinee-row.present td { background:rgba(35,134,54,0.10); }
+.examinee-row.absent td { background:rgba(218,54,51,0.05); }
+.attend-time { font-size:0.78rem; color:#3fb950; }
+.import-box { border:2px dashed var(--border); border-radius:12px; padding:24px; text-align:center; cursor:pointer; transition:border-color 0.2s; }
+.import-box:hover { border-color:var(--accent2); }
+.filter-btns { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+.filter-btn { padding:6px 16px; border-radius:20px; border:1px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; font-family:inherit; font-size:0.85rem; transition:all 0.2s; }
+.filter-btn.active, .filter-btn:hover { background:rgba(31,111,235,0.15); border-color:var(--accent2); color:var(--accent2); }
+</style>
+
+<div class="exam-header">
+    <div>
+        <h1 style="font-size:2rem; font-weight:800;">🎓 נוכחות נבחנים</h1>
+        <p style="color:var(--muted); margin-top:4px;">סריקת QR לרישום נוכחות בזמן אמת</p>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <a href="{{ url_for('exam_attendance_scanner') }}" style="padding:12px 24px; background:linear-gradient(135deg,#1f6feb,#0d4a9e); color:#fff; border-radius:12px; font-weight:700; text-decoration:none; font-size:1rem;">📱 סרוק נוכחות</a>
+        <a href="{{ url_for('exam_attendance_add') }}" style="padding:12px 24px; background:rgba(35,134,54,0.2); border:1px solid #238636; color:#3fb950; border-radius:12px; font-weight:700; text-decoration:none;">➕ הוסף נבחן</a>
+        <a href="{{ url_for('exam_attendance_print') }}" style="padding:12px 24px; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--text); border-radius:12px; font-weight:700; text-decoration:none;">🖨️ הדפס טפסים עם QR</a>
+    </div>
+</div>
+
+<!-- כרטיסי סטטיסטיקות -->
+<div class="stats">
+    <div class="stat-card blue">
+        <div class="number" style="color:#58a6ff;">{{ total }}</div>
+        <div class="label">סה"כ נבחנים</div>
+    </div>
+    <div class="stat-card green">
+        <div class="number" style="color:#3fb950;">{{ attended }}</div>
+        <div class="label">✅ הגיעו</div>
+        {% if total > 0 %}
+        <div class="progress-bar-wrap" style="margin-top:12px;">
+            <div class="progress-bar-fill" style="width:{{ (attended/total*100)|int }}%"></div>
+        </div>
+        <div style="font-size:0.8rem; color:var(--muted); margin-top:6px;">{{ (attended/total*100)|int }}%</div>
+        {% endif %}
+    </div>
+    <div class="stat-card red">
+        <div class="number" style="color:#f85149;">{{ not_attended }}</div>
+        <div class="label">❌ טרם הגיעו</div>
+    </div>
+</div>
+
+<!-- ייבוא וכלים -->
+<div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
+    <!-- ייבוא מ-Excel (רגיל) -->
+    <div class="card" style="flex:1; min-width:300px;">
+        <h3 style="margin-bottom:14px; font-size:1rem;">📂 ייבוא נבחנים מ-Excel</h3>
+        <form method="POST" action="{{ url_for('exam_attendance_import') }}" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:12px;">
+            <input type="file" name="excel_file" accept=".xlsx,.xls" class="form-control" required>
+            <button type="submit" style="padding:10px 20px; background:rgba(31,111,235,0.2); border:1px solid var(--accent2); color:#58a6ff; border-radius:10px; cursor:pointer; font-weight:700; font-family:inherit;">⬆️ ייבא למערכת</button>
+            <span style="color:var(--muted); font-size:0.85rem;">עמודות: שם / ת.ז. / קוד משתמש / סיסמא / מיקום / שם בחינה / מחשב</span>
+        </form>
+    </div>
+
+    <!-- מחולל Word -->
+    <div class="card" style="flex:1; min-width:300px; border:1px solid #a371f7;">
+        <h3 style="margin-bottom:14px; font-size:1rem; color:#a371f7;">📄 מחולל תבניות Word אוטומטי</h3>
+        <form method="POST" action="{{ url_for('generate_word_docs') }}" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:12px;">
+            <div>
+                <label style="color:var(--text-color); font-weight:bold; font-size:0.9rem;">1. בחר קובץ נבחנים (אקסל)</label>
+                <input type="file" name="excel_file" accept=".xlsx,.xls" class="form-control" required style="margin-top:5px;">
+            </div>
+            <div>
+                <label style="color:var(--text-color); font-weight:bold; font-size:0.9rem;">2. עיצוב דף נבחן (וורד) [אופציונלי]</label>
+                <input type="file" name="word_template" accept=".docx" class="form-control" style="margin-top:5px;">
+            </div>
+            <button type="submit" style="padding:10px 20px; background:rgba(163,113,247,0.2); border:1px solid #a371f7; color:#a371f7; border-radius:10px; cursor:pointer; font-weight:700; font-family:inherit; margin-top:5px;">✨ הפק מסמך מוכן להדפסה</button>
+            <div style="font-size:0.8rem; color:var(--muted); line-height:1.4;">
+                המערכת תעשה מיזוג אוטומטי ותיצור את ה-QR לכל נבחן! <br>אם תשאיר את העיצוב ריק, נשתמש בעיצוב ברירת המחדל שלנו.
+            </div>
+        </form>
+    </div>
+
+
+</div>
+
+<!-- פילטרים לפי בחינה -->
+{% if exams %}
+<div class="filter-btns">
+    <button class="filter-btn active" onclick="filterExam('all', event)">הכל</button>
+    {% for exam in exams %}
+    <button class="filter-btn" onclick="filterExam('{{ exam }}', event)">{{ exam }}</button>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- טבלת נבחנים -->
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+        <h3 style="font-size:1rem;">📋 רשימת נבחנים</h3>
+        <div style="display:flex; gap:10px;">
+            <input type="text" id="searchInput" class="form-control" placeholder="🔍 חפש נבחן..." style="max-width:220px;" oninput="filterTable()">
+            {% if session.get('role') == 'admin' %}
+            <form method="POST" action="{{ url_for('exam_attendance_clear') }}" onsubmit="return confirm('לאפס את כל הנוכחות? (לא ניתן לבטל)')">
+                <button type="submit" style="padding:8px 16px; background:rgba(218,54,51,0.15); border:1px solid var(--danger); color:#f85149; border-radius:8px; cursor:pointer; font-family:inherit; font-weight:700;">🔄 אפס נוכחות</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if examinees %}
+    <div class="table-wrap">
+        <table id="examTable">
+            <thead>
+                <tr>
+                    <th>שם נבחן</th>
+                    <th>ת.ז.</th>
+                    <th>קוד משתמש</th>
+                    <th>סיסמא</th>
+                    <th>מחשב</th>
+                    <th>שם בחינה</th>
+                    <th>מיקום</th>
+                    <th>סטטוס</th>
+                    <th>שעת הגעה</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in examinees %}
+                <tr class="examinee-row {{ 'present' if e.is_present else 'absent' }}" data-exam="{{ e.exam_name or '' }}">
+                    <td><strong>{{ e.full_name }}</strong></td>
+                    <td>{{ e.id_number }}</td>
+                    <td>{{ e.username or '—' }}</td>
+                    <td>{{ e.password or '—' }}</td>
+                    <td>{{ e.laptop_number or '—' }}</td>
+                    <td>{{ e.exam_name or '—' }}</td>
+                    <td>{{ e.classroom or '—' }}</td>
+                    <td>
+                        {% if e.is_present %}
+                        <span class="badge badge-green">✅ הגיע</span>
+                        {% else %}
+                        <span class="badge badge-red">❌ לא הגיע</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if e.scan_time %}
+                        <span class="attend-time">{{ e.scan_time|string|truncate(16, true, '') }}</span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>
+                        {% if session.get('role') == 'admin' %}
+                        <form method="POST" action="{{ url_for('exam_attendance_delete', eid=e.id) }}" onsubmit="return confirm('למחוק נבחן זה?')" style="display:inline;">
+                            <button type="submit" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:1rem;">🗑️</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="text-align:center; padding:60px; color:var(--muted);">
+        <div style="font-size:3rem;">🎓</div>
+        <p style="margin-top:12px;">אין נבחנים עדיין. הוסף ידנית או ייבא מ-Excel.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+var activeExamFilter = 'all';
+
+function filterExam(exam, evt) {
+    activeExamFilter = exam;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    if (evt && evt.target) evt.target.classList.add('active');
+    applyFilters();
+}
+function filterTable() {
+    applyFilters();
+}
+function applyFilters() {
+    const q = (document.getElementById('searchInput').value || '').toLowerCase();
+    document.querySelectorAll('.examinee-row').forEach(row => {
+        const examMatch = activeExamFilter === 'all' || row.dataset.exam === activeExamFilter;
+        const textMatch = !q || row.textContent.toLowerCase().includes(q);
+        row.style.display = (examMatch && textMatch) ? '' : 'none';
+    });
+}
+// רענון אוטומטי כל 30 שניות לעדכון נוכחות
+setInterval(() => location.reload(), 30000);
+</script>
+{% endblock %}

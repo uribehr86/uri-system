@@ -243,6 +243,26 @@ def sync_inventory_to_sheets():
             ])
         update_worksheet(sh, "היסטוריה", hist_header, hist_data)
 
+        # --- טאב 4: נוכחות נבחנים ---
+        try:
+            safe_execute("SELECT full_name, id_number, username, laptop_number, exam_name, classroom, is_present, scan_time, notes FROM examinees ORDER BY exam_name, full_name")
+            exam_rows = cur.fetchall()
+            exam_header = ["שם נבחן", "ת.ז.", "קוד משתמש", "מחשב", "שם בחינה", "מיקום", "הגיע?", "שעת הגעה", "התאמות"]
+            exam_data = []
+            for r in exam_rows:
+                attended = r['is_present']
+                attended_str = "✅ כן" if attended in (True, 1, 'true', 't') else "❌ לא"
+                attend_time = r['scan_time']
+                if attend_time and not isinstance(attend_time, str):
+                    attend_time_str = attend_time.strftime("%d/%m/%Y %H:%M")
+                else:
+                    attend_time_str = str(attend_time or '')
+                exam_data.append([r['full_name'], r['id_number'], r['username'] or '', r['laptop_number'] or '',
+                                   r['exam_name'] or '', r['classroom'] or '', attended_str, attend_time_str, r['notes'] or ''])
+            update_worksheet(sh, "נוכחות נבחנים", exam_header, exam_data)
+        except Exception as e:
+            print(f"לא ניתן לסנכרן נוכחות נבחנים: {e}")
+
         cur.close()
         conn.close()
 

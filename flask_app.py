@@ -17,10 +17,14 @@ import re
 import traceback
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
-import google.generativeai as genai
+from google import genai
 from google_sheets_sync import sync_inventory_to_sheets
 from utils import format_history, summarize_history
 from threading import Timer
+from docxtpl import DocxTemplate, InlineImage
+from docx.shared import Mm
+from docxcompose.composer import Composer
+from docx import Document
 
 _sync_timer = None
 
@@ -42,7 +46,7 @@ from datetime import timedelta
 app.permanent_session_lifetime = timedelta(days=30)
 
 # Initialize Google AI (Gemini)
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+genai_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Initialize Connection Pool
 db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
@@ -108,6 +112,14 @@ def get_db_connection():
     try:
         # Attempt Postgres from pool
         conn = db_pool.getconn()
+        try:
+            # Ping connection to ensure it's alive
+            with conn.cursor() as c:
+                c.execute('SELECT 1')
+        except Exception:
+            # Connection is dead, throw it away and get a new one
+            db_pool.putconn(conn, close=True)
+            conn = db_pool.getconn()
         IS_LOCAL_MODE = False
         return conn
     except Exception as e:
@@ -409,7 +421,6 @@ def add_computer():
     return render_template('computer_form.html', action='add', computer=None)
 
 @app.route('/edit-computer/<int:cid>', methods=['GET', 'POST'])
-@app.route('/edit-computer/<int:cid>', methods=['GET', 'POST'])
 @login_required
 def edit_computer(cid):
     conn = get_db_connection()
@@ -694,8 +705,10 @@ def api_ai_chat():
         משתמש נוכחי: {session.get('username')}
         """
         
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content([system_prompt, user_msg])
+        response = genai_client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=[system_prompt, user_msg]
+        )
         
         return {"response": response.text}
         
@@ -1157,12 +1170,14 @@ def api_pack_cage_photo():
     cur = None
     try:
         # Call Gemini Vision
-        model = genai.GenerativeModel('gemini-2.5-flash')
         prompt = "Look at the handwritten numbers written in white on the edges of the laptops in the cage. Extract all of them. Return ONLY a JSON array of strings (e.g. [\"1064\", \"366\", \"1480\"]). Do not add any markdown, comments, or other text."
-        response = model.generate_content([
-            {"mime_type": "image/jpeg", "data": image_data},
-            prompt
-        ])
+        response = genai_client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[
+                genai.types.Part.from_bytes(data=image_data, mime_type="image/jpeg"),
+                prompt
+            ]
+        )
         
         try:
             # Clean response text just in case Gemini adds markdown
@@ -1325,10 +1340,760 @@ def export_computers():
         return send_file(buf, as_attachment=True, download_name=f"inventory_{datetime.now().strftime('%Y%m%d')}.xlsx", mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     finally: release_db_connection(conn)
 
+# ══════════════════════════════════════════════════════════════
+# מערכת נוכחות נבחנים
+# ══════════════════════════════════════════════════════════════
+
+@app.route('/exam-attendance')
+@login_required
+def exam_attendance():
+    """דשבורד נוכחות נבחנים"""
+    conn = get_db_connection()
+    if not conn: return "DB Error", 500
+    try:
+        cur = get_safe_cursor(conn)
+        cur.execute("SELECT * FROM examinees ORDER BY exam_name, full_name")
+        examinees = [dict(e) for e in cur.fetchall()]
+        cur.execute("SELECT COUNT(*) as total FROM examinees")
+        total = cur.fetchone()['total']
+        cur.execute("SELECT COUNT(*) as attended FROM examinees WHERE is_present = 1")
+        attended = cur.fetchone()['attended']
+        cur.execute("SELECT DISTINCT exam_name FROM examinees WHERE exam_name IS NOT NULL AND exam_name != ''")
+        exams = [r['exam_name'] for r in cur.fetchall()]
+        cur.close()
+        return render_template('exam_attendance.html',
+                               examinees=examinees,
+                               total=total,
+                               attended=attended,
+                               not_attended=total - attended,
+                               exams=exams)
+    finally:
+        release_db_connection(conn)
+
+@app.route('/exam-attendance/add', methods=['GET', 'POST'])
+@login_required
+def exam_attendance_add():
+    """הוספת נבחן ידנית"""
+    if request.method == 'POST':
+        data = request.form
+        conn = get_db_connection()
+        if not conn: return "DB Error", 500
+        try:
+            cur = get_safe_cursor(conn)
+            import uuid
+            token = uuid.uuid4().hex
+            cur.execute("""
+                INSERT INTO examinees (full_name, id_number, username, password, classroom, exam_name, laptop_number, token)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                data.get('name','').strip(),
+                data.get('id_number','').strip(),
+                data.get('username','').strip(),
+                data.get('password','').strip(),
+                data.get('location','').strip(),
+                data.get('exam_name','').strip(),
+                data.get('computer','').strip(),
+                token
+            ))
+            conn.commit()
+            cur.close()
+            flash(f"נבחן {data.get('name','')} נוסף בהצלחה! ✅", "success")
+            return redirect(url_for('exam_attendance'))
+        except Exception as e:
+            flash(f"שגיאה: {e}", "danger")
+        finally:
+            release_db_connection(conn)
+    return render_template('exam_attendance_add.html')
+
+@app.route('/exam-attendance/import', methods=['POST'])
+@login_required
+def exam_attendance_import():
+    """ייבוא נבחנים מ-Excel"""
+    file = request.files.get('excel_file')
+    if not file or not file.filename.endswith(('.xlsx', '.xls')):
+        flash("יש להעלות קובץ Excel (.xlsx / .xls)", "danger")
+        return redirect(url_for('exam_attendance'))
+
+    try:
+        wb = openpyxl.load_workbook(file)
+        ws = wb.active
+        
+        headers = []
+        header_row_idx = 1
+        for row_idx, r in enumerate(ws.iter_rows(min_row=1, max_row=10, values_only=True), start=1):
+            row_strs = [str(c).strip() if c else '' for c in r]
+            if any('שם' in s or 'תעודת' in s or 'id' in s.lower() for s in row_strs):
+                headers = row_strs
+                header_row_idx = row_idx
+                break
+        if not headers:
+            headers = [str(cell.value).strip() if cell.value else '' for cell in ws[1]]
+
+        # מיפוי עמודות גמיש
+        col_map = {}
+        for i, h in enumerate(headers):
+            h_lower = h.lower()
+            if 'שם' in h or 'name' in h_lower: col_map['name'] = i
+            elif 'זהות' in h or 'ת.ז' in h or 'id' in h_lower: col_map['id_number'] = i
+            elif 'משתמש' in h or 'user' in h_lower or 'קוד' in h: col_map['username'] = i
+            elif 'סיסמ' in h or 'pass' in h_lower: col_map['password'] = i
+            elif 'טור' in h or 'row' in h_lower or 'עמודה' in h: col_map['row_number'] = i
+            elif 'כסא' in h or 'seat' in h_lower or 'מושב' in h: col_map['seat_number'] = i
+            elif 'מיקום' in h or 'location' in h_lower or 'כיתה' in h or 'class' in h_lower: col_map['location'] = i
+            elif 'בחינה' in h or 'exam' in h_lower: col_map['exam_name'] = i
+            elif 'מחשב' in h or 'computer' in h_lower or 'laptop' in h_lower: col_map['computer'] = i
+            elif 'התאמות' in h or 'notes' in h_lower or 'adjust' in h_lower: col_map['notes'] = i
+
+        # איסוף כל השורות
+        all_rows = []
+        for row in ws.iter_rows(min_row=header_row_idx + 1, values_only=True):
+            if not any(row): continue
+            def get_val(key, r=row):
+                idx = col_map.get(key)
+                if idx is None: return ''
+                val = r[idx]
+                return str(val).strip() if val is not None else ''
+            name = get_val('name')
+            if not name: continue
+            all_rows.append({
+                'name':        name,
+                'id_number':   get_val('id_number'),
+                'username':    get_val('username'),
+                'password':    get_val('password'),
+                'location':    get_val('location'),
+                'exam_name':   get_val('exam_name'),
+                'computer':    get_val('computer'),
+                'notes':       get_val('notes'),
+                'row_number':  get_val('row_number'),
+                'seat_number': get_val('seat_number'),
+            })
+
+        # מיון לפי טור → כסא
+        def sort_key(r):
+            try:    row_n  = int(r['row_number'])  if r['row_number']  else 9999
+            except: row_n  = 9999
+            try:    seat_n = int(r['seat_number']) if r['seat_number'] else 9999
+            except: seat_n = 9999
+            return (row_n, seat_n)
+        all_rows.sort(key=sort_key)
+
+        # שמירה לגוגל שיטס בלבד - ללא DB
+        import gspread, os
+        from google.oauth2.service_account import Credentials
+        scopes   = ['https://www.googleapis.com/auth/spreadsheets',
+                    'https://www.googleapis.com/auth/drive']
+        sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+        sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
+        creds    = Credentials.from_service_account_file(sa_file, scopes=scopes)
+        client   = gspread.authorize(creds)
+        sh       = client.open_by_key(sheet_id)
+
+        # לשונית "נבחנים" - יוצר אם לא קיימת, מוחק תוכן ישן
+        try:
+            ws_st = sh.worksheet('נבחנים')
+            ws_st.clear()
+        except gspread.exceptions.WorksheetNotFound:
+            ws_st = sh.add_worksheet(title='נבחנים', rows=1000, cols=15)
+
+        header_row = ['שם נבחן', 'תעודת זהות', 'קוד משתמש', 'סיסמה',
+                      'טור', 'כסא', 'מחשב', 'הערות', 'בחינה', 'מיקום']
+        rows_to_write = [header_row]
+        for rec in all_rows:
+            rows_to_write.append([
+                rec['name'], rec['id_number'], rec['username'], rec['password'],
+                rec['row_number'], rec['seat_number'], rec['computer'],
+                rec['notes'], rec['exam_name'], rec['location']
+            ])
+        ws_st.update('A1', rows_to_write, value_input_option='USER_ENTERED')
+
+        flash(f"✅ יובאו {len(all_rows)} נבחנים לגוגל שיטס (ממוינים לפי טור וכסא)!", "success")
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        flash(f"שגיאה בייבוא: {e}", "danger")
+    return redirect(url_for('exam_attendance'))
+
+
+@app.route('/api/generate-word-docs', methods=['POST'])
+@login_required
+def generate_word_docs():
+    """מחולל דפי נבחנים מקובץ אקסל ותבנית וורד"""
+    excel_file = request.files.get('excel_file')
+    word_template = request.files.get('word_template')
+    
+    if not excel_file:
+        flash("יש להעלות קובץ Excel", "danger")
+        return redirect(url_for('exam_attendance'))
+        
+    try:
+        # Load Excel data
+        wb = openpyxl.load_workbook(excel_file)
+        ws = wb.active
+        
+        # קריאת שם הבחינה משורה 1 (כותרת הדף) אם קיים
+        exam_title_from_header = ''
+        first_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
+        for cell in first_row:
+            if cell and str(cell).strip():
+                exam_title_from_header = str(cell).strip()
+                break
+
+        headers = []
+        header_row_idx = 1
+        for row_idx, r in enumerate(ws.iter_rows(min_row=1, max_row=10, values_only=True), start=1):
+            row_strs = [str(c).strip() if c else '' for c in r]
+            if any('שם' in s or 'תעודת' in s or 'id' in s.lower() for s in row_strs):
+                headers = row_strs
+                header_row_idx = row_idx
+                break
+        if not headers:
+            headers = [str(cell.value).strip() if cell.value else '' for cell in ws[1]]
+        
+        col_map = {}
+        for i, h in enumerate(headers):
+            h_lower = h.lower()
+            if 'שם' in h or 'name' in h_lower: col_map['name'] = i
+            elif 'זהות' in h or 'ת.ז' in h or 'id' in h_lower: col_map['id_number'] = i
+            elif 'משתמש' in h or 'user' in h_lower or 'קוד' in h: col_map['username'] = i
+            elif 'סיסמ' in h or 'pass' in h_lower: col_map['password'] = i
+            elif 'מיקום' in h or 'location' in h_lower or 'כיתה' in h or 'class' in h_lower: col_map['location'] = i
+            elif 'בחינה' in h or 'exam' in h_lower: col_map['exam_name'] = i
+            elif 'מחשב' in h or 'computer' in h_lower or 'laptop' in h_lower: col_map['computer'] = i
+            elif 'התאמות' in h or 'notes' in h_lower or 'adjust' in h_lower: col_map['notes'] = i
+            elif 'טור' in h or 'row' in h_lower: col_map['row'] = i
+            elif 'כסא' in h or 'seat' in h_lower: col_map['seat'] = i
+            
+        examinees = []
+        for row in ws.iter_rows(min_row=header_row_idx + 1, values_only=True):
+            if not any(row): continue
+            def get_val(key):
+                idx = col_map.get(key)
+                if idx is None: return ''
+                val = row[idx]
+                return str(val).strip() if val is not None else ''
+            
+            name = get_val('name')
+            if not name: continue
+            
+            examinees.append({
+                'name': name,
+                'id_number': get_val('id_number'),
+                'username': get_val('username'),
+                'password': get_val('password'),
+                'location': get_val('location'),
+                'row': get_val('row'),
+                'seat': get_val('seat'),
+                'exam_name': get_val('exam_name'),
+                'computer': get_val('computer'),
+                'notes': get_val('notes')
+            })
+            
+        if not examinees:
+            flash("לא נמצאו נתונים בקובץ האקסל", "warning")
+            return redirect(url_for('exam_attendance'))
+            
+        # Load template
+        if word_template and word_template.filename.endswith('.docx'):
+            word_bytes = word_template.read()
+        else:
+            template_path = os.path.join(os.path.dirname(__file__), 'default_template.docx')
+            with open(template_path, 'rb') as f:
+                word_bytes = f.read()
+        
+        master_doc = None
+        
+        for i, e in enumerate(examinees):
+            # Load template first so we can use it for InlineImage
+            tpl = DocxTemplate(io.BytesIO(word_bytes))
+            
+            # Format: exam_name|id_number|name|username|password|row|seat
+            # exam_name: from column or from Excel title row
+            exam_title = e['exam_name'] if e['exam_name'] else (exam_title_from_header or 'EXAMINEE')
+            qr_data = f"{exam_title}|{e['id_number']}|{e['name']}|{e['username']}|{e['password']}|{e['row']}|{e['seat']}"
+            import urllib.request
+            import urllib.parse
+            try:
+                encoded_data = urllib.parse.quote(qr_data)
+                url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={encoded_data}"
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req) as response:
+                    qr_buf = io.BytesIO(response.read())
+                qr_inline = InlineImage(tpl, qr_buf, width=Mm(25))
+            except Exception as ex:
+                print(f"Error generating QR from API: {ex}")
+                # Fallback empty string if API fails
+                qr_inline = ""
+            
+            # Context
+            context = {
+                'full_name': e['name'],
+                'id_number': e['id_number'],
+                'username': e['username'],
+                'password': e['password'],
+                'location': e['location'],
+                'row': e['row'],
+                'seat': e['seat'],
+                'exam_name': e['exam_name'],
+                'computer': e['computer'],
+                'notes': e['notes'],
+                'qr_code': qr_inline
+            }
+            
+            tpl.render(context)
+            
+            # Save rendered to memory
+            rendered_buf = io.BytesIO()
+            tpl.save(rendered_buf)
+            rendered_buf.seek(0)
+            
+            doc = Document(rendered_buf)
+            
+            # Generate QR locally
+            import qrcode as qrcode_lib
+            qr_gen = qrcode_lib.QRCode(version=1, box_size=10, border=1)
+            qr_gen.add_data(qr_data)
+            qr_gen.make(fit=True)
+            qr_img = qr_gen.make_image(fill_color="black", back_color="white")
+            qr_buf_local = io.BytesIO()
+            qr_img.save(qr_buf_local, format='PNG')
+            qr_buf_local.seek(0)
+
+            from docx.shared import Inches, Pt, Cm
+            from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
+            from docx.oxml.ns import qn
+            from docx.oxml import OxmlElement
+
+            # ---- Step 1: Fill data tables by label matching ----
+            label_to_value = {
+                'שם נבחן': e['name'],
+                'תעודת זהות': e['id_number'],
+                'קוד משתמש': e['username'],
+                'סיסמה': e['password'],
+                'התאמות': e['notes'],
+            }
+            for t_idx, t in enumerate(doc.tables):
+                for row_idx, r in enumerate(t.rows):
+                    if len(r.cells) >= 2:
+                        label_right = r.cells[1].text.strip()
+                        label_left  = r.cells[0].text.strip()
+                        for key, val_text in label_to_value.items():
+                            if key in label_right:
+                                r.cells[0].paragraphs[0].clear()
+                                r.cells[0].paragraphs[0].add_run(val_text)
+                                break
+                            elif key in label_left:
+                                r.cells[1].paragraphs[0].clear()
+                                r.cells[1].paragraphs[0].add_run(val_text)
+                                break
+                        # Signature table row (2nd table, index 1)
+                        if t_idx == 1 and row_idx == 1:
+                            if not any(c.text.strip() for c in r.cells):
+                                r.cells[0].paragraphs[0].clear()
+                                r.cells[0].paragraphs[0].add_run(e['name'])
+                                if len(r.cells) >= 3:
+                                    r.cells[1].paragraphs[0].clear()
+                                    r.cells[1].paragraphs[0].add_run(e['id_number'])
+
+            # ---- Step 2: Find "1" paragraph in BODY ----
+            target_p = None
+            for p in doc.paragraphs:
+                if p.text.strip() == '1':
+                    target_p = p
+                    break
+
+            if target_p:
+                # Force LTR on this specific paragraph (so QR is left, number is right)
+                pPr = target_p._p.get_or_add_pPr()
+                for bidi_el in pPr.findall(qn('w:bidi')):
+                    pPr.remove(bidi_el)
+                bidi = OxmlElement('w:bidi')
+                bidi.set(qn('w:val'), '0')
+                pPr.append(bidi)
+
+                target_p.text = ''
+                target_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+                # 1. Add QR Code first (will be on the LEFT in LTR)
+                qr_buf_local.seek(0)
+                run_qr = target_p.add_run()
+                run_qr.add_picture(qr_buf_local, width=Inches(1.2))
+
+                # 2. Add a RIGHT tab stop to push the number to the far right
+                tab_stops = target_p.paragraph_format.tab_stops
+                tab_stops.add_tab_stop(Cm(16), WD_TAB_ALIGNMENT.RIGHT)
+                target_p.add_run('\t')
+
+                # 3. Add Seat Number (will be on the RIGHT)
+                seat_display = e.get('seat', '') or '1'
+                run_seat = target_p.add_run(seat_display)
+                run_seat.font.size = Pt(85)
+                run_seat.font.bold = True
+                run_seat.font.name = 'Tahoma'
+
+
+            if master_doc is None:
+                master_doc = doc
+            else:
+                # Add page break before appending
+                master_doc.add_page_break()
+                # Append elements manually
+                for element in doc.element.body:
+                    master_doc.element.body.append(element)
+                
+        final_buf = io.BytesIO()
+        master_doc.save(final_buf)
+        final_buf.seek(0)
+        
+        # (DB insertion logic removed per user request)
+        
+        return send_file(
+            final_buf,
+            as_attachment=True,
+            download_name='Generated_Exam_Forms.docx',
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        flash(f"שגיאה ביצירת המסמכים: {e}", "danger")
+        return redirect(url_for('exam_attendance'))
+
+@app.route('/exam-attendance/print')
+@login_required
+def exam_attendance_print():
+    """דף הדפסת טפסים עם QR"""
+    exam_filter = request.args.get('exam', '')
+    conn = get_db_connection()
+    if not conn: return "DB Error", 500
+    try:
+        cur = get_safe_cursor(conn)
+        if exam_filter:
+            cur.execute("SELECT * FROM examinees WHERE exam_name = %s ORDER BY full_name", (exam_filter,))
+        else:
+            cur.execute("SELECT * FROM examinees ORDER BY exam_name, full_name")
+        examinees = [dict(e) for e in cur.fetchall()]
+        cur.close()
+        # יצירת QR לכל נבחן
+        for e in examinees:
+            qr_data = f"EXAMINEE|{e['id_number']}|{e['full_name']}|{e.get('username','')}|{e.get('password','')}|{e.get('classroom','')}|{e.get('exam_name','')}|{e.get('laptop_number','')}"  
+            qr_img = qrcode.make(qr_data)
+            buf = io.BytesIO()
+            qr_img.save(buf)
+            buf.seek(0)
+            e['qr_b64'] = base64.b64encode(buf.read()).decode('utf-8')
+        return render_template('exam_print.html', examinees=examinees, exam_filter=exam_filter)
+    finally:
+        release_db_connection(conn)
+
+@app.route('/test-scanner', methods=['GET'])
+@login_required
+def test_scanner():
+    return render_template('test_scanner.html')
+
+@app.route('/simple-scanner', methods=['GET'])
+@login_required
+def simple_scanner():
+    """עמוד סורק פשוט - סורק רק נבחנים"""
+    return render_template('simple_scanner.html')
+
+@app.route('/api/simple-scan', methods=['POST'])
+@login_required
+def api_simple_scan():
+    data = request.json
+    qr_text = data.get('qr', '').strip()
+    if not qr_text.startswith('EXAMINEE|'):
+        return {"error": "QR לא תקין"}, 400
+
+    parts = qr_text.split('|')
+    id_number = parts[1] if len(parts) > 1 else ''
+    name = parts[2] if len(parts) > 2 else ''
+
+    conn = get_db_connection()
+    if not conn: return {"error": "DB Error"}, 500
+    try:
+        cur = get_safe_cursor(conn)
+        cur.execute("SELECT * FROM examinees WHERE id_number = %s", (id_number,))
+        if not cur.fetchone():
+            return {"error": f"נבחן עם ת.ז. {id_number} לא במערכת"}, 404
+
+        cur.execute("""
+            UPDATE examinees SET is_present = 1, scan_time = %s, scanner_technician = %s WHERE id_number = %s
+        """, (datetime.now(), session.get('username',''), id_number))
+        conn.commit()
+        return {"success": True, "name": name, "id": id_number}
+    except Exception as e:
+        return {"error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
+@app.route('/api/exam-scan-double', methods=['POST'])
+@login_required
+def api_exam_scan_double():
+    """סריקה כפולה: נבחן + מחשב + סטטוסים"""
+    data = request.json
+    qr_text = data.get('qr', '').strip()
+    computer = data.get('computer', '').strip()
+    seat = data.get('seat', '').strip()
+    col = data.get('col', '').strip()
+    pc_status = data.get('pc_status', '').strip()
+    is_present = int(data.get('is_present', 1))
+
+    parts = qr_text.split('|')
+    if len(parts) < 3:
+        return {"error": "QR לא מזוהה כנבחן"}, 400
+
+    # קריאת נתונים ישירות מה-QR - לא תלוי ב-DB
+    id_number = parts[1] if len(parts) > 1 else ''
+    full_name = parts[2] if len(parts) > 2 else ''
+    exam_name = parts[0] if parts[0] != 'EXAMINEE' else ''
+    scan_time_str = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+    technician = session.get('username', '')
+    present_str = 'נוכח' if is_present == 1 else 'לא נוכח'
+
+    # עדכון DB אופציונלי
+    try:
+        conn = get_db_connection()
+        if conn:
+            cur = get_safe_cursor(conn)
+            cur.execute("SELECT exam_name, full_name FROM examinees WHERE id_number = %s", (id_number,))
+            db_row = cur.fetchone()
+            if db_row:
+                db_row = dict(db_row)
+                exam_name = db_row.get('exam_name', exam_name) or exam_name
+                full_name = db_row.get('full_name', full_name) or full_name
+                extra_notes = f"מחשב {pc_status} | כסא {seat} | טור {col}"
+                cur.execute("""
+                    UPDATE examinees SET is_present = %s, laptop_number = %s, notes = %s,
+                    scan_time = %s, scanner_technician = %s WHERE id_number = %s
+                """, (is_present, computer, extra_notes, datetime.now(), technician, id_number))
+                conn.commit()
+            cur.close()
+            release_db_connection(conn)
+    except Exception as db_err:
+        print(f"[DB] Optional update skipped: {db_err}")
+
+
+    # שמירה לגוגל שיטס ברקע
+    def append_to_exam_sheet(row_data):
+        try:
+            import gspread
+            from google.oauth2.service_account import Credentials
+            import os
+            scopes = [
+                'https://www.googleapis.com/auth/spreadsheets',
+                'https://www.googleapis.com/auth/drive'
+            ]
+            sa_file = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+            sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
+            creds = Credentials.from_service_account_file(sa_file, scopes=scopes)
+            client = gspread.authorize(creds)
+            sh = client.open_by_key(sheet_id)
+            ws = sh.sheet1
+            # אם הגיליון ריק - הוסף שורת כותרות
+            if ws.row_count == 0 or not ws.cell(1, 1).value:
+                headers = ['שם נבחן', 'תעודת זהות', 'מחשב', 'נוכח', 'סטטוס מחשב',
+                           'שם בחינה', 'שעת סריקה', 'טכנאי', 'טור', 'כסא']
+                ws.append_row(headers, value_input_option='USER_ENTERED')
+            ws.append_row(row_data, value_input_option='USER_ENTERED')
+            print(f"[Sheets] Saved: {row_data[0]} | PC: {row_data[2]}")
+        except Exception as ex:
+            print(f"[Sheets] Error: {ex}")
+
+    import threading
+    row = [full_name, id_number, computer, present_str, pc_status, exam_name, scan_time_str, technician, col, seat]
+    threading.Thread(target=append_to_exam_sheet, args=(row,), daemon=True).start()
+
+    return {"success": True}
+
+
+@app.route('/api/undo-last-scan', methods=['POST'])
+@login_required
+def undo_last_scan():
+    """מחיקת השורה האחרונה מגוגל שיטס (ביטול סריקה)"""
+    try:
+        import gspread, os
+        from google.oauth2.service_account import Credentials
+        scopes   = ['https://www.googleapis.com/auth/spreadsheets',
+                    'https://www.googleapis.com/auth/drive']
+        sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+        sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
+        creds    = Credentials.from_service_account_file(sa_file, scopes=scopes)
+        client   = gspread.authorize(creds)
+        sh       = client.open_by_key(sheet_id)
+        ws       = sh.sheet1
+        last_row = len(ws.get_all_values())
+        if last_row <= 1:   # רק כותרות - אין מה למחוק
+            return {"success": False, "error": "אין שורות למחיקה"}
+        ws.delete_rows(last_row)
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.route('/api/exam-scan', methods=['POST'])
+@login_required
+def api_exam_scan():
+    """סריקת QR לנוכחות"""
+    data = request.json
+    qr_text = data.get('qr', '').strip()
+    if not qr_text:
+        return {"error": "לא התקבל QR"}, 400
+
+    # פרמט: שם_בחינה|ת.ז.|שם|קוד|סיסמא|טור|כסא
+    parts = qr_text.split('|')
+    if len(parts) < 6:
+        return {"error": "QR לא מזוהה כנבחן", "type": "unknown"}, 400
+
+    id_number = parts[1] if len(parts) > 1 else ''
+
+    conn = get_db_connection()
+    if not conn: return {"error": "DB Error"}, 500
+    try:
+        cur = get_safe_cursor(conn)
+        cur.execute("SELECT * FROM examinees WHERE id_number = %s", (id_number,))
+        examinee = cur.fetchone()
+        if not examinee:
+            return {"error": f"נבחן עם ת.ז. {id_number} לא נמצא במערכת"}, 404
+
+        examinee = dict(examinee)
+        if examinee.get('is_present') in (True, 1):
+            return {"success": True, "already": True, "examinee": examinee}
+
+        # סמן כנוכח
+        cur.execute("""
+            UPDATE examinees SET is_present = 1, scan_time = %s, scanner_technician = %s WHERE id_number = %s
+        """, (datetime.now(), session.get('username',''), id_number))
+        conn.commit()
+
+        # סנכרון לגוגל דרייב ברקע
+        exam_name = examinee.get('exam_name')
+        if exam_name:
+            cur.execute("SELECT * FROM examinees WHERE exam_name = %s", (exam_name,))
+            all_exam_examinees = [dict(row) for row in cur.fetchall()]
+            
+            import threading
+            from sync_attendance_drive import sync_exam_to_drive
+            threading.Thread(target=sync_exam_to_drive, args=(exam_name, all_exam_examinees)).start()
+
+        cur.close()
+
+        # סנכרון Google Sheets (קוד קיים)
+        threading.Thread(target=sync_inventory_to_sheets, daemon=True).start()
+
+        examinee['is_present'] = True
+        examinee['attend_time'] = datetime.now().strftime("%H:%M:%S")
+        return {"success": True, "already": False, "examinee": examinee}
+    except Exception as e:
+        return {"error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
+@app.route('/exam-attendance/delete/<int:eid>', methods=['POST'])
+@login_required
+def exam_attendance_delete(eid):
+    """מחיקת נבחן"""
+    conn = get_db_connection()
+    if not conn: return "DB Error", 500
+    try:
+        cur = get_safe_cursor(conn)
+        cur.execute("DELETE FROM examinees WHERE id = %s", (eid,))
+        conn.commit()
+        cur.close()
+        flash("הנבחן נמחק בהצלחה", "success")
+    finally:
+        release_db_connection(conn)
+    return redirect(url_for('exam_attendance'))
+
+@app.route('/exam-attendance/clear', methods=['POST'])
+@login_required
+def exam_attendance_clear():
+    """איפוס כל הנוכחות (לפני בחינה חדשה) - מנהל בלבד"""
+    if session.get('role') != 'admin':
+        flash("אין הרשאה לפעולה זו", "danger")
+        return redirect(url_for('exam_attendance'))
+    conn = get_db_connection()
+    if not conn: return "DB Error", 500
+    try:
+        cur = get_safe_cursor(conn)
+        cur.execute("UPDATE examinees SET is_present = 0, scan_time = NULL")
+        conn.commit()
+        cur.close()
+        flash("✅ כל הנוכחות אופסה – מוכן לבחינה חדשה!", "success")
+    finally:
+        release_db_connection(conn)
+    return redirect(url_for('exam_attendance'))
+
+@app.route('/exam-attendance/scanner')
+@login_required
+def exam_attendance_scanner():
+    """עמוד סריקת נוכחות"""
+    return render_template('exam_scanner.html')
+
+
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
+# --- Standalone Exam Form Generator ---
+
+@app.route('/exam-generator')
+def exam_generator():
+    """דף העלאת אקסל ליצירת טפסי בחינה"""
+    return render_template('exam_generator.html')
+
+@app.route('/generate-forms', methods=['POST'])
+def generate_forms():
+    """מעבד אקסל ומחזיר דף מוכן להדפסה עם QR"""
+    excel_file = request.files.get('excel_file')
+    if not excel_file:
+        return "לא הועלה קובץ", 400
+
+    try:
+        wb = openpyxl.load_workbook(excel_file)
+        ws = wb.active
+
+        headers = [str(cell.value).strip() if cell.value else '' for cell in ws[1]]
+
+        col_map = {}
+        for i, h in enumerate(headers):
+            h_l = h.lower()
+            if 'שם' in h and 'נבחן' in h: col_map['name'] = i
+            elif 'שם' in h and col_map.get('name') is None: col_map['name'] = i
+            elif 'זהות' in h or 'ת.ז' in h or 'id' in h_l: col_map['id_number'] = i
+            elif 'משתמש' in h or 'קוד' in h or 'user' in h_l: col_map['username'] = i
+            elif 'סיסמ' in h or 'pass' in h_l: col_map['password'] = i
+            elif 'התאמ' in h or 'notes' in h_l: col_map['notes'] = i
+            elif 'מחשב' in h or 'computer' in h_l or 'מספר' in h: col_map['computer'] = i
+            elif 'מיקום' in h or 'כיתה' in h or 'location' in h_l: col_map['location'] = i
+
+        students = []
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if not any(row): continue
+            def get_val(key):
+                idx = col_map.get(key)
+                if idx is None: return ''
+                v = row[idx]
+                return str(v).strip() if v is not None else ''
+
+            name = get_val('name')
+            if not name or name == 'None': continue
+
+            students.append({
+                'name': name,
+                'id_number': get_val('id_number'),
+                'username': get_val('username'),
+                'password': get_val('password'),
+                'notes': get_val('notes'),
+                'computer': get_val('computer'),
+                'location': get_val('location'),
+            })
+
+        return render_template('exam_forms_print.html', students=students)
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return f"שגיאה: {e}", 500
 
 # --- End of Routes ---
 
