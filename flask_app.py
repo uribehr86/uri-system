@@ -17,7 +17,13 @@ import re
 import traceback
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
-from google import genai
+try:
+    from google import genai
+except ImportError:
+    try:
+        import google.generativeai as genai
+    except ImportError:
+        genai = None
 from google_sheets_sync import sync_inventory_to_sheets
 from utils import format_history, summarize_history
 from threading import Timer
