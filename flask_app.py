@@ -58,8 +58,11 @@ except Exception as e:
 
 # Initialize Connection Pool
 db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
+# הוסף connect_timeout כדי שהחיבור לא יתקע את ה-startup
+if db_url and 'connect_timeout' not in db_url:
+    db_url += ('&' if '?' in db_url else '?') + 'connect_timeout=5'
 try:
-    db_pool = psycopg2.pool.SimpleConnectionPool(2, 20, db_url)
+    db_pool = psycopg2.pool.SimpleConnectionPool(1, 5, db_url)
     print("[OK] Database connection pool created successfully")
 except Exception as e:
     print(f"[ERROR] Error creating connection pool: {e}")
