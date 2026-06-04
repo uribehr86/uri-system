@@ -21,10 +21,14 @@ from google import genai
 from google_sheets_sync import sync_inventory_to_sheets
 from utils import format_history, summarize_history
 from threading import Timer
-from docxtpl import DocxTemplate, InlineImage
-from docx.shared import Mm
-from docxcompose.composer import Composer
-from docx import Document
+try:
+    from docxtpl import DocxTemplate, InlineImage
+    from docx.shared import Mm
+    from docxcompose.composer import Composer
+    from docx import Document
+except ImportError as e:
+    print(f"[WARNING] Word/docx packages not available: {e}")
+    DocxTemplate = InlineImage = Mm = Composer = Document = None
 
 _sync_timer = None
 
