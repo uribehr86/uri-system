@@ -46,7 +46,11 @@ from datetime import timedelta
 app.permanent_session_lifetime = timedelta(days=30)
 
 # Initialize Google AI (Gemini)
-genai_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+try:
+    genai_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+except Exception as e:
+    print(f"[WARNING] Google AI init failed: {e}")
+    genai_client = None
 
 # Initialize Connection Pool
 db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
