@@ -113,7 +113,8 @@ def sync_inventory_to_sheets():
         # --- טאב 1: מלאי מחשבים ---
         # שליפת נתוני המלאי
         q_inv = """
-            SELECT barcode, case_number, cage_number, status, location, specs, project, exam_appeal, notes, scan_time
+            SELECT barcode, case_number, cage_number, status, location, specs, project, exam_appeal, notes, scan_time,
+                   COALESCE(sheets_delete_request, FALSE) as sheets_delete_request
             FROM computers 
             ORDER BY scan_time DESC
         """
@@ -122,7 +123,12 @@ def sync_inventory_to_sheets():
         inv_header = ["מחשב", "מספר תיק", "מספר כלוב", "סטטוס", "מיקום", "מפרט", "פרויקט", "מבחן/ערעור", "הערות", "נצפה לאחרונה"]
         
         inv_data = [inv_header]
-        for r in inv_rows:
+        # שמור את אינדקסי השורות שמסומנות למחיקה (1-based, כולל כותרת)
+        delete_flagged_rows = []
+        for idx, r in enumerate(inv_rows):
+            is_flagged = r['sheets_delete_request'] if not is_sqlite else bool(r[10])
+            if is_flagged:
+                delete_flagged_rows.append(idx + 2)  # +2: כותרת בשורה 1, נתונים מ-2
             inv_data.append([
                 r['barcode'], r['case_number'] or '', r['cage_number'] or '', r['status'] or '', 
                 r['location'] or '', r['specs'] or '', r['project'] or '', 
@@ -130,7 +136,7 @@ def sync_inventory_to_sheets():
                 r['scan_time'].strftime("%d/%m/%Y %H:%M") if r['scan_time'] and not isinstance(r['scan_time'], str) else str(r['scan_time'] or '')
             ])
             
-        # חישוב סטטיסטיקות עבור עמודה K
+        # חישוב סטטיסטיקות
         q_stats = """
             SELECT 
                 COUNT(*) as total,
@@ -158,13 +164,23 @@ def sync_inventory_to_sheets():
             worksheet = sh.add_worksheet(title="מלאי מחשבים", rows="1000", cols="15")
         
         worksheet.clear()
-        # עדכון הטבלה המרכזית ב-A1
         worksheet.update(inv_data, 'A1')
-        # עיצוב הכותרות
+        
+        # עיצוב כותרות
         worksheet.format("A1:J1", {
             "textFormat": {"bold": True},
             "backgroundColor": {"red": 0.8, "green": 0.9, "blue": 1.0}
         })
+
+        # צביעת שורות שמסומנות למחיקה בירוק זוהר
+        for row_num in delete_flagged_rows:
+            try:
+                worksheet.format(f"A{row_num}:J{row_num}", {
+                    "backgroundColor": {"red": 0.0, "green": 1.0, "blue": 0.39},
+                    "textFormat": {"bold": True, "foregroundColor": {"red": 0.0, "green": 0.0, "blue": 0.0}}
+                })
+            except Exception:
+                pass  # אם העיצוב נכשל — לא נעצור את כל הסנכרון
 
         # --- טאבים לפי פרויקט ---
         safe_execute("SELECT DISTINCT project FROM computers WHERE project IS NOT NULL AND TRIM(project) != ''")
