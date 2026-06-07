@@ -149,7 +149,49 @@
         /* Further tighten column widths for mobile */
         .col-tech { width: 70px; }
     }
-</style>
+
+    /* שורות שמסומנות למחיקה מגוגל שיטס */
+    tr.delete-flagged td {
+        background: rgba(0, 255, 100, 0.07) !important;
+        border-bottom-color: rgba(0, 255, 100, 0.25);
+    }
+    tr.delete-flagged {
+        box-shadow: inset 0 0 0 1px rgba(0, 255, 100, 0.4);
+    }
+    tr.delete-flagged td:first-child {
+        border-left: 3px solid #00ff64;
+    }
+    .delete-badge {
+        display: inline-block;
+        background: #00ff64;
+        color: #000;
+        font-size: 0.65rem;
+        font-weight: 900;
+        padding: 2px 6px;
+        border-radius: 20px;
+        margin-right: 4px;
+        animation: glowPulse 1.5s ease-in-out infinite;
+        vertical-align: middle;
+    }
+    @keyframes glowPulse {
+        0%, 100% { box-shadow: 0 0 4px #00ff64; }
+        50%       { box-shadow: 0 0 14px #00ff64, 0 0 28px rgba(0,255,100,0.4); }
+    }
+    .sheets-admin-panel {
+        background: rgba(0, 255, 100, 0.05);
+        border: 1px solid rgba(0, 255, 100, 0.3);
+        border-radius: 12px;
+        padding: 14px 18px;
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .sheets-admin-panel .label { color: #4ade80; font-weight: 700; font-size: 0.9rem; }
+    .btn-sheets-import  { background: #4ade80; color: #000; border: none; padding: 9px 16px; border-radius: 8px; font-weight: 800; cursor: pointer; font-size: 0.85rem; }
+    .btn-sheets-approve { background: #ef4444; color: #fff; border: none; padding: 9px 16px; border-radius: 8px; font-weight: 800; cursor: pointer; font-size: 0.85rem; }
+    .btn-sheets-cancel  { background: rgba(255,255,255,0.1); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15); padding: 9px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
 
 <div class="page-header">
     <h1>📊 לוח בקרה ומלאי</h1>
@@ -179,6 +221,16 @@
         <div class="label" style="color: var(--muted); font-size: 0.9rem;">📦 מחוץ לכלוב</div>
     </div>
 </div>
+
+{% if session.get('role') == 'admin' %}
+<div class="sheets-admin-panel" id="sheets-admin-panel">
+    <span class="label">🔗 גוגל שיטס:</span>
+    <button class="btn-sheets-import" onclick="importFromSheets()">⬇️ ייבא שינויים מגוגל שיטס</button>
+    <button class="btn-sheets-approve" id="btn-approve-delete" style="display:none;" onclick="approveSheetDelete('approve')">🗑️ אשר מחיקת מסומנים</button>
+    <button class="btn-sheets-cancel"  id="btn-cancel-delete"  style="display:none;" onclick="approveSheetDelete('cancel')">↩️ בטל סימוני מחיקה</button>
+    <span id="sheets-status" style="font-size:0.8rem; color:#94a3b8;"></span>
+</div>
+{% endif %}
 
 <div class="card">
     <form method="GET" class="search-bar" style="margin-bottom: 12px; gap: 8px;">
@@ -296,11 +348,13 @@
             </thead>
             <tbody>
                 {% for c in computers %}
-                <tr data-id="{{ c.id }}">
-                    <td class="col-chk"><input type="checkbox" class="row-chk" value="{{ c.id }}"
-                            onchange="updateBatchBar()"></td>
-                    <td class="hide-mobile" style="color:var(--muted); font-size:.7rem;">{{ loop.index }}</td>
-                    <td><code style="color:var(--accent2); font-weight: 700;">{{ c.barcode }}</code></td>
+            <tr data-id="{{ c.id }}" {% if c.sheets_delete_request %}class="delete-flagged"{% endif %}>
+                <td class="col-chk"><input type="checkbox" class="row-chk" value="{{ c.id }}"
+                        onchange="updateBatchBar()"></td>
+                <td class="hide-mobile" style="color:var(--muted); font-size:.7rem;">{{ loop.index }}</td>
+                <td><code style="color:var(--accent2); font-weight: 700;">{{ c.barcode }}</code>
+                    {% if c.sheets_delete_request %}<span class="delete-badge">🗑 ממתין למחיקה</span>{% endif %}
+                </td>
                     <td class="hide-mobile">{{ c.case_number or '—' }}</td>
                     <td>
                         {% set display_cage = c.cage_number or c.cage_name %}
@@ -465,6 +519,67 @@
                 else alert("שגיאה במחיקה: " + data.error);
             });
     }
+
+    // ── Google Sheets Two-Way Sync (Admin only) ────────────────────────
+    function setSheetStatus(msg, isLoading = false) {
+        const el = document.getElementById('sheets-status');
+        if (el) el.textContent = isLoading ? '⏳ ' + msg : msg;
+    }
+
+    function importFromSheets() {
+        if (!confirm('ייבא שינויים מגוגל שיטס?\n\nשורות שנמחקו בגיליון יסומנו בירוק זוהר ויחכו לאישורך למחיקה.')) return;
+        setSheetStatus('מתחבר לגוגל שיטס...', true);
+
+        fetch('/api/import-from-sheets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const s = data.stats || {};
+                setSheetStatus(`✅ ${data.message}`);
+                if (s.delete_flagged > 0) {
+                    document.getElementById('btn-approve-delete').style.display = 'inline-block';
+                    document.getElementById('btn-cancel-delete').style.display = 'inline-block';
+                }
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                setSheetStatus('❌ שגיאה: ' + data.error);
+                alert('שגיאה בייבוא: ' + data.error);
+            }
+        })
+        .catch(() => setSheetStatus('❌ שגיאת תקשורת עם השרת'));
+    }
+
+    function approveSheetDelete(action) {
+        const label = action === 'approve' ? 'מחיקה סופית' : 'ביטול סימוני מחיקה';
+        if (!confirm(`האם לבצע ${label} על כל המחשבים המסומנים?`)) return;
+        setSheetStatus('מבצע...', true);
+
+        fetch('/api/approve-sheets-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: action })
+        })
+        .then(r => r.json())
+        .then(data => {
+            setSheetStatus(data.success ? `✅ ${data.message}` : `❌ ${data.error}`);
+            if (data.success) setTimeout(() => location.reload(), 1200);
+        })
+        .catch(() => setSheetStatus('❌ שגיאת תקשורת'));
+    }
+
+    // הצג כפתורי אישור אם יש מסומנים בעמוד
+    document.addEventListener('DOMContentLoaded', () => {
+        const flagged = document.querySelectorAll('tr.delete-flagged').length;
+        if (flagged > 0) {
+            const approveBtn = document.getElementById('btn-approve-delete');
+            const cancelBtn  = document.getElementById('btn-cancel-delete');
+            if (approveBtn) approveBtn.style.display = 'inline-block';
+            if (cancelBtn)  cancelBtn.style.display  = 'inline-block';
+        }
+    });
 
 </script>
 {% endblock %}

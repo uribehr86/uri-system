@@ -169,6 +169,30 @@ def close_db(error):
     # though it's better to do it manually in routes.
     pass
 
+def run_startup_migrations():
+    """הוספת עמודות חדשות למסד אם עדיין לא קיימות"""
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        cur = get_safe_cursor(conn)
+        # הוסף עמודת sheets_delete_request אם לא קיימת
+        try:
+            if IS_LOCAL_MODE:
+                cur.execute("ALTER TABLE computers ADD COLUMN sheets_delete_request INTEGER DEFAULT 0")
+            else:
+                cur.execute("ALTER TABLE computers ADD COLUMN IF NOT EXISTS sheets_delete_request BOOLEAN DEFAULT FALSE")
+            conn.commit()
+            print("[OK] Migration: added sheets_delete_request column")
+        except Exception:
+            conn.rollback()  # העמודה כבר קיימת — בסדר
+        cur.close()
+    finally:
+        release_db_connection(conn)
+
+with app.app_context():
+    run_startup_migrations()
+
 @app.context_processor
 def utility_processor():
     def get_cage_color(cage):
@@ -824,6 +848,73 @@ def api_sync_to_sheets():
         return {"success": True, "message": message}
     else:
         return {"success": False, "error": message}, 500
+
+
+# ── API: ייבוא מגוגל שיטס → מסד (רק admin) ──────────────────────────
+@app.route('/api/import-from-sheets', methods=['POST'])
+@login_required
+def api_import_from_sheets():
+    if session.get('role') != 'admin' and session.get('user') != 'admin_uri':
+        return {"success": False, "error": "גישה מותרת לאדמין בלבד"}, 403
+    from google_sheets_sync import import_from_sheets
+    success, message, stats = import_from_sheets()
+    return {"success": success, "message": message, "stats": stats}
+
+
+# ── API: אישור מחיקה סופית (רק admin) ───────────────────────────────
+@app.route('/api/approve-sheets-delete', methods=['POST'])
+@login_required
+def api_approve_sheets_delete():
+    """רק admin_uri יכול לאשר מחיקה סופית של מחשבים שמסומנים כ-sheets_delete_request"""
+    if session.get('user') != 'admin_uri' and session.get('role') != 'admin':
+        return {"success": False, "error": "גישה מותרת לאדמין בלבד"}, 403
+
+    data = request.json or {}
+    action = data.get('action')  # 'approve' or 'cancel'
+    computer_ids = data.get('ids', [])
+
+    if not computer_ids:
+        # אם לא נשלחו IDs — פעל על כולם המסומנים
+        conn = get_db_connection()
+        if not conn:
+            return {"success": False, "error": "DB connection failed"}, 500
+        try:
+            cur = get_safe_cursor(conn)
+            cur.execute("SELECT id FROM computers WHERE sheets_delete_request = TRUE")
+            rows = cur.fetchall()
+            computer_ids = [r['id'] for r in rows]
+            cur.close()
+        finally:
+            release_db_connection(conn)
+
+    if not computer_ids:
+        return {"success": True, "message": "אין מחשבים הממתינים לאישור מחיקה", "count": 0}
+
+    conn = get_db_connection()
+    if not conn:
+        return {"success": False, "error": "DB connection failed"}, 500
+    try:
+        cur = get_safe_cursor(conn)
+        placeholders = ','.join(['%s'] * len(computer_ids))
+
+        if action == 'approve':
+            # מחיקה סופית
+            cur.execute(f"DELETE FROM computers WHERE id IN ({placeholders}) AND sheets_delete_request = TRUE", computer_ids)
+            conn.commit()
+            count = cur.rowcount
+            cur.close()
+            return {"success": True, "message": f"נמחקו {count} מחשבים לצמיתות", "count": count}
+        else:
+            # ביטול סימון — המחשב נשאר במסד
+            cur.execute(f"UPDATE computers SET sheets_delete_request = FALSE WHERE id IN ({placeholders})", computer_ids)
+            conn.commit()
+            count = cur.rowcount
+            cur.close()
+            return {"success": True, "message": f"בוטל סימון המחיקה עבור {count} מחשבים", "count": count}
+    except Exception as e:
+        return {"success": False, "error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
 
 
 # ── API: שליפת מידע כלוב ──────────────────────────────────────────────
