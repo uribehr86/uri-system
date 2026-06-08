@@ -182,6 +182,57 @@ def sync_inventory_to_sheets():
             except Exception:
                 pass  # אם העיצוב נכשל — לא נעצור את כל הסנכרון
 
+        # --- טאב תקולים --- (מתעדכן אוטומטית עם כל סנכרון)
+        q_faulty = """
+            SELECT barcode, case_number, cage_number, location, specs, project, notes, scan_time, last_technician
+            FROM computers
+            WHERE status = 'תקול'
+            ORDER BY scan_time DESC
+        """
+        safe_execute(q_faulty)
+        faulty_rows = cur.fetchall()
+        faulty_header = ["🔴 מחשב", "מספר תיק", "כלוב", "מיקום", "מפרט", "פרויקט", "הערות", "נצפה לאחרונה", "טכנאי אחרון"]
+        faulty_data = [faulty_header]
+        for r in faulty_rows:
+            ts = r['scan_time']
+            ts_str = ts.strftime("%d/%m/%Y %H:%M") if ts and not isinstance(ts, str) else str(ts or '')
+            faulty_data.append([
+                r['barcode'],
+                r['case_number'] or '',
+                r['cage_number'] or '',
+                r['location'] or '',
+                r['specs'] or '',
+                r['project'] or '',
+                r['notes'] or '',
+                ts_str,
+                r['last_technician'] or ''
+            ])
+
+        # פתיחת/יצירת גיליון תקולים
+        try:
+            ws_faulty = sh.worksheet("תקולים")
+        except gspread.WorksheetNotFound:
+            ws_faulty = sh.add_worksheet(title="תקולים", rows="500", cols="10")
+
+        ws_faulty.clear()
+        ws_faulty.update(faulty_data, 'A1')
+
+        # עיצוב כותרת — אדום
+        ws_faulty.format("A1:I1", {
+            "textFormat": {"bold": True, "foregroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0}},
+            "backgroundColor": {"red": 0.85, "green": 0.1, "blue": 0.1}
+        })
+
+        # צביעת כל שורות הנתונים באדום בהיר
+        if len(faulty_data) > 1:
+            end_row = len(faulty_data)
+            try:
+                ws_faulty.format(f"A2:I{end_row}", {
+                    "backgroundColor": {"red": 1.0, "green": 0.87, "blue": 0.87}
+                })
+            except Exception:
+                pass
+
         # --- טאבים לפי פרויקט ---
         safe_execute("SELECT DISTINCT project FROM computers WHERE project IS NOT NULL AND TRIM(project) != ''")
         projects = [row['project'] for row in cur.fetchall()]
