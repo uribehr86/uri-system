@@ -121,7 +121,7 @@
   <div class="mode-bar">
     <button class="mode-btn active" onclick="setMode('area')" id="btn-area">🌍 סריקת שטח</button>
     <button class="mode-btn" onclick="setMode('cage')" id="btn-cage">📦 סריקת כלוב</button>
-    <button class="mode-btn" onclick="setMode('exam')" id="btn-exam">🎓 סריקת מבחנים</button>
+
     <button class="mode-btn" onclick="setMode('attend')" id="btn-attend">📋 נוכחות</button>
   </div>
 
@@ -237,8 +237,17 @@
     <div id="panel-attend" style="display:none;">
       <div style="text-align:center; padding:8px 0;">
         <div class="waiting-hint"><div class="pulse-dot"></div> <span id="attend-hint-text">סרוק QR מדף הנבחן (הוורוד)</span></div>
+      <div id="attend-computer-wrap" style="display:none; margin-top:10px; padding:10px; background:rgba(37,99,235,0.1); border-radius:12px; border:1px solid rgba(37,99,235,0.3);">
+        <div style="color:#94a3b8; font-size:0.8rem; margin-bottom:6px;">📟 הקלד מספר מחשב:</div>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="attend-manual-computer" placeholder="לדוגמה: 1324"
+            style="flex:1; padding:10px; border-radius:10px; background:#0a0f1e; color:#fff; border:1px solid rgba(255,255,255,0.2); font-size:1rem;"
+            onkeypress="if(event.key==='Enter') submitManualComputer()">
+          <button onclick="submitManualComputer()" style="padding:10px 16px; border-radius:10px; background:#2563eb; color:#fff; border:none; font-weight:700; cursor:pointer;">✅</button>
+        </div>
       </div>
-      <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+    </div>
+    <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
         <div class="scan-counter" style="flex:1; background:rgba(37,99,235,0.1); padding:8px; border-radius:10px; border:1px solid rgba(37,99,235,0.2); text-align:center;">
           נסרקו: <span id="attend-count" style="font-weight:800; font-size:1.2rem;">0</span>
           <span id="attend-total-display" style="color:#64748b;"></span>
@@ -1206,29 +1215,44 @@
     disp.textContent = attendTotal > 0 ? ' / ' + attendTotal : '';
   }
 
+  let lastAttendCode = null;
+  let lastAttendTime = 0;
+
   function onAttendScan(code) {
+    // 3 שניות cooldown בין סריקות
+    const now = Date.now();
+    if (code === lastAttendCode && now - lastAttendTime < 3000) return;
+    lastAttendCode = code;
+    lastAttendTime = now;
+
     if (!attendQR) {
       const parts = code.split('|');
       if (parts.length >= 3) {
-        var id = parts[1] || '';
+        // פורמט: exam_title|id_number|name|username|password|row|seat
+        var id   = parts[3] || parts[1] || '';  // username — מזהה ייחודי לכל נבחן
+        var name = parts[2] || 'נבחן לא ידוע';
         // ── בדיקת כפול ──
         if (id && scannedIds.has(id)) {
           setScanBoxState('fail');
           playBeepDuplicate();
-          showToast('⚠️ ' + (parts[2] || '') + ' כבר נסרק!', true);
+          showToast('⚠️ ' + name + ' כבר נסרק!', true);
           return;
         }
         attendQR = code;
         attendQRData = {
           examName: (parts[0] !== 'EXAMINEE' ? parts[0] : ''),
           id: id,
-          name: parts[2] || 'נבחן לא ידוע',
+          name: name,
           row: parts[5] || '',
           seat: parts[6] || ''
         };
         onScanSuccess_visual();
-        showToast('✅ ' + attendQRData.name + ' — סרוק עכשיו ברקוד מחשב!');
-        document.getElementById('attend-hint-text').textContent = 'ממתין לסריקת מחשב עבור: ' + attendQRData.name;
+        showToast('✅ ' + attendQRData.name + ' — סרוק ברקוד מחשב או הקלד ידנית');
+        document.getElementById('attend-hint-text').textContent = 'ממתין למחשב עבור: ' + attendQRData.name;
+        // הצג שדה קלט ידני למחשב
+        document.getElementById('attend-computer-wrap').style.display = 'block';
+        document.getElementById('attend-manual-computer').value = '';
+        setTimeout(function(){ document.getElementById('attend-manual-computer').focus(); }, 200);
       } else {
         setScanBoxState('fail');
         showToast('סרוק תחילה QR של נבחן!', true);
@@ -1263,6 +1287,16 @@
   function resetAttend() {
     attendQR = null; attendQRData = null; attendComputer = '';
     document.getElementById('attend-hint-text').textContent = 'סרוק QR מדף הנבחן (הוורוד)';
+    document.getElementById('attend-computer-wrap').style.display = 'none';
+    document.getElementById('attend-manual-computer').value = '';
+    resetScanBox(); // מאפס גם את הטיימר ומצב הצבע
+  }
+
+  function submitManualComputer() {
+    var val = document.getElementById('attend-manual-computer').value.trim();
+    if (!attendQR) { showToast('סרוק תחילה QR של נבחן!', true); return; }
+    attendComputer = val;
+    openAttendModal(val);
   }
 
   function saveAttend() {
@@ -1278,7 +1312,9 @@
     });
     var savedName = attendQRData ? attendQRData.name : '';
     var savedId   = attendQRData ? attendQRData.id   : '';
+    if (savedId) scannedIds.add(savedId); // מניעת כפל מיידית
     closeAttendModal(false);
+    resetAttend(); // מאפס מיד — מוכן לנבחן הבא
     fetch('/api/exam-scan-double', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1291,7 +1327,6 @@
       } else {
         // ── עדכון מונה ──
         attendCount++;
-        if (savedId) scannedIds.add(savedId);
         document.getElementById('attend-count').textContent = attendCount;
         var total = attendTotal > 0 ? ' / ' + attendTotal : '';
         document.getElementById('attend-total-display').textContent = total;

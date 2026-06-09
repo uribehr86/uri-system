@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}הוספת נבחן{% endblock %}
+{% block content %}
+<div style="max-width:600px; margin:0 auto;">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:28px;">
+        <a href="{{ url_for('exam_attendance') }}" style="color:var(--muted); text-decoration:none; font-size:1.5rem;">←</a>
+        <h1 style="font-size:1.8rem; font-weight:800;">➕ הוספת נבחן</h1>
+    </div>
+
+    <div class="card">
+        <form method="POST">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>שם מלא *</label>
+                    <input type="text" name="name" class="form-control" placeholder="ישראל ישראלי" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label>תעודת זהות *</label>
+                    <input type="text" name="id_number" class="form-control" placeholder="123456789" required>
+                </div>
+                <div class="form-group">
+                    <label>קוד משתמש</label>
+                    <input type="text" name="username" class="form-control" placeholder="12345678">
+                </div>
+                <div class="form-group">
+                    <label>סיסמא</label>
+                    <input type="text" name="password" class="form-control" placeholder="00000">
+                </div>
+                <div class="form-group">
+                    <label>שם בחינה</label>
+                    <input type="text" name="exam_name" class="form-control" placeholder="בטיחות בבניה">
+                </div>
+                <div class="form-group">
+                    <label>מחשב</label>
+                    <input type="text" name="computer" class="form-control" placeholder="1">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>מיקום (כיתה / אולם)</label>
+                <input type="text" name="location" class="form-control" placeholder="אפעל 6, פתח תקווה">
+            </div>
+            <div style="display:flex; gap:12px; margin-top:8px;">
+                <button type="submit" style="flex:1; padding:14px; background:linear-gradient(135deg,#238636,#1a6627); color:#fff; border:none; border-radius:12px; font-weight:700; font-size:1rem; cursor:pointer; font-family:inherit;">✅ שמור נבחן</button>
+                <a href="{{ url_for('exam_attendance') }}" style="flex:1; padding:14px; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--muted); border-radius:12px; font-weight:700; font-size:1rem; text-align:center; text-decoration:none;">ביטול</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

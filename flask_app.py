@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify
 import psycopg2
 import sqlite3
 
@@ -185,13 +185,39 @@ def run_startup_migrations():
             conn.commit()
             print("[OK] Migration: added sheets_delete_request column")
         except Exception:
-            conn.rollback()  # העמודה כבר קיימת — בסדר
+            conn.rollback()
+        # צור טבלת פרויקטים אם לא קיימת
+        try:
+            if IS_LOCAL_MODE:
+                cur.execute("""CREATE TABLE IF NOT EXISTS projects (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    keywords TEXT NOT NULL,
+                    sheets_id TEXT DEFAULT '',
+                    drive_url TEXT DEFAULT '',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )""")
+            else:
+                cur.execute("""CREATE TABLE IF NOT EXISTS projects (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    keywords TEXT NOT NULL,
+                    sheets_id TEXT DEFAULT '',
+                    drive_url TEXT DEFAULT '',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )""")
+            conn.commit()
+            print("[OK] Migration: projects table ready")
+        except Exception as e:
+            conn.rollback()
+            print(f"[WARNING] projects table: {e}")
         cur.close()
     finally:
         release_db_connection(conn)
 
 with app.app_context():
     run_startup_migrations()
+
 
 @app.context_processor
 def utility_processor():
@@ -217,6 +243,25 @@ def login_required(f):
         if 'user' not in session: return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
+
+@app.route('/api/projects')
+@login_required
+def api_projects():
+    """מחזיר רשימת פרויקטים + Sheet IDs לסורק"""
+    conn = get_db_connection()
+    projects = []
+    if conn:
+        try:
+            cur = get_safe_cursor(conn)
+            cur.execute("SELECT name, keywords, sheets_id, drive_url FROM projects WHERE sheets_id != '' ORDER BY name")
+            rows = cur.fetchall()
+            projects = [dict(r) for r in rows]
+            cur.close()
+        except Exception:
+            pass
+        finally:
+            release_db_connection(conn)
+    return jsonify(projects)
 
 @app.route('/')
 def index():
@@ -1526,31 +1571,48 @@ def exam_attendance_import():
         wb = openpyxl.load_workbook(file)
         ws = wb.active
         
+        # קריאת כותרת הבחינה משורה 1
+        exam_title_row1 = ''
+        for cell in ws[1]:
+            if cell.value and str(cell.value).strip():
+                exam_title_row1 = str(cell.value).strip()
+                break
+
         headers = []
         header_row_idx = 1
         for row_idx, r in enumerate(ws.iter_rows(min_row=1, max_row=10, values_only=True), start=1):
             row_strs = [str(c).strip() if c else '' for c in r]
-            if any('שם' in s or 'תעודת' in s or 'id' in s.lower() for s in row_strs):
+            if any('שם' in s or 'תעודת' in s or 'ת.ז' in s or 'id' in s.lower() or 'פרטי' in s for s in row_strs):
                 headers = row_strs
                 header_row_idx = row_idx
                 break
         if not headers:
             headers = [str(cell.value).strip() if cell.value else '' for cell in ws[1]]
 
-        # מיפוי עמודות גמיש
+        # מיפוי עמודות גמיש — כולל שם פרטי + שם משפחה
         col_map = {}
         for i, h in enumerate(headers):
             h_lower = h.lower()
-            if 'שם' in h or 'name' in h_lower: col_map['name'] = i
-            elif 'זהות' in h or 'ת.ז' in h or 'id' in h_lower: col_map['id_number'] = i
-            elif 'משתמש' in h or 'user' in h_lower or 'קוד' in h: col_map['username'] = i
-            elif 'סיסמ' in h or 'pass' in h_lower: col_map['password'] = i
-            elif 'טור' in h or 'row' in h_lower or 'עמודה' in h: col_map['row_number'] = i
-            elif 'כסא' in h or 'seat' in h_lower or 'מושב' in h: col_map['seat_number'] = i
-            elif 'מיקום' in h or 'location' in h_lower or 'כיתה' in h or 'class' in h_lower: col_map['location'] = i
-            elif 'בחינה' in h or 'exam' in h_lower: col_map['exam_name'] = i
-            elif 'מחשב' in h or 'computer' in h_lower or 'laptop' in h_lower: col_map['computer'] = i
-            elif 'התאמות' in h or 'notes' in h_lower or 'adjust' in h_lower: col_map['notes'] = i
+            if 'פרטי' in h:                                          col_map['first_name'] = i
+            elif 'משפחה' in h or 'family' in h_lower:               col_map['last_name']  = i
+            elif ('שם' in h or 'name' in h_lower) and 'משתמש' not in h: col_map['name'] = i
+            elif 'זהות' in h or 'ת.ז' in h or 'id' in h_lower:     col_map['id_number']  = i
+            elif 'משתמש' in h or 'user' in h_lower or 'קוד' in h:  col_map['username']   = i
+            elif 'סיסמ' in h or 'pass' in h_lower:                  col_map['password']   = i
+            elif 'טור' in h or 'עמודה' in h:                        col_map['row_number'] = i
+            elif 'כסא' in h or 'כיסא' in h or 'seat' in h_lower or 'מושב' in h:   col_map['seat_number']= i
+            elif 'מיקום' in h or 'כיתה' in h or 'location' in h_lower: col_map['location']= i
+            elif 'בחינה' in h or 'exam' in h_lower:                 col_map['exam_name']  = i
+            elif 'מחשב' in h or 'computer' in h_lower:              col_map['computer']   = i
+            elif 'התאמות' in h or 'notes' in h_lower:               col_map['notes']      = i
+
+        def safe_val(val):
+            """המרת ערך תא — מטפל במספרים גדולים/נוטציה מדעית"""
+            if val is None: return ''
+            if isinstance(val, float):
+                if val == int(val): return str(int(val))
+                return str(val)
+            return str(val).strip()
 
         # איסוף כל השורות
         all_rows = []
@@ -1559,10 +1621,17 @@ def exam_attendance_import():
             def get_val(key, r=row):
                 idx = col_map.get(key)
                 if idx is None: return ''
-                val = r[idx]
-                return str(val).strip() if val is not None else ''
-            name = get_val('name')
+                return safe_val(r[idx])
+
+            # שם מלא: אם יש שם פרטי + משפחה — מאחד
+            first = get_val('first_name')
+            last  = get_val('last_name')
+            if first or last:
+                name = (first + ' ' + last).strip()
+            else:
+                name = get_val('name')
             if not name: continue
+
             all_rows.append({
                 'name':        name,
                 'id_number':   get_val('id_number'),
@@ -1578,43 +1647,124 @@ def exam_attendance_import():
 
         # מיון לפי טור → כסא
         def sort_key(r):
-            try:    row_n  = int(r['row_number'])  if r['row_number']  else 9999
+            try:    row_n  = int(float(r['row_number']))  if r['row_number']  else 9999
             except: row_n  = 9999
-            try:    seat_n = int(r['seat_number']) if r['seat_number'] else 9999
+            try:    seat_n = int(float(r['seat_number'])) if r['seat_number'] else 9999
             except: seat_n = 9999
             return (row_n, seat_n)
         all_rows.sort(key=sort_key)
 
-        # שמירה לגוגל שיטס בלבד - ללא DB
-        import gspread, os
+        # ── Google Drive + Sheets: תיקיה + גיליון אחד למשרד, טאב לכל מבחן ──
+        import re, gspread, os
         from google.oauth2.service_account import Credentials
-        scopes   = ['https://www.googleapis.com/auth/spreadsheets',
-                    'https://www.googleapis.com/auth/drive']
-        sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
-        sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
-        creds    = Credentials.from_service_account_file(sa_file, scopes=scopes)
-        client   = gspread.authorize(creds)
-        sh       = client.open_by_key(sheet_id)
+        from googleapiclient.discovery import build
 
-        # לשונית "נבחנים" - יוצר אם לא קיימת, מוחק תוכן ישן
-        try:
-            ws_st = sh.worksheet('נבחנים')
-            ws_st.clear()
-        except gspread.exceptions.WorksheetNotFound:
-            ws_st = sh.add_worksheet(title='נבחנים', rows=1000, cols=15)
+        scopes  = ['https://www.googleapis.com/auth/spreadsheets',
+                   'https://www.googleapis.com/auth/drive']
+        sa_file = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+        creds   = Credentials.from_service_account_file(sa_file, scopes=scopes)
+        client  = gspread.authorize(creds)
+        drive   = build('drive', 'v3', credentials=creds)
 
-        header_row = ['שם נבחן', 'תעודת זהות', 'קוד משתמש', 'סיסמה',
-                      'טור', 'כסא', 'מחשב', 'הערות', 'בחינה', 'מיקום']
+        PARENT_FOLDER_ID = '18-VtXbYxvT8EqVzJgdAZv54aDnRWhNvM'
+
+        # שם קובץ ללא סיומת
+        raw_name = os.path.splitext(file.filename)[0]
+
+        # שם המשרד/פרויקט
+        words = raw_name.split()
+        if len(words) >= 2 and words[0] == 'משרד':
+            # "משרד הבריאות מומחיות 7.6.26" → תיקיה: משרד הבריאות, טאב: מומחיות 7.6.26
+            ministry_name = f"{words[0]} {words[1]}"
+            tab_name      = ' '.join(words[2:]).strip() or raw_name
+        elif exam_title_row1:
+            # אם יש כותרת בשורה 1 → השתמש בה לשם הפרויקט
+            # דוגמה: "רישיון חשמלאים - 19.05.2026 - נוכחות" → ministry=חשמלאים, tab=19.05.2026
+            title_clean   = re.sub(r'[-–]\s*נוכחות\s*$', '', exam_title_row1).strip()
+            title_clean   = re.sub(r'[-–]\s*\d+\.\d+\.\d+\s*$', '', title_clean).strip()
+            ministry_name = title_clean or raw_name
+            tab_name      = raw_name
+        else:
+            ministry_name = re.sub(r'\s*\d+[\./]\d+[\./]\d+\s*$', '', raw_name).strip() or raw_name
+            tab_name      = raw_name
+
+        # ── שלב 1: מצא או צור תיקיה למשרד ──
+        q = (f"name='{ministry_name}' and "
+             f"mimeType='application/vnd.google-apps.folder' and "
+             f"'{PARENT_FOLDER_ID}' in parents and trashed=false")
+        folders = drive.files().list(q=q, fields='files(id,name)').execute().get('files', [])
+        if folders:
+            folder_id = folders[0]['id']
+        else:
+            folder_id = drive.files().create(body={
+                'name': ministry_name,
+                'mimeType': 'application/vnd.google-apps.folder',
+                'parents': [PARENT_FOLDER_ID]
+            }, fields='id').execute()['id']
+
+        # ── שלב 2: מצא או צור גיליון אחד למשרד ──
+        q2 = (f"name='{ministry_name}' and "
+              f"mimeType='application/vnd.google-apps.spreadsheet' and "
+              f"'{folder_id}' in parents and trashed=false")
+        sheets = drive.files().list(q=q2, fields='files(id,name)').execute().get('files', [])
+        if sheets:
+            ss_id = sheets[0]['id']
+        else:
+            ss_id = drive.files().create(body={
+                'name': ministry_name,
+                'mimeType': 'application/vnd.google-apps.spreadsheet',
+                'parents': [folder_id]
+            }, fields='id').execute()['id']
+
+        sh = client.open_by_key(ss_id)
+
+        # ── שלב 3: הוסף טאב חדש לכל מבחן (אם כבר קיים הוסף מספר) ──
+        existing_titles = [w.title for w in sh.worksheets()]
+        unique_tab = tab_name
+        counter    = 2
+        while unique_tab in existing_titles:
+            unique_tab = f"{tab_name} ({counter})"
+            counter   += 1
+
+        ws_tab = sh.add_worksheet(title=unique_tab, rows=1000, cols=15)
+
+        # ── שלב 4: כתוב נתונים לטאב ──
+        header_row    = ['שם נבחן', 'תעודת זהות', 'קוד משתמש', 'סיסמה',
+                         'טור', 'כסא', 'מחשב', 'הערות', 'בחינה', 'מיקום',
+                         'נוכחות', 'מצב מחשב', 'שעת סריקה']
         rows_to_write = [header_row]
         for rec in all_rows:
             rows_to_write.append([
                 rec['name'], rec['id_number'], rec['username'], rec['password'],
                 rec['row_number'], rec['seat_number'], rec['computer'],
-                rec['notes'], rec['exam_name'], rec['location']
+                rec['notes'], rec['exam_name'], rec['location'],
+                '', '', ''   # נוכחות + מצב מחשב + שעת סריקה ימולאו בסריקה
             ])
-        ws_st.update('A1', rows_to_write, value_input_option='USER_ENTERED')
+        ws_tab.update('A1', rows_to_write, value_input_option='USER_ENTERED')
 
-        flash(f"✅ יובאו {len(all_rows)} נבחנים לגוגל שיטס (ממוינים לפי טור וכסא)!", "success")
+        # ── שלב 5: שמור מיפוי פרויקט במסד לשימוש הסורק ──
+        sheet_url = f"https://docs.google.com/spreadsheets/d/{ss_id}"
+        conn2 = get_db_connection()
+        if conn2:
+            try:
+                cur2 = get_safe_cursor(conn2)
+                # בדוק אם פרויקט כבר קיים
+                cur2.execute("SELECT id FROM projects WHERE name = %s", (ministry_name,))
+                existing = cur2.fetchone()
+                if existing:
+                    cur2.execute("UPDATE projects SET sheets_id=%s, drive_url=%s WHERE name=%s",
+                                 (ss_id, sheet_url, ministry_name))
+                else:
+                    cur2.execute("INSERT INTO projects (name, keywords, sheets_id, drive_url) VALUES (%s,%s,%s,%s)",
+                                 (ministry_name, ministry_name, ss_id, sheet_url))
+                conn2.commit()
+                cur2.close()
+            except Exception:
+                conn2.rollback()
+            finally:
+                release_db_connection(conn2)
+
+        flash(f"✅ {len(all_rows)} נבחנים נוספו! 📁 {ministry_name} → 📑 {unique_tab}", "success")
 
     except Exception as e:
         import traceback; traceback.print_exc()
@@ -1648,39 +1798,67 @@ def generate_word_docs():
 
         headers = []
         header_row_idx = 1
+        # זיהוי שורת כותרות: צריך לפחות 2 עמודות מוכרות (מונע שגיאות כמו "חשמלאים"⊃"שם")
+        HEADER_KEYS = ['שם', 'ת.ז', 'תעודת', 'סיסמ', 'משתמש', 'טור', 'כסא', 'מחשב', 'התאמות', 'פרטי', 'משפחה', 'id', 'pass', 'user', 'seat', 'name']
         for row_idx, r in enumerate(ws.iter_rows(min_row=1, max_row=10, values_only=True), start=1):
             row_strs = [str(c).strip() if c else '' for c in r]
-            if any('שם' in s or 'תעודת' in s or 'id' in s.lower() for s in row_strs):
+            matches = sum(1 for s in row_strs if any(k in s.lower() for k in HEADER_KEYS))
+            if matches >= 2:
                 headers = row_strs
                 header_row_idx = row_idx
                 break
         if not headers:
             headers = [str(cell.value).strip() if cell.value else '' for cell in ws[1]]
-        
+
+        def safe_val(val):
+            """המרת ערך תא — מטפל במספרים גדולים/נוטציה מדעית"""
+            if val is None: return ''
+            if isinstance(val, float):
+                if val == int(val): return str(int(val))
+                return str(val)
+            return str(val).strip()
+
         col_map = {}
         for i, h in enumerate(headers):
             h_lower = h.lower()
-            if 'שם' in h or 'name' in h_lower: col_map['name'] = i
-            elif 'זהות' in h or 'ת.ז' in h or 'id' in h_lower: col_map['id_number'] = i
-            elif 'משתמש' in h or 'user' in h_lower or 'קוד' in h: col_map['username'] = i
-            elif 'סיסמ' in h or 'pass' in h_lower: col_map['password'] = i
-            elif 'מיקום' in h or 'location' in h_lower or 'כיתה' in h or 'class' in h_lower: col_map['location'] = i
-            elif 'בחינה' in h or 'exam' in h_lower: col_map['exam_name'] = i
-            elif 'מחשב' in h or 'computer' in h_lower or 'laptop' in h_lower: col_map['computer'] = i
-            elif 'התאמות' in h or 'notes' in h_lower or 'adjust' in h_lower: col_map['notes'] = i
-            elif 'טור' in h or 'row' in h_lower: col_map['row'] = i
-            elif 'כסא' in h or 'seat' in h_lower: col_map['seat'] = i
-            
+            if 'פרטי' in h:                                              col_map['first_name'] = i
+            elif 'משפחה' in h or 'family' in h_lower:                   col_map['last_name']  = i
+            elif ('שם' in h or 'name' in h_lower) and 'משתמש' not in h: col_map['name']       = i
+            elif 'זהות' in h or 'ת.ז' in h or 'id' in h_lower:         col_map['id_number']  = i
+            elif 'משתמש' in h or 'user' in h_lower or 'קוד' in h:      col_map['username']   = i
+            elif 'סיסמ' in h or 'pass' in h_lower:                      col_map['password']   = i
+            elif 'מיקום' in h or 'כיתה' in h or 'location' in h_lower: col_map['location']   = i
+            elif 'בחינה' in h or 'exam' in h_lower:                     col_map['exam_name']  = i
+            elif 'מחשב' in h or 'computer' in h_lower:                  col_map['computer']   = i
+            elif 'התאמות' in h or 'notes' in h_lower:                   col_map['notes']      = i
+            elif 'טור' in h or 'עמודה' in h:                            col_map['row']        = i
+            elif 'כסא' in h or 'כיסא' in h or 'seat' in h_lower or 'מושב' in h:       col_map['seat']       = i
+
         examinees = []
         for row in ws.iter_rows(min_row=header_row_idx + 1, values_only=True):
             if not any(row): continue
-            def get_val(key):
+            def get_val(key, r=row):
                 idx = col_map.get(key)
                 if idx is None: return ''
-                val = row[idx]
-                return str(val).strip() if val is not None else ''
-            
-            name = get_val('name')
+                return safe_val(r[idx])
+
+            # DEBUG — שומר מיפוי לקובץ (למניעת שגיאת charmap בטרמינל)
+            if len(examinees) == 0:
+                try:
+                    with open('debug_colmap.txt', 'w', encoding='utf-8') as dbf:
+                        dbf.write(f"col_map = {col_map}\n")
+                        dbf.write(f"headers = {headers}\n")
+                        dbf.write(f"first data row = {[str(v) for v in row]}\n")
+                except Exception:
+                    pass
+
+            # שם מלא: שם פרטי + שם משפחה אם קיימים
+            first = get_val('first_name')
+            last  = get_val('last_name')
+            if first or last:
+                name = (first + ' ' + last).strip()
+            else:
+                name = get_val('name')
             if not name: continue
             
             examinees.append({
@@ -1708,7 +1886,7 @@ def generate_word_docs():
             with open(template_path, 'rb') as f:
                 word_bytes = f.read()
         
-        master_doc = None
+        all_docs = []  # רשימה של (שם_קובץ, bytes) לכל נבחן
         
         for i, e in enumerate(examinees):
             # Load template first so we can use it for InlineImage
@@ -1717,7 +1895,8 @@ def generate_word_docs():
             # Format: exam_name|id_number|name|username|password|row|seat
             # exam_name: from column or from Excel title row
             exam_title = e['exam_name'] if e['exam_name'] else (exam_title_from_header or 'EXAMINEE')
-            qr_data = f"{exam_title}|{e['id_number']}|{e['name']}|{e['username']}|{e['password']}|{e['row']}|{e['seat']}"
+            exam_title_clean = exam_title.replace('|', ' ').strip()  # מונע שבירת פורמט ה-QR
+            qr_data = f"{exam_title_clean}|{e['id_number']}|{e['name']}|{e['username']}|{e['password']}|{e['row']}|{e['seat']}"
             import urllib.request
             import urllib.parse
             try:
@@ -1780,6 +1959,10 @@ def generate_word_docs():
                 'התאמות': e['notes'],
             }
             for t_idx, t in enumerate(doc.tables):
+                # דלג על טבלת "למילוי על ידי הנבחן/ת" — נשארת ריקה לכתב יד
+                table_text = ' '.join(cell.text for row in t.rows for cell in row.cells)
+                if 'חתימה' in table_text or 'למילוי' in table_text:
+                    continue
                 for row_idx, r in enumerate(t.rows):
                     if len(r.cells) >= 2:
                         label_right = r.cells[1].text.strip()
@@ -1793,19 +1976,13 @@ def generate_word_docs():
                                 r.cells[1].paragraphs[0].clear()
                                 r.cells[1].paragraphs[0].add_run(val_text)
                                 break
-                        # Signature table row (2nd table, index 1)
-                        if t_idx == 1 and row_idx == 1:
-                            if not any(c.text.strip() for c in r.cells):
-                                r.cells[0].paragraphs[0].clear()
-                                r.cells[0].paragraphs[0].add_run(e['name'])
-                                if len(r.cells) >= 3:
-                                    r.cells[1].paragraphs[0].clear()
-                                    r.cells[1].paragraphs[0].add_run(e['id_number'])
 
-            # ---- Step 2: Find "1" paragraph in BODY ----
+            # ---- Step 2: Find seat paragraph in BODY and add QR ----
+            seat_display = e.get('seat', '') or str(i + 1)  # fallback: מספר סידורי
             target_p = None
             for p in doc.paragraphs:
-                if p.text.strip() == '1':
+                txt = p.text.strip()
+                if txt == seat_display or txt == '1':   # '1' הוא ה-placeholder בתבנית
                     target_p = p
                     break
 
@@ -1832,34 +2009,39 @@ def generate_word_docs():
                 target_p.add_run('\t')
 
                 # 3. Add Seat Number (will be on the RIGHT)
-                seat_display = e.get('seat', '') or '1'
                 run_seat = target_p.add_run(seat_display)
                 run_seat.font.size = Pt(85)
                 run_seat.font.bold = True
                 run_seat.font.name = 'Tahoma'
 
 
-            if master_doc is None:
-                master_doc = doc
-            else:
-                # Add page break before appending
-                master_doc.add_page_break()
-                # Append elements manually
-                for element in doc.element.body:
-                    master_doc.element.body.append(element)
-                
+            # שמור כל דוק ברשימה
+            all_docs.append(doc)
+
+        # מזג עם docxcompose — מטפל נכון בקשרי תמונות
+        from docxcompose.composer import Composer
+        from docx.enum.text import WD_BREAK
+
+        master_doc = all_docs[0]
+        composer = Composer(master_doc)
+
+        for doc in all_docs[1:]:
+            # הוסף מעבר עמוד בסוף המסמך הנוכחי לפני הצירוף
+            last_para = master_doc.paragraphs[-1] if master_doc.paragraphs else master_doc.add_paragraph()
+            last_para.add_run().add_break(WD_BREAK.PAGE)
+            composer.append(doc)
+
         final_buf = io.BytesIO()
         master_doc.save(final_buf)
         final_buf.seek(0)
-        
-        # (DB insertion logic removed per user request)
-        
+
         return send_file(
             final_buf,
             as_attachment=True,
-            download_name='Generated_Exam_Forms.docx',
+            download_name='טפסי_נבחנים.docx',
             mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         )
+
         
     except Exception as e:
         import traceback
@@ -1957,7 +2139,7 @@ def api_exam_scan_double():
     exam_name = parts[0] if parts[0] != 'EXAMINEE' else ''
     scan_time_str = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
     technician = session.get('username', '')
-    present_str = 'נוכח' if is_present == 1 else 'לא נוכח'
+    present_val = 1 if is_present == 1 else 0
 
     # עדכון DB אופציונלי
     try:
@@ -2009,7 +2191,7 @@ def api_exam_scan_double():
             print(f"[Sheets] Error: {ex}")
 
     import threading
-    row = [full_name, id_number, computer, present_str, pc_status, exam_name, scan_time_str, technician, col, seat]
+    row = [full_name, id_number, computer, present_val, pc_status, exam_name, scan_time_str, technician, col, seat]
     threading.Thread(target=append_to_exam_sheet, args=(row,), daemon=True).start()
 
     return {"success": True}

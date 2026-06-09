@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מחולל טפסי בחינה</title>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Heebo', sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            min-height: 100vh;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 40px 20px;
+            overflow-y: auto;
+        }
+        .container {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 24px;
+            padding: 50px 60px;
+            max-width: 560px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+        }
+        .icon { font-size: 4rem; margin-bottom: 16px; }
+        h1 {
+            color: #fff;
+            font-size: 1.8rem;
+            font-weight: 900;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: rgba(255,255,255,0.55);
+            font-size: 0.95rem;
+            margin-bottom: 36px;
+            line-height: 1.6;
+        }
+        .upload-area {
+            border: 2px dashed rgba(163,113,247,0.5);
+            border-radius: 16px;
+            padding: 36px 20px;
+            margin-bottom: 24px;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+        .upload-area:hover { border-color: #a371f7; background: rgba(163,113,247,0.08); }
+        .upload-area input[type="file"] {
+            display: none;
+        }
+        .upload-icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .upload-label { color: rgba(255,255,255,0.7); font-size: 0.95rem; }
+        .upload-label span { color: #a371f7; font-weight: 700; }
+        .file-name {
+            margin-top: 10px;
+            color: #58a6ff;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: none;
+        }
+        .columns-info {
+            background: rgba(88,166,255,0.08);
+            border: 1px solid rgba(88,166,255,0.2);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 28px;
+            text-align: right;
+        }
+        .columns-info p {
+            color: rgba(255,255,255,0.5);
+            font-size: 0.8rem;
+            margin-bottom: 6px;
+        }
+        .columns-info .col-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .col-tag {
+            background: rgba(163,113,247,0.2);
+            border: 1px solid rgba(163,113,247,0.4);
+            color: #c9a0f7;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+        .btn-generate {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #a371f7, #6e40c9);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            font-family: 'Heebo', sans-serif;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 8px 24px rgba(163,113,247,0.35);
+        }
+        .btn-generate:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px rgba(163,113,247,0.5);
+        }
+        .btn-generate:active { transform: translateY(0); }
+        .loading { display: none; margin-top: 16px; color: rgba(255,255,255,0.5); font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="icon">📋</div>
+    <h1>מחולל טפסי בחינה</h1>
+    <p class="subtitle">העלה קובץ אקסל עם רשימת הנבחנים<br>וקבל דפים מוכנים להדפסה עם QR לכל נבחן</p>
+
+    <form method="POST" action="/generate-forms" enctype="multipart/form-data" onsubmit="showLoading()">
+        <label for="fileInput" class="upload-area">
+            <input type="file" name="excel_file" id="fileInput" accept=".xlsx,.xls" required
+                   onchange="showFileName(this)">
+            <div class="upload-icon">📊</div>
+            <div class="upload-label">לחץ לבחירת קובץ <span>Excel</span></div>
+            <div class="file-name" id="fileName"></div>
+        </label>
+
+        <div class="columns-info">
+            <p>עמודות נתמכות בקובץ האקסל:</p>
+            <div class="col-tags">
+                <span class="col-tag">שם נבחן</span>
+                <span class="col-tag">תעודת זהות</span>
+                <span class="col-tag">קוד משתמש</span>
+                <span class="col-tag">סיסמה</span>
+                <span class="col-tag">התאמות</span>
+                <span class="col-tag">מספר מחשב</span>
+                <span class="col-tag">מיקום/כיתה</span>
+            </div>
+        </div>
+
+        <button type="submit" class="btn-generate">✨ צור דפי בחינה + QR</button>
+        <div class="loading" id="loading">⏳ מעבד נתונים ויוצר QR לכל נבחן...</div>
+    </form>
+</div>
+
+<script>
+function showFileName(input) {
+    const fn = document.getElementById('fileName');
+    if (input.files && input.files[0]) {
+        fn.textContent = '✅ ' + input.files[0].name;
+        fn.style.display = 'block';
+    }
+}
+function showLoading() {
+    document.getElementById('loading').style.display = 'block';
+    document.querySelector('.btn-generate').textContent = '⏳ מעבד...';
+}
+</script>
+</body>
+</html>
