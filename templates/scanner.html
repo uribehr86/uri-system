@@ -76,9 +76,28 @@
   @keyframes pulse { 0%,100% { opacity: 0.3; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.2); } }
 
   /* Toast */
-  #toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-80px); background: #16a34a; color: #fff; padding: 12px 22px; border-radius: 30px; font-weight: 700; font-size: 0.95rem; z-index: 200; transition: transform 0.3s cubic-bezier(.17,.67,.39,1.3); white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+  #toast {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    opacity: 0;
+    background: #16a34a;
+    color: #fff;
+    padding: 18px 28px;
+    border-radius: 20px;
+    font-weight: 800;
+    font-size: 1.1rem;
+    z-index: 9999;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+    white-space: pre-wrap;
+    max-width: 85vw;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    pointer-events: none;
+  }
   #toast.err { background: #dc2626; }
-  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.show { transform: translate(-50%, -50%) scale(1); opacity: 1; }
 
   /* Full mode sheet */
   .sheet-overlay { display: none; position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.75); backdrop-filter: blur(3px); }
@@ -121,8 +140,6 @@
   <div class="mode-bar">
     <button class="mode-btn active" onclick="setMode('area')" id="btn-area">🌍 סריקת שטח</button>
     <button class="mode-btn" onclick="setMode('cage')" id="btn-cage">📦 סריקת כלוב</button>
-
-    <button class="mode-btn" onclick="setMode('attend')" id="btn-attend">📋 נוכחות</button>
   </div>
 
   <!-- Camera -->
@@ -132,7 +149,7 @@
     <div class="scan-overlay">
       <div class="scan-box" id="scan-box">
         <div class="scan-line"></div>
-        <div class="fail-msg" id="fail-msg">⚠️ לא זוהה — נסה שוב או הקלד ידנית</div>
+        <div class="fail-msg" id="fail-msg">⚠️ לא זוהה — קרב את הדף לסורק</div>
         <div class="success-burst" id="success-burst"></div>
       </div>
     </div>
@@ -233,71 +250,7 @@
       </div>
     </div>
 
-    <!-- ATTENDANCE SCAN (QR + Computer Barcode) -->
-    <div id="panel-attend" style="display:none;">
-      <div style="text-align:center; padding:8px 0;">
-        <div class="waiting-hint"><div class="pulse-dot"></div> <span id="attend-hint-text">סרוק QR מדף הנבחן (הוורוד)</span></div>
-      <div id="attend-computer-wrap" style="display:none; margin-top:10px; padding:10px; background:rgba(37,99,235,0.1); border-radius:12px; border:1px solid rgba(37,99,235,0.3);">
-        <div style="color:#94a3b8; font-size:0.8rem; margin-bottom:6px;">📟 הקלד מספר מחשב:</div>
-        <div style="display:flex; gap:8px;">
-          <input type="text" id="attend-manual-computer" placeholder="לדוגמה: 1324"
-            style="flex:1; padding:10px; border-radius:10px; background:#0a0f1e; color:#fff; border:1px solid rgba(255,255,255,0.2); font-size:1rem;"
-            onkeypress="if(event.key==='Enter') submitManualComputer()">
-          <button onclick="submitManualComputer()" style="padding:10px 16px; border-radius:10px; background:#2563eb; color:#fff; border:none; font-weight:700; cursor:pointer;">✅</button>
-        </div>
-      </div>
-    </div>
-    <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
-        <div class="scan-counter" style="flex:1; background:rgba(37,99,235,0.1); padding:8px; border-radius:10px; border:1px solid rgba(37,99,235,0.2); text-align:center;">
-          נסרקו: <span id="attend-count" style="font-weight:800; font-size:1.2rem;">0</span>
-          <span id="attend-total-display" style="color:#64748b;"></span>
-        </div>
-        <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-          <label style="color:#64748b; font-size:0.7rem;">סה"כ נבחנים</label>
-          <input type="number" id="attend-total-input" placeholder="?" min="1"
-            style="width:64px; padding:8px; border-radius:10px; background:#0a0f1e; color:#fff; border:1px solid rgba(255,255,255,0.15); font-size:1rem; text-align:center;"
-            oninput="updateAttendTotal(this.value)">
-        </div>
-      </div>
-      <div style="margin-top:8px;">
-        <button id="btn-undo-attend" onclick="undoLastAttend()" style="display:none; width:100%; padding:10px; border-radius:10px; border:1px solid rgba(239,68,68,0.4); background:rgba(239,68,68,0.1); color:#f87171; font-weight:700; cursor:pointer;">
-          ↩️ בטל סריקה אחרונה (<span id="undo-name"></span>)
-        </button>
-      </div>
-    </div>
 
-  </div>
-</div>
-
-<!-- Attendance Modal -->
-<div id="attend-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:2000; align-items:flex-end; justify-content:center;">
-  <div style="background:#1a2035; border-radius:24px 24px 0 0; padding:24px; width:100%; max-width:480px;">
-    <div style="text-align:center; margin-bottom:16px;">
-      <div style="font-weight:800; font-size:1.2rem; color:#fff;" id="attend-modal-name">שם נבחן</div>
-      <div style="color:#94a3b8; font-size:0.9rem; margin-top:4px;" id="attend-modal-computer">מחשב: -</div>
-    </div>
-    <div style="display:grid; gap:12px;">
-      <div>
-        <label style="color:#94a3b8; font-size:0.8rem; margin-bottom:4px; display:block;">נוכחות</label>
-        <select id="attend-presence" style="width:100%; padding:12px; border-radius:10px; background:#0a0f1e; color:#fff; border:1px solid rgba(255,255,255,0.15); font-size:1rem;">
-          <option value="1">✅ נוכח בבחינה</option>
-          <option value="0">❌ לא הגיע (נעדר)</option>
-        </select>
-      </div>
-      <div>
-        <label style="color:#94a3b8; font-size:0.8rem; margin-bottom:4px; display:block;">מצב מחשב</label>
-        <select id="attend-pc-status" style="width:100%; padding:12px; border-radius:10px; background:#0a0f1e; color:#fff; border:1px solid rgba(255,255,255,0.15); font-size:1rem;">
-          <option value="תקין">✅ תקין</option>
-          <option value="תקול">❌ תקול</option>
-        </select>
-      </div>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-        <button onclick="closeAttendModal(true)" style="padding:14px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); background:transparent; color:#94a3b8; font-weight:700; cursor:pointer;">ביטול</button>
-        <button onclick="saveAttend()" style="padding:14px; border-radius:12px; border:none; background:#2563eb; color:#fff; font-weight:700; cursor:pointer; font-size:1rem;">💾 שמור</button>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- Toast -->
 <div id="toast"></div>
@@ -461,17 +414,21 @@
   }
 
   function resetFailTimer() {
-    // Clear any existing timer
     if (failTimer) clearTimeout(failTimer);
     manualShown = false;
     setScanBoxState('idle');
     hideManualInput();
-
-    // After 5 seconds of no successful scan → go red
+    // עדכן טקסט ההודעה לפי מצב
+    var msg = document.getElementById('fail-msg');
+    if (msg) {
+      msg.textContent = currentMode === 'attend'
+        ? '⚠️ לא זוהה — קרב את הדף לסורק'
+        : '⚠️ לא זוהה — נסה שוב או הקלד ידנית';
+    }
     failTimer = setTimeout(() => {
       if (!isSheetOpen) {
         setScanBoxState('fail');
-        showManualInput();
+        if (currentMode !== 'attend') showManualInput();
       }
     }, 5000);
   }
@@ -524,7 +481,7 @@
     t.textContent = msg;
     t.className = isErr ? 'err show' : 'show';
     if (navigator.vibrate) navigator.vibrate(isErr ? [100,50,100] : 80);
-    setTimeout(() => { t.classList.remove('show'); t.classList.remove('err'); }, 2200);
+    setTimeout(() => { t.classList.remove('show'); t.classList.remove('err'); }, 4000);
   }
 
   // ── Mode switching ────────────────────────────────────────────────────
@@ -1200,171 +1157,7 @@
     .catch(() => showToast('שגיאת חיבור', true));
   }
 
-  // ── ATTENDANCE MODE ──────────────────────────────────────────────────────
-  let attendQR = null;
-  let attendQRData = null;
-  let attendComputer = '';
-  let attendCount = 0;
-  let attendTotal = 0;
-  let scannedIds = new Set();       // זיהוי כפולים
-  let lastSavedSheetRow = null;     // לביטול
 
-  function updateAttendTotal(val) {
-    attendTotal = parseInt(val) || 0;
-    var disp = document.getElementById('attend-total-display');
-    disp.textContent = attendTotal > 0 ? ' / ' + attendTotal : '';
-  }
-
-  let lastAttendCode = null;
-  let lastAttendTime = 0;
-
-  function onAttendScan(code) {
-    // 3 שניות cooldown בין סריקות
-    const now = Date.now();
-    if (code === lastAttendCode && now - lastAttendTime < 3000) return;
-    lastAttendCode = code;
-    lastAttendTime = now;
-
-    if (!attendQR) {
-      const parts = code.split('|');
-      if (parts.length >= 3) {
-        // פורמט: exam_title|id_number|name|username|password|row|seat
-        var id   = parts[3] || parts[1] || '';  // username — מזהה ייחודי לכל נבחן
-        var name = parts[2] || 'נבחן לא ידוע';
-        // ── בדיקת כפול ──
-        if (id && scannedIds.has(id)) {
-          setScanBoxState('fail');
-          playBeepDuplicate();
-          showToast('⚠️ ' + name + ' כבר נסרק!', true);
-          return;
-        }
-        attendQR = code;
-        attendQRData = {
-          examName: (parts[0] !== 'EXAMINEE' ? parts[0] : ''),
-          id: id,
-          name: name,
-          row: parts[5] || '',
-          seat: parts[6] || ''
-        };
-        onScanSuccess_visual();
-        showToast('✅ ' + attendQRData.name + ' — סרוק ברקוד מחשב או הקלד ידנית');
-        document.getElementById('attend-hint-text').textContent = 'ממתין למחשב עבור: ' + attendQRData.name;
-        // הצג שדה קלט ידני למחשב
-        document.getElementById('attend-computer-wrap').style.display = 'block';
-        document.getElementById('attend-manual-computer').value = '';
-        setTimeout(function(){ document.getElementById('attend-manual-computer').focus(); }, 200);
-      } else {
-        setScanBoxState('fail');
-        showToast('סרוק תחילה QR של נבחן!', true);
-      }
-      return;
-    }
-    if (code.includes('|')) {
-      setScanBoxState('fail');
-      showToast('כבר סרקת נבחן! סרוק ברקוד מחשב עכשיו.', true);
-      return;
-    }
-    attendComputer = code;
-    onScanSuccess_visual();
-    openAttendModal(code);
-  }
-
-  function openAttendModal(computerNum) {
-    isSheetOpen = true;
-    document.getElementById('attend-modal-name').textContent = attendQRData ? attendQRData.name : '';
-    document.getElementById('attend-modal-computer').textContent = 'מחשב: ' + computerNum;
-    document.getElementById('attend-presence').value = '1';
-    document.getElementById('attend-pc-status').value = 'תקין';
-    document.getElementById('attend-modal').style.display = 'flex';
-  }
-
-  function closeAttendModal(cancel) {
-    document.getElementById('attend-modal').style.display = 'none';
-    isSheetOpen = false;
-    if (cancel) { resetAttend(); }
-  }
-
-  function resetAttend() {
-    attendQR = null; attendQRData = null; attendComputer = '';
-    document.getElementById('attend-hint-text').textContent = 'סרוק QR מדף הנבחן (הוורוד)';
-    document.getElementById('attend-computer-wrap').style.display = 'none';
-    document.getElementById('attend-manual-computer').value = '';
-    resetScanBox(); // מאפס גם את הטיימר ומצב הצבע
-  }
-
-  function submitManualComputer() {
-    var val = document.getElementById('attend-manual-computer').value.trim();
-    if (!attendQR) { showToast('סרוק תחילה QR של נבחן!', true); return; }
-    attendComputer = val;
-    openAttendModal(val);
-  }
-
-  function saveAttend() {
-    var isPresent = document.getElementById('attend-presence').value;
-    var pcStatus  = document.getElementById('attend-pc-status').value;
-    var body = JSON.stringify({
-      qr: attendQR,
-      computer: attendComputer,
-      pc_status: pcStatus,
-      is_present: isPresent,
-      col: attendQRData ? attendQRData.row : '',
-      seat: attendQRData ? attendQRData.seat : ''
-    });
-    var savedName = attendQRData ? attendQRData.name : '';
-    var savedId   = attendQRData ? attendQRData.id   : '';
-    if (savedId) scannedIds.add(savedId); // מניעת כפל מיידית
-    closeAttendModal(false);
-    resetAttend(); // מאפס מיד — מוכן לנבחן הבא
-    fetch('/api/exam-scan-double', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: body
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.error) {
-        showToast('שגיאה: ' + data.error, true);
-      } else {
-        // ── עדכון מונה ──
-        attendCount++;
-        document.getElementById('attend-count').textContent = attendCount;
-        var total = attendTotal > 0 ? ' / ' + attendTotal : '';
-        document.getElementById('attend-total-display').textContent = total;
-        showToast('✅ ' + savedName + ' נשמר! (' + attendCount + (total) + ')');
-        // ── כפתור ביטול ──
-        lastSavedSheetRow = { name: savedName, id: savedId };
-        document.getElementById('undo-name').textContent = savedName;
-        document.getElementById('btn-undo-attend').style.display = 'block';
-        setTimeout(function() {
-          document.getElementById('btn-undo-attend').style.display = 'none';
-        }, 15000); // מסתיר אחרי 15 שניות
-      }
-      resetAttend();
-    })
-    .catch(function() {
-      showToast('שגיאת תקשורת', true);
-      resetAttend();
-    });
-  }
-
-  function undoLastAttend() {
-    if (!lastSavedSheetRow) return;
-    fetch('/api/undo-last-scan', { method: 'POST' })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.success) {
-        attendCount = Math.max(0, attendCount - 1);
-        if (lastSavedSheetRow.id) scannedIds.delete(lastSavedSheetRow.id);
-        document.getElementById('attend-count').textContent = attendCount;
-        showToast('↩️ בוטל: ' + lastSavedSheetRow.name);
-        lastSavedSheetRow = null;
-        document.getElementById('btn-undo-attend').style.display = 'none';
-      } else {
-        showToast('שגיאה בביטול', true);
-      }
-    })
-    .catch(function() { showToast('שגיאת תקשורת', true); });
-  }
 
   // ── צלילים ──────────────────────────────────────────────────────────────
   function playBeepDuplicate() {
@@ -1402,4 +1195,6 @@
     }
   });
 </script>
+
+<!-- iframe נסתר לשליחת טפסים ללא ניווט -->
 {% endblock %}

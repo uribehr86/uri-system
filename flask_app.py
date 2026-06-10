@@ -1,3 +1,8 @@
+import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify
 import psycopg2
 import sqlite3
@@ -53,7 +58,18 @@ app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'uri_system_2026')
 
 from datetime import timedelta
-app.permanent_session_lifetime = timedelta(days=30)
+app.permanent_session_lifetime = timedelta(days=365)
+app.config['SESSION_COOKIE_SECURE']   = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+@app.before_request
+def refresh_session():
+    """מרענן את הסשן בכל בקשה כדי שלא יפוג"""
+    if 'user_id' in session:
+        session.permanent = True
+        session.modified  = True
+
 
 # Initialize Google AI (Gemini)
 try:
@@ -361,6 +377,17 @@ def register():
 @login_required
 def portal():
     return render_template('portal.html')
+
+@app.route('/install-cert')
+def install_cert():
+    """מאפשר לאייפון להוריד ולהתקין את אישור ה-SSL"""
+    cert_path = os.path.join(os.path.dirname(__file__), 'server.crt')
+    if not os.path.exists(cert_path):
+        return "Certificate not found", 404
+    return send_file(cert_path, 
+                     mimetype='application/x-x509-ca-cert',
+                     as_attachment=False,
+                     download_name='uri-system.crt')
 
 @app.route('/dashboard')
 @app.route('/manage-computers')
@@ -1897,19 +1924,8 @@ def generate_word_docs():
             exam_title = e['exam_name'] if e['exam_name'] else (exam_title_from_header or 'EXAMINEE')
             exam_title_clean = exam_title.replace('|', ' ').strip()  # מונע שבירת פורמט ה-QR
             qr_data = f"{exam_title_clean}|{e['id_number']}|{e['name']}|{e['username']}|{e['password']}|{e['row']}|{e['seat']}"
-            import urllib.request
-            import urllib.parse
-            try:
-                encoded_data = urllib.parse.quote(qr_data)
-                url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={encoded_data}"
-                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-                with urllib.request.urlopen(req) as response:
-                    qr_buf = io.BytesIO(response.read())
-                qr_inline = InlineImage(tpl, qr_buf, width=Mm(25))
-            except Exception as ex:
-                print(f"Error generating QR from API: {ex}")
-                # Fallback empty string if API fails
-                qr_inline = ""
+            # QR מ-API מבוטל — משתמשים רק ב-QR מקומי (ראה Step 2 בהמשך)
+            qr_inline = ""
             
             # Context
             context = {
@@ -2015,6 +2031,18 @@ def generate_word_docs():
                 run_seat.font.name = 'Tahoma'
 
 
+            # DEBUG: שמור כל מסמך נפרד לבדיקה
+            import os as _os
+            _debug_dir = r'C:\Users\uri\OneDrive\Desktop\test\debug_docs'
+            _os.makedirs(_debug_dir, exist_ok=True)
+            _safe = e['name'].replace(' ','_')[:20]
+            _dbuf = io.BytesIO()
+            doc.save(_dbuf)
+            _dbuf.seek(0)
+            with open(f'{_debug_dir}\\{i+1:02d}_{_safe}.docx','wb') as _f:
+                _f.write(_dbuf.read())
+            print(f"[DEBUG] Saved person {i+1}: {e['name']} | qr_data={qr_data[:60]}")
+
             # שמור כל דוק ברשימה
             all_docs.append(doc)
 
@@ -2117,17 +2145,67 @@ def api_simple_scan():
     finally:
         release_db_connection(conn)
 
+# ── BEACON: GET endpoint לסריקות מהטלפון (עוקף בעיות SSL בכרום) ──────
+@app.route('/api/exam-scan-beacon', methods=['GET'])
+@login_required
+def api_exam_scan_beacon():
+    """
+    מקבל נתוני סריקה דרך GET params ומחזיר pixel שקוף.
+    הדפדפן תמיד שולח GET לתמונות — עוקף בעיות SSL בכרום מובייל.
+    """
+    qr_text    = (request.args.get('qr', '') or '').strip()
+    computer   = (request.args.get('computer', '') or '').strip()
+    pc_status  = (request.args.get('pc_status', '') or '').strip()
+    is_present = int(request.args.get('is_present', 1) or 1)
+    seat       = (request.args.get('seat', '') or '').strip()
+    col        = (request.args.get('col', '') or '').strip()
+    technician = session.get('username', '')
+
+    parts = qr_text.split('|')
+    if len(parts) >= 3:
+        id_number  = parts[1] if len(parts) > 1 else ''
+        full_name  = parts[2] if len(parts) > 2 else ''
+        exam_name  = parts[0] if parts[0] != 'EXAMINEE' else ''
+        scan_time_str = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+
+        def _save():
+            try:
+                import gspread
+                from google.oauth2.service_account import Credentials
+                scopes   = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+                sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+                sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
+                creds    = Credentials.from_service_account_file(sa_file, scopes=scopes)
+                client   = gspread.authorize(creds)
+                ws       = client.open_by_key(sheet_id).sheet1
+                row = [exam_name, id_number, full_name, computer, pc_status,
+                       '✅' if is_present == 1 else '❌', scan_time_str, technician, col, seat]
+                ws.append_row(row, value_input_option='USER_ENTERED')
+                print(f"[BEACON] Saved: {full_name} | {computer}")
+            except Exception as ex:
+                print(f"[BEACON] Save error: {ex}")
+        threading.Thread(target=_save, daemon=True).start()
+    else:
+        print(f"[BEACON] ⚠️ Invalid QR: {qr_text[:40]}")
+
+    # החזר pixel שקוף 1x1
+    pixel = base64.b64decode('R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==')
+    return send_file(io.BytesIO(pixel), mimetype='image/gif', max_age=0)
+
 @app.route('/api/exam-scan-double', methods=['POST'])
 @login_required
 def api_exam_scan_double():
-    """סריקה כפולה: נבחן + מחשב + סטטוסים"""
-    data = request.json
-    qr_text = data.get('qr', '').strip()
-    computer = data.get('computer', '').strip()
-    seat = data.get('seat', '').strip()
-    col = data.get('col', '').strip()
-    pc_status = data.get('pc_status', '').strip()
-    is_present = int(data.get('is_present', 1))
+    """סריקה כפולה: נבחן + מחשב + סטטוסים — מקבל JSON או form data"""
+    if request.is_json:
+        data = request.json
+    else:
+        data = request.form
+    qr_text   = (data.get('qr', '') or '').strip()
+    computer  = (data.get('computer', '') or '').strip()
+    seat      = (data.get('seat', '') or '').strip()
+    col       = (data.get('col', '') or '').strip()
+    pc_status = (data.get('pc_status', '') or '').strip()
+    is_present = int(data.get('is_present', 1) or 1)
 
     parts = qr_text.split('|')
     if len(parts) < 3:
@@ -2141,60 +2219,64 @@ def api_exam_scan_double():
     technician = session.get('username', '')
     present_val = 1 if is_present == 1 else 0
 
-    # עדכון DB אופציונלי
-    try:
-        conn = get_db_connection()
-        if conn:
-            cur = get_safe_cursor(conn)
-            cur.execute("SELECT exam_name, full_name FROM examinees WHERE id_number = %s", (id_number,))
-            db_row = cur.fetchone()
-            if db_row:
-                db_row = dict(db_row)
-                exam_name = db_row.get('exam_name', exam_name) or exam_name
-                full_name = db_row.get('full_name', full_name) or full_name
-                extra_notes = f"מחשב {pc_status} | כסא {seat} | טור {col}"
-                cur.execute("""
-                    UPDATE examinees SET is_present = %s, laptop_number = %s, notes = %s,
-                    scan_time = %s, scanner_technician = %s WHERE id_number = %s
-                """, (is_present, computer, extra_notes, datetime.now(), technician, id_number))
-                conn.commit()
-            cur.close()
-            release_db_connection(conn)
-    except Exception as db_err:
-        print(f"[DB] Optional update skipped: {db_err}")
 
+    # בדיקת כפול בגוגל שיטס (סינכרונית — לפני השמירה)
+    duplicate_info = None
+    try:
+        import gspread, os
+        from google.oauth2.service_account import Credentials
+        scopes   = ['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/drive']
+        sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+        sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
+        creds    = Credentials.from_service_account_file(sa_file, scopes=scopes)
+        client   = gspread.authorize(creds)
+        ws       = client.open_by_key(sheet_id).sheet1
+        all_rows = ws.get_all_values()
+        for r in all_rows[1:]:  # דלג על שורת כותרות
+            if len(r) > 1 and str(r[1]).strip() == str(id_number).strip():
+                prev_time = r[6] if len(r) > 6 else '?'
+                duplicate_info = f"⚠️ {full_name} כבר נסרק! (קודם: {prev_time})"
+                break
+    except Exception as ex:
+        import sys
+        sys.stdout.buffer.write(f"[Sheets] Duplicate check error: {ex}\n".encode('utf-8', errors='replace'))
+        sys.stdout.flush()
 
     # שמירה לגוגל שיטס ברקע
     def append_to_exam_sheet(row_data):
+        import sys, traceback
+        print(f"[THREAD] Starting save: {row_data[0]} | PC: {row_data[2]}", flush=True)
         try:
-            import gspread
+            import gspread, os
             from google.oauth2.service_account import Credentials
-            import os
-            scopes = [
-                'https://www.googleapis.com/auth/spreadsheets',
-                'https://www.googleapis.com/auth/drive'
-            ]
-            sa_file = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+            scopes = ['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/drive']
+            sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
             sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
-            creds = Credentials.from_service_account_file(sa_file, scopes=scopes)
-            client = gspread.authorize(creds)
-            sh = client.open_by_key(sheet_id)
-            ws = sh.sheet1
-            # אם הגיליון ריק - הוסף שורת כותרות
-            if ws.row_count == 0 or not ws.cell(1, 1).value:
-                headers = ['שם נבחן', 'תעודת זהות', 'מחשב', 'נוכח', 'סטטוס מחשב',
-                           'שם בחינה', 'שעת סריקה', 'טכנאי', 'טור', 'כסא']
+            print(f"[THREAD] Connecting to sheet: {sheet_id[:20]}...", flush=True)
+            creds    = Credentials.from_service_account_file(sa_file, scopes=scopes)
+            client   = gspread.authorize(creds)
+            ws       = client.open_by_key(sheet_id).sheet1
+            # בדיקת כותרות נכונה - לא לפי row_count אלא לפי הערך בתא הראשון
+            first_cell = ws.acell('A1').value
+            if not first_cell or first_cell.strip() == '':
+                headers = ['שם נבחן','תעודת זהות','מחשב','נוכח','סטטוס מחשב','שם בחינה','שעת סריקה','טכנאי','טור','כסא']
                 ws.append_row(headers, value_input_option='USER_ENTERED')
+                print("[THREAD] Headers added to sheet", flush=True)
             ws.append_row(row_data, value_input_option='USER_ENTERED')
-            print(f"[Sheets] Saved: {row_data[0]} | PC: {row_data[2]}")
+            print(f"[OK] Saved: {row_data[0]} | PC: {row_data[2]} | Time: {row_data[6]}", flush=True)
         except Exception as ex:
-            print(f"[Sheets] Error: {ex}")
+            print(f"[ERROR] Save to sheets failed: {str(ex)}", flush=True)
+            traceback.print_exc()
 
     import threading
     row = [full_name, id_number, computer, present_val, pc_status, exam_name, scan_time_str, technician, col, seat]
-    threading.Thread(target=append_to_exam_sheet, args=(row,), daemon=True).start()
+    t = threading.Thread(target=append_to_exam_sheet, args=(row,), daemon=False)
+    t.start()
+    print(f"[THREAD] Started save thread for: {full_name}", flush=True)
 
-    return {"success": True}
+    if duplicate_info:
+        return jsonify({"success": True, "warning": duplicate_info})
+    return jsonify({"success": True})
 
 
 @app.route('/api/undo-last-scan', methods=['POST'])
@@ -2212,9 +2294,11 @@ def undo_last_scan():
         client   = gspread.authorize(creds)
         sh       = client.open_by_key(sheet_id)
         ws       = sh.sheet1
-        last_row = len(ws.get_all_values())
+        all_vals = ws.get_all_values()
+        last_row = len(all_vals)
         if last_row <= 1:   # רק כותרות - אין מה למחוק
             return {"success": False, "error": "אין שורות למחיקה"}
+            
         ws.delete_rows(last_row)
         return {"success": True}
     except Exception as e:
@@ -2392,4 +2476,13 @@ if __name__ == '__main__':
     print("URL Link: https://127.0.0.1:5000")
     print("Mobile Link: https://10.0.0.31:5000\n")
     print("[WARNING] When opening on iPhone, you will see a 'Not Private' warning. Click 'Show Details' -> 'Visit this website' to bypass and test the scanner.")
-    app.run(host='0.0.0.0', debug=True, port=5000, ssl_context='adhoc')
+    import os
+    cert_file = os.path.join(os.path.dirname(__file__), 'server.crt')
+    key_file  = os.path.join(os.path.dirname(__file__), 'server.key')
+    if os.path.exists(cert_file) and os.path.exists(key_file):
+        ssl_ctx = (cert_file, key_file)
+        print("[OK] Using custom SSL certificate (valid for local network)")
+    else:
+        ssl_ctx = 'adhoc'
+        print("[WARN] Custom cert not found, using adhoc SSL")
+    app.run(host='0.0.0.0', debug=True, port=5000, ssl_context=ssl_ctx)
