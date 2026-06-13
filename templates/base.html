@@ -373,14 +373,60 @@
 
         /* ── Buttons ── */
         .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
             padding: 12px 24px;
             border-radius: 12px;
             font-weight: 700;
+            text-decoration: none !important;
+            border: none;
+            cursor: pointer;
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
         .btn:active {
             transform: scale(0.95);
+        }
+
+        .btn-blue {
+            background: #3b82f6;
+            color: #ffffff !important;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+            border: 1px solid #3b82f6;
+        }
+
+        .btn-blue:hover {
+            background: #60a5fa;
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.7), 0 0 40px rgba(59, 130, 246, 0.3);
+            color: #ffffff !important;
+        }
+
+        .btn-green {
+            background: #00ff64;
+            color: #000000 !important;
+            font-weight: 800;
+            box-shadow: 0 0 10px rgba(0, 255, 100, 0.4);
+            border: 1px solid #00ff64;
+        }
+
+        .btn-green:hover {
+            background: #12ff72;
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(0, 255, 100, 0.7), 0 0 40px rgba(0, 255, 100, 0.3);
+            color: #000000 !important;
+        }
+
+        .btn-ghost {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text) !important;
+            border: 1px solid var(--border);
+        }
+
+        .btn-ghost:hover {
+            background: rgba(255, 255, 255, 0.1);
         }
 
         /* ── Badge ── */
@@ -752,6 +798,9 @@
             <a href="{{ url_for('history_page') }}"
                 class="{{ 'active' if request.endpoint == 'history_page' }}">🕒 היסטוריה</a>
             <a href="{{ url_for('export_computers') }}">📤 ייצוא</a>
+            <a href="{{ url_for('fault_report_page') }}"
+               class="{{ 'active' if request.endpoint == 'fault_report_page' }}"
+               style="color:#f87171!important; font-weight:800;">🔴 דיווח תקלה</a>
         </div>
 
         <div class="user-badge">
