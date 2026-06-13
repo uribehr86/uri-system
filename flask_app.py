@@ -4,6 +4,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='repla
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify
+from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
 import sqlite3
 
@@ -42,6 +43,7 @@ except ImportError as e:
     DocxTemplate = InlineImage = Mm = Composer = Document = None
 
 _sync_timer = None
+_last_sheets_import = None   # זמן הסנכרון האחרון שיטס→אתר
 
 def trigger_debounced_sync():
     global _sync_timer
@@ -50,6 +52,35 @@ def trigger_debounced_sync():
     # דיליי של 5 שניות כדי לא להציף את גוגל בבקשות
     _sync_timer = Timer(5.0, sync_inventory_to_sheets)
     _sync_timer.start()
+
+# ── AUTO-POLLER: שיטס → אתר כל 5 דקות ─────────────────────────────
+def _auto_import_loop():
+    """לולאה ברקע: כל 5 דקות מושכת שינויים מגוגל שיטס לאתר"""
+    import time
+    global _last_sheets_import
+    # המתן 30 שניות לפני הריצה הראשונה (לתת ל-Flask להתייצב)
+    time.sleep(30)
+    while True:
+        try:
+            from google_sheets_sync import import_from_sheets
+            success, msg, stats = import_from_sheets()
+            _last_sheets_import = datetime.now()
+            if success:
+                updated = stats.get('updated', 0)
+                if updated > 0:
+                    print(f"[AUTO-SYNC] ✅ {_last_sheets_import.strftime('%H:%M:%S')} — עודכנו {updated} רשומות מגיליון שיטס", flush=True)
+                else:
+                    print(f"[AUTO-SYNC] ⏳ {_last_sheets_import.strftime('%H:%M:%S')} — אין שינויים בשיטס", flush=True)
+            else:
+                print(f"[AUTO-SYNC] ⚠️ {msg}", flush=True)
+        except Exception as ex:
+            print(f"[AUTO-SYNC] ❌ שגיאה: {ex}", flush=True)
+        time.sleep(300)  # 5 דקות
+
+# הפעל את הפולר בתחילת האפליקציה
+_poller_thread = threading.Thread(target=_auto_import_loop, daemon=True, name="SheetsAutoPoller")
+_poller_thread.start()
+print("[AUTO-SYNC] 🔄 Auto-poller הופעל — יסנכרן שיטס→אתר כל 5 דקות", flush=True)
 
 # טעינת הגדרות
 load_dotenv()
@@ -308,23 +339,50 @@ def login():
         if conn:
             try:
                 cur = get_safe_cursor(conn)
-                cur.execute("SELECT * FROM users WHERE username = %s AND password = %s", (username, password))
+                cur.execute("SELECT * FROM users WHERE username = %s", (username,))
                 user = cur.fetchone()
                 
                 if user:
-                    # Update last active time
-                    cur.execute("UPDATE users SET timestamp = NOW() WHERE id = %s", (user['id'],))
-                    conn.commit()
+                    db_pass = (user['password'] or '').strip()
+                    is_valid = False
+                    needs_migration = False
                     
-                    session.update({
-                        'user': user['username'],
-                        'user_id': user.get('id', 999), # In case id is missing
-                        'username': user['username'],
-                        'role': user['role']
-                    })
-                    session.permanent = True
-                    print(f"[OK] User {username} logged in via DB")
-                    return redirect(url_for('portal'))
+                    # Check if the stored password is a hash (starts with scrypt:, pbkdf2:, bcrypt$, argon2$)
+                    if any(db_pass.startswith(prefix) for prefix in ['scrypt:', 'pbkdf2:', 'bcrypt$', 'argon2$']):
+                        if check_password_hash(db_pass, password):
+                            is_valid = True
+                    else:
+                        # Plain text match fallback
+                        if db_pass == password:
+                            is_valid = True
+                            needs_migration = True
+                    
+                    if is_valid:
+                        # If plain text, hash and migrate it now
+                        if needs_migration:
+                            try:
+                                hashed_pass = generate_password_hash(password)
+                                cur.execute("UPDATE users SET password = %s WHERE id = %s", (hashed_pass, user['id']))
+                                conn.commit()
+                                print(f"[MIGRATION] Successfully hashed plain-text password for user: {username}", flush=True)
+                            except Exception as em:
+                                print(f"[MIGRATION ERROR] Could not hash password for user {username}: {em}", flush=True)
+                                
+                        # Update last active time
+                        cur.execute("UPDATE users SET timestamp = NOW() WHERE id = %s", (user['id'],))
+                        conn.commit()
+                        
+                        session.update({
+                            'user': user['username'],
+                            'user_id': user.get('id', 999), # In case id is missing
+                            'username': user['username'],
+                            'role': user['role']
+                        })
+                        session.permanent = True
+                        print(f"[OK] User {username} logged in via DB")
+                        return redirect(url_for('portal'))
+                    else:
+                        flash("שם משתמש או סיסמה שגויים", "danger")
                 else:
                     flash("שם משתמש או סיסמה שגויים", "danger")
             except Exception as e:
@@ -351,12 +409,12 @@ def register():
         if conn:
             try:
                 cur = get_safe_cursor(conn)
-                # Check if exists
                 cur.execute("SELECT * FROM users WHERE username = %s", (username,))
                 if cur.fetchone():
                     flash("שם המשתמש כבר קיים במערכת, בחר שם אחר או התחבר", "warning")
                 else:
-                    cur.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, 'technician')", (username, password))
+                    hashed_pass = generate_password_hash(password)
+                    cur.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, 'technician')", (username, hashed_pass))
                     conn.commit()
                     flash(f"משתמש {username} נוצר בהצלחה! כעת ניתן להתחבר.", "success")
                     cur.close()
@@ -1243,7 +1301,8 @@ def api_add_user():
     if not conn: return {"success": False, "error": "DB connection failed"}, 500
     try:
         cur = get_safe_cursor(conn)
-        cur.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, %s)", (username, password, role))
+        hashed_pass = generate_password_hash(password)
+        cur.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, %s)", (username, hashed_pass, role))
         conn.commit()
         cur.close()
         return {"success": True}
@@ -2468,6 +2527,116 @@ def generate_forms():
     except Exception as e:
         import traceback; traceback.print_exc()
         return f"שגיאה: {e}", 500
+
+# ── FAULT REPORT: טופס תקלות מחשב ────────────────────────────────
+@app.route('/fault-report', methods=['GET'])
+@login_required
+def fault_report_page():
+    """עמוד טופס דיווח תקלה"""
+    # שלוף רשימת מחשבים לרשימת auto-complete
+    conn = get_db_connection()
+    barcodes = []
+    if conn:
+        try:
+            cur = get_safe_cursor(conn)
+            cur.execute("SELECT barcode, case_number, location FROM computers ORDER BY barcode")
+            barcodes = [dict(r) for r in cur.fetchall()]
+            cur.close()
+        except Exception:
+            pass
+        finally:
+            release_db_connection(conn)
+    return render_template('fault_report.html', barcodes=barcodes)
+
+@app.route('/api/submit-fault', methods=['POST'])
+@login_required
+def api_submit_fault():
+    """קבלת דיווח תקלה — שומר לשיטס + להיסטוריה"""
+    data = request.json or {}
+    barcode     = (data.get('barcode', '') or '').strip()
+    fault_type  = (data.get('fault_type', '') or '').strip()
+    description = (data.get('description', '') or '').strip()
+    location    = (data.get('location', '') or '').strip()
+    technician  = session.get('username', '')
+    report_time = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+
+    if not barcode:
+        return jsonify({"success": False, "error": "חובה להזין מספר מחשב"}), 400
+    if not description:
+        return jsonify({"success": False, "error": "חובה לתאר את התקלה"}), 400
+
+    # ── שמירה לגיליון 'תקלות' בשיטס ─────────────────────────────
+    def save_fault_to_sheets():
+        import traceback
+        print(f"[FAULT] ▶️ שומר תקלה: מחשב {barcode} | {fault_type}", flush=True)
+        try:
+            import gspread
+            from google.oauth2.service_account import Credentials
+            scopes   = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+            sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+            sheet_id = os.getenv('GOOGLE_SHEETS_ID')
+            if not sheet_id:
+                print("[FAULT] ⚠️ GOOGLE_SHEETS_ID לא מוגדר", flush=True)
+                return
+            creds  = Credentials.from_service_account_file(sa_file, scopes=scopes)
+            client = gspread.authorize(creds)
+            sh     = client.open_by_key(sheet_id)
+            # פתח/צור גיליון 'תקלות'
+            try:
+                ws = sh.worksheet('תקלות')
+            except gspread.WorksheetNotFound:
+                ws = sh.add_worksheet(title='תקלות', rows='500', cols='8')
+                ws.append_row(['תאריך', 'מחשב', 'סוג תקלה', 'תיאור', 'מיקום', 'טכנאי', 'סטטוס טיפול'],
+                              value_input_option='USER_ENTERED')
+                ws.format('A1:G1', {'textFormat': {'bold': True},
+                                    'backgroundColor': {'red': 1.0, 'green': 0.85, 'blue': 0.4}})
+            ws.append_row([report_time, barcode, fault_type, description, location, technician, 'ממתין לטיפול'],
+                          value_input_option='USER_ENTERED')
+            print(f"[FAULT] ✅ נשמר לגיליון תקלות: {barcode}", flush=True)
+        except Exception as ex:
+            print(f"[FAULT] ❌ שגיאה בשמירה לשיטס: {ex}", flush=True)
+            traceback.print_exc()
+
+    threading.Thread(target=save_fault_to_sheets, daemon=False).start()
+
+    # ── שמירה להיסטוריה בDB ───────────────────────────────────────
+    conn = get_db_connection()
+    if conn:
+        try:
+            cur = get_safe_cursor(conn)
+            cur.execute("SELECT id FROM computers WHERE barcode = %s", (barcode,))
+            comp = cur.fetchone()
+            if comp:
+                comp_id = comp['id']
+                note_text = f"[תקלה] {fault_type}: {description}"
+                cur.execute("""
+                    INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
+                    VALUES (%s, %s, 'דיווח תקלה', %s, %s)
+                """, (comp_id, technician,
+                       f"מיקום: {location}",
+                       note_text))
+                conn.commit()
+            cur.close()
+        except Exception as e:
+            print(f"[FAULT] DB history error: {e}", flush=True)
+        finally:
+            release_db_connection(conn)
+
+    return jsonify({"success": True, "message": f"תקלה דווחה בהצלחה עבור מחשב {barcode}"})
+
+@app.route('/api/sheets-sync-status')
+@login_required
+def api_sheets_sync_status():
+    """מחזיר זמן הסנכרון האחרון מגיליון שיטס"""
+    global _last_sheets_import
+    if _last_sheets_import:
+        diff = (datetime.now() - _last_sheets_import).seconds
+        if diff < 60:
+            ago = f"לפני {diff} שניות"
+        else:
+            ago = f"לפני {diff // 60} דקות"
+        return jsonify({"last_sync": _last_sheets_import.strftime('%H:%M:%S'), "ago": ago})
+    return jsonify({"last_sync": None, "ago": "טרם סונכרן"})
 
 # --- End of Routes ---
 
