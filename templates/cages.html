@@ -220,16 +220,46 @@
             <th style="padding:6px;text-align:right">סטטוס</th>
             <th style="padding:6px;text-align:right">מיקום</th>
             <th style="padding:6px;text-align:right">נסרק</th>
+            <th style="padding:6px;text-align:center">הסר</th>
           </tr></thead>
           <tbody>${computers.map(c => `
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);" id="row-${c.id}">
               <td style="padding:7px;font-weight:700">${c.barcode}</td>
               <td style="padding:7px;color:${c.status==='תקול'?'#f87171':'#86efac'}">${c.status||'—'}</td>
               <td style="padding:7px;color:#94a3b8">${c.location||'—'}</td>
               <td style="padding:7px;color:#64748b;font-size:0.75rem">${c.scan_time?c.scan_time.slice(0,16).replace('T',' '):'—'}</td>
+              <td style="padding:7px;text-align:center">
+                <button onclick="removeFromCage(${c.id},'${c.barcode}')"
+                  style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);color:#f87171;padding:4px 10px;border-radius:8px;cursor:pointer;font-size:0.78rem;font-weight:700;">
+                  ✕ הסר
+                </button>
+              </td>
             </tr>`).join('')}
           </tbody>
         </table>`;
+    });
+  }
+
+  function removeFromCage(computerId, barcode) {
+    if (!confirm(`להסיר את ${barcode} מהכלוב?\n(המחשב יישאר במערכת, רק הכלוב שלו יתנקה)`)) return;
+    fetch('/api/batch-update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [computerId], updates: { cage_number: '', cage_name: '' } })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        const row = document.getElementById('row-' + computerId);
+        if (row) {
+          row.style.opacity = '0.3';
+          row.style.textDecoration = 'line-through';
+          row.querySelector('button').textContent = '✓ הוסר';
+          row.querySelector('button').disabled = true;
+        }
+      } else {
+        alert('שגיאה: ' + data.error);
+      }
     });
   }
 </script>
