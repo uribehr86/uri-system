@@ -52,19 +52,19 @@
 
     /* ===== שורת תקול — הדגשה בולטת ===== */
     tr.row-faulty td {
-        background: rgba(239, 68, 68, 0.08) !important;
-        border-bottom: 1px solid rgba(239, 68, 68, 0.25) !important;
+        background: rgba(251, 146, 60, 0.12) !important;
+        border-bottom: 1px solid rgba(251, 146, 60, 0.3) !important;
     }
     tr.row-faulty:hover td {
-        background: rgba(239, 68, 68, 0.15) !important;
+        background: rgba(251, 146, 60, 0.22) !important;
     }
     tr.row-faulty td:first-child {
-        border-right: 3px solid #ef4444 !important;
+        border-right: 4px solid #fb923c !important;
         animation: faultPulse 2s ease-in-out infinite;
     }
     @keyframes faultPulse {
-        0%, 100% { border-right-color: #ef4444; }
-        50%       { border-right-color: #ff8080; }
+        0%, 100% { border-right-color: #fb923c; }
+        50%       { border-right-color: #fdba74; }
     }
 
     /* Undo the rounded corners on extreme cells from base.html */
