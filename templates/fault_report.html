@@ -1,0 +1,449 @@
+{% extends "base.html" %}
+{% block title %}דיווח תקלה — URI System{% endblock %}
+
+{% block content %}
+<style>
+    .fault-hero {
+        background: linear-gradient(135deg, rgba(218,54,51,0.15), rgba(210,153,34,0.1));
+        border: 1px solid rgba(218,54,51,0.3);
+        border-radius: 20px;
+        padding: 32px 36px;
+        margin-bottom: 28px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+    .fault-icon {
+        font-size: 3.5rem;
+        filter: drop-shadow(0 0 16px rgba(218,54,51,0.6));
+        animation: pulse-icon 2.5s ease-in-out infinite;
+    }
+    @keyframes pulse-icon {
+        0%,100% { transform: scale(1); }
+        50%      { transform: scale(1.08); }
+    }
+    .fault-hero h1 { font-size: 2rem; font-weight: 800; margin-bottom: 6px; }
+    .fault-hero p  { color: var(--muted); font-size: 0.95rem; }
+
+    .fault-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 32px;
+        backdrop-filter: blur(12px);
+    }
+
+    .field-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.88rem;
+        color: var(--muted);
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+    .field-label .required { color: #f85149; font-size: 1.1rem; }
+
+    .fault-input {
+        width: 100%;
+        background: rgba(5,10,31,0.8);
+        border: 1.5px solid var(--border);
+        border-radius: 12px;
+        color: var(--text);
+        font-family: 'Heebo', sans-serif;
+        font-size: 1rem;
+        padding: 13px 16px;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .fault-input:focus {
+        border-color: var(--danger);
+        box-shadow: 0 0 0 3px rgba(218,54,51,0.15);
+    }
+    .fault-input.valid   { border-color: #22c55e; }
+    .fault-input.invalid { border-color: #f85149; }
+
+    textarea.fault-input { min-height: 120px; resize: vertical; }
+
+    .fault-type-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 12px;
+        margin-bottom: 0;
+    }
+    .fault-type-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 16px 12px;
+        background: rgba(255,255,255,0.03);
+        border: 1.5px solid var(--border);
+        border-radius: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: var(--text);
+        font-size: 0.88rem;
+        font-weight: 600;
+        font-family: 'Heebo', sans-serif;
+    }
+    .fault-type-btn .icon { font-size: 1.8rem; }
+    .fault-type-btn:hover { border-color: var(--danger); background: rgba(218,54,51,0.08); transform: translateY(-2px); }
+    .fault-type-btn.selected {
+        border-color: var(--danger);
+        background: rgba(218,54,51,0.18);
+        box-shadow: 0 0 0 3px rgba(218,54,51,0.2);
+    }
+
+    .submit-btn {
+        width: 100%;
+        background: linear-gradient(135deg, #da3633, #b91c1c);
+        color: white;
+        border: none;
+        border-radius: 14px;
+        font-size: 1.1rem;
+        font-weight: 800;
+        padding: 16px;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-family: 'Heebo', sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 12px;
+    }
+    .submit-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(218,54,51,0.4); }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .success-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(5,10,31,0.85);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 16px;
+        animation: fadeIn 0.3s;
+    }
+    .success-overlay.show { display: flex; }
+    .success-box {
+        background: var(--card);
+        border: 1px solid #22c55e;
+        border-radius: 24px;
+        padding: 48px 56px;
+        text-align: center;
+        box-shadow: 0 0 60px rgba(34,197,94,0.2);
+        animation: popIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+    }
+    @keyframes popIn {
+        from { transform: scale(0.7); opacity: 0; }
+        to   { transform: scale(1);   opacity: 1; }
+    }
+    .success-box .check { font-size: 4rem; margin-bottom: 12px; }
+    .success-box h2 { font-size: 1.5rem; font-weight: 800; margin-bottom: 8px; color: #4ade80; }
+    .success-box p  { color: var(--muted); margin-bottom: 24px; }
+
+    .sheets-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-bottom: 24px;
+    }
+    .sheets-dot {
+        width: 8px; height: 8px; border-radius: 50%;
+        background: #22c55e;
+        box-shadow: 0 0 6px #22c55e;
+        animation: pulse-dot 2s infinite;
+    }
+    @keyframes pulse-dot {
+        0%,100% { transform: scale(0.95); opacity: 0.8; }
+        50%      { transform: scale(1.15); opacity: 1; }
+    }
+    .autocomplete-list {
+        position: absolute;
+        z-index: 100;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        max-height: 200px;
+        overflow-y: auto;
+        width: 100%;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    .autocomplete-list div {
+        padding: 10px 16px;
+        cursor: pointer;
+        font-size: 0.92rem;
+        transition: background 0.15s;
+    }
+    .autocomplete-list div:hover { background: rgba(255,255,255,0.07); }
+    .pos-relative { position: relative; }
+    .char-counter { font-size: 0.75rem; color: var(--muted); text-align: left; margin-top: 4px; }
+    .char-counter.warn { color: var(--warning); }
+</style>
+
+<!-- Hero -->
+<div class="fault-hero">
+    <div class="fault-icon">🔴</div>
+    <div>
+        <h1>דיווח תקלת מחשב</h1>
+        <p>מלא את הטופס — הדיווח יישמר אוטומטית לגיליון Google Sheets ולהיסטוריית המחשב</p>
+    </div>
+</div>
+
+<!-- Sheets sync status -->
+<div class="sheets-status">
+    <div class="sheets-dot"></div>
+    <span id="syncStatusText">בודק סנכרון...</span>
+</div>
+
+<div class="fault-card">
+    <!-- שדה מחשב -->
+    <div class="form-group pos-relative" style="margin-bottom:24px;">
+        <div class="field-label">
+            💻 מספר מחשב (ברקוד) <span class="required">*</span>
+        </div>
+        <input type="text" id="barcodeInput" class="fault-input"
+               placeholder="הקלד מספר מחשב או חפש..."
+               autocomplete="off"
+               oninput="filterBarcodes()"
+               onblur="setTimeout(closeList,200)">
+        <div class="autocomplete-list" id="autocompleteList" style="display:none;"></div>
+    </div>
+
+    <!-- סוג תקלה -->
+    <div class="form-group" style="margin-bottom:24px;">
+        <div class="field-label">⚠️ סוג תקלה <span class="required">*</span></div>
+        <div class="fault-type-grid" id="faultTypeGrid">
+            <button class="fault-type-btn" data-value="חומרה" onclick="selectType(this)">
+                <span class="icon">🖥️</span>חומרה
+            </button>
+            <button class="fault-type-btn" data-value="תוכנה" onclick="selectType(this)">
+                <span class="icon">💾</span>תוכנה
+            </button>
+            <button class="fault-type-btn" data-value="רשת / Wi-Fi" onclick="selectType(this)">
+                <span class="icon">📡</span>רשת / Wi-Fi
+            </button>
+            <button class="fault-type-btn" data-value="מסך / תצוגה" onclick="selectType(this)">
+                <span class="icon">🖨️</span>מסך / תצוגה
+            </button>
+            <button class="fault-type-btn" data-value="מקלדת / עכבר" onclick="selectType(this)">
+                <span class="icon">⌨️</span>מקלדת / עכבר
+            </button>
+            <button class="fault-type-btn" data-value="אחר" onclick="selectType(this)">
+                <span class="icon">❓</span>אחר
+            </button>
+        </div>
+        <input type="hidden" id="faultTypeHidden">
+    </div>
+
+    <!-- תיאור תקלה -->
+    <div class="form-group" style="margin-bottom:24px;">
+        <div class="field-label">📝 תיאור מפורט של התקלה <span class="required">*</span></div>
+        <textarea id="descriptionInput" class="fault-input"
+                  placeholder="תאר בדיוק מה קורה — מה המחשב עושה? מה הניסית? מתי זה התחיל?..."
+                  maxlength="500"
+                  oninput="updateCounter()"></textarea>
+        <div class="char-counter" id="charCounter">0 / 500 תווים</div>
+    </div>
+
+    <!-- מיקום -->
+    <div class="form-group" style="margin-bottom:28px;">
+        <div class="field-label">📍 מיקום המחשב (אופציונלי)</div>
+        <input type="text" id="locationInput" class="fault-input"
+               placeholder="לדוגמה: כלוב 3, חדר 201, מעבדה...">
+    </div>
+
+    <!-- כפתור שליחה -->
+    <button class="submit-btn" id="submitBtn" onclick="submitFault()">
+        <span>🚨</span> שלח דיווח תקלה
+    </button>
+</div>
+
+<!-- Overlay הצלחה -->
+<div class="success-overlay" id="successOverlay">
+    <div class="success-box">
+        <div class="check">✅</div>
+        <h2>הדיווח נשלח בהצלחה!</h2>
+        <p id="successMsg">התקלה נרשמה וגיליון Google Sheets עודכן</p>
+        <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+            <button onclick="resetForm()" style="background:var(--accent);color:white;border:none;padding:12px 24px;border-radius:10px;font-weight:700;cursor:pointer;font-family:inherit;font-size:1rem;">
+                🔄 דיווח נוסף
+            </button>
+            <a href="/computers" style="background:rgba(255,255,255,0.08);color:var(--text);border:1px solid var(--border);padding:12px 24px;border-radius:10px;font-weight:700;text-decoration:none;font-size:1rem;">
+                📊 חזרה למלאי
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+const BARCODES = {{ barcodes | tojson }};
+let selectedType = '';
+
+// ── Auto-complete ────────────────────────────────────────────────
+function filterBarcodes() {
+    const q = document.getElementById('barcodeInput').value.toLowerCase();
+    const list = document.getElementById('autocompleteList');
+    if (!q || q.length < 1) { list.style.display = 'none'; return; }
+    const matches = BARCODES.filter(b =>
+        b.barcode.toLowerCase().includes(q) ||
+        (b.case_number || '').toLowerCase().includes(q) ||
+        (b.location || '').toLowerCase().includes(q)
+    ).slice(0, 10);
+    if (!matches.length) { list.style.display = 'none'; return; }
+    list.innerHTML = matches.map(b =>
+        `<div onclick="selectBarcode('${b.barcode}')">
+            <strong>${b.barcode}</strong>
+            ${b.case_number ? `<span style="color:var(--muted);font-size:0.85rem;"> — תיק ${b.case_number}</span>` : ''}
+            ${b.location    ? `<span style="color:var(--muted);font-size:0.85rem;"> | ${b.location}</span>` : ''}
+        </div>`
+    ).join('');
+    list.style.display = 'block';
+}
+
+function selectBarcode(bc) {
+    document.getElementById('barcodeInput').value = bc;
+    document.getElementById('barcodeInput').classList.add('valid');
+    closeList();
+}
+function closeList() {
+    document.getElementById('autocompleteList').style.display = 'none';
+}
+
+// ── Fault type ───────────────────────────────────────────────────
+function selectType(btn) {
+    document.querySelectorAll('.fault-type-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedType = btn.dataset.value;
+    document.getElementById('faultTypeHidden').value = selectedType;
+}
+
+// ── Char counter ─────────────────────────────────────────────────
+function updateCounter() {
+    const len = document.getElementById('descriptionInput').value.length;
+    const el  = document.getElementById('charCounter');
+    el.textContent = `${len} / 500 תווים`;
+    el.className   = 'char-counter' + (len > 450 ? ' warn' : '');
+}
+
+// ── Submit ───────────────────────────────────────────────────────
+async function submitFault() {
+    const barcode     = document.getElementById('barcodeInput').value.trim();
+    const description = document.getElementById('descriptionInput').value.trim();
+    const location    = document.getElementById('locationInput').value.trim();
+    const btn         = document.getElementById('submitBtn');
+
+    // Validation
+    if (!barcode) {
+        shake(document.getElementById('barcodeInput'));
+        showToast('⚠️ חובה להזין מספר מחשב');
+        return;
+    }
+    if (!selectedType) {
+        showToast('⚠️ בחר סוג תקלה');
+        return;
+    }
+    if (!description) {
+        shake(document.getElementById('descriptionInput'));
+        showToast('⚠️ חובה לתאר את התקלה');
+        return;
+    }
+    if (description.length < 10) {
+        shake(document.getElementById('descriptionInput'));
+        showToast('⚠️ תיאור קצר מדי — הוסף פרטים');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span style="animation:spin 0.8s linear infinite;display:inline-block">⏳</span> שולח...';
+
+    try {
+        const res = await fetch('/api/submit-fault', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ barcode, fault_type: selectedType, description, location })
+        });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('successMsg').textContent = data.message;
+            document.getElementById('successOverlay').classList.add('show');
+        } else {
+            showToast('❌ ' + (data.error || 'שגיאה בשמירה'));
+            btn.disabled = false;
+            btn.innerHTML = '<span>🚨</span> שלח דיווח תקלה';
+        }
+    } catch (e) {
+        showToast('❌ שגיאת רשת: ' + e.message);
+        btn.disabled = false;
+        btn.innerHTML = '<span>🚨</span> שלח דיווח תקלה';
+    }
+}
+
+function resetForm() {
+    document.getElementById('barcodeInput').value = '';
+    document.getElementById('barcodeInput').className = 'fault-input';
+    document.getElementById('descriptionInput').value = '';
+    document.getElementById('locationInput').value = '';
+    document.getElementById('charCounter').textContent = '0 / 500 תווים';
+    document.querySelectorAll('.fault-type-btn').forEach(b => b.classList.remove('selected'));
+    selectedType = '';
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('submitBtn').innerHTML = '<span>🚨</span> שלח דיווח תקלה';
+    document.getElementById('successOverlay').classList.remove('show');
+}
+
+// ── Helpers ──────────────────────────────────────────────────────
+function shake(el) {
+    el.style.animation = 'none';
+    el.offsetHeight; // reflow
+    el.style.animation = 'shake 0.4s ease';
+    setTimeout(() => el.style.animation = '', 400);
+}
+
+let toastTimeout;
+function showToast(msg) {
+    let t = document.getElementById('toast');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'toast';
+        t.style.cssText = `position:fixed;bottom:30px;right:30px;background:var(--surface);border:1px solid var(--danger);
+            color:var(--text);padding:14px 20px;border-radius:12px;font-weight:600;z-index:9999;
+            box-shadow:0 8px 24px rgba(0,0,0,0.5);font-family:'Heebo',sans-serif;font-size:0.95rem;
+            animation:slideInRight 0.3s ease;`;
+        document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.display = 'block';
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => t.style.display = 'none', 3500);
+}
+
+// ── Sheets sync status ────────────────────────────────────────────
+async function loadSyncStatus() {
+    try {
+        const res = await fetch('/api/sheets-sync-status');
+        const d = await res.json();
+        const el = document.getElementById('syncStatusText');
+        if (d.last_sync) {
+            el.textContent = `גיליון שיטס מסונכרן ${d.ago} (${d.last_sync})`;
+        } else {
+            el.textContent = 'ממתין לסנכרון הראשון (כל 5 דקות)';
+        }
+    } catch(e) { /* silent */ }
+}
+loadSyncStatus();
+setInterval(loadSyncStatus, 60000);
+
+// Spin animation
+const style = document.createElement('style');
+style.textContent = `@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}`;
+document.head.appendChild(style);
+</script>
+{% endblock %}
