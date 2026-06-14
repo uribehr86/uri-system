@@ -2292,14 +2292,87 @@ def generate_word_docs():
             last_para.add_run().add_break(WD_BREAK.PAGE)
             composer.append(doc)
 
+        # ---- Auto-create project folder and save document locally ----
+        project_name = "כללי"
+        exam_name = "טפסי_נבחנים"
+        
+        def parse_project_and_exam(text):
+            if not text:
+                return None, None
+            text = text.strip()
+            # Try hyphen first
+            for sep in ['-', '–']:
+                if sep in text:
+                    parts = text.split(sep, 1)
+                    p = parts[0].strip()
+                    e = parts[1].strip()
+                    if p and e:
+                        return p, e
+            # Try "משרד" prefix
+            words = text.split()
+            if len(words) >= 2 and words[0] == 'משרד':
+                p = f"{words[0]} {words[1]}"
+                e = ' '.join(words[2:]).strip()
+                return p, e
+            return None, text
+
+        try:
+            fn_clean = ""
+            if excel_file and excel_file.filename:
+                fn_clean = os.path.splitext(excel_file.filename)[0]
+                
+            fn_p, fn_e = parse_project_and_exam(fn_clean)
+            hdr_p, hdr_e = parse_project_and_exam(exam_title_from_header)
+            
+            # Determine project name
+            if fn_p:
+                project_name = fn_p
+            elif hdr_p:
+                project_name = hdr_p
+                
+            # Determine exam name
+            if hdr_e and hdr_e != exam_title_from_header:
+                exam_name = hdr_e
+            elif fn_e and fn_e != fn_clean:
+                exam_name = fn_e
+            elif exam_title_from_header:
+                exam_name = exam_title_from_header.strip()
+            elif fn_clean:
+                exam_name = fn_clean.strip()
+            
+            # Clean names for OS file system
+            def clean_filename(name):
+                # Remove illegal OS characters, but keep spaces/Hebrew
+                return re.sub(r'[\\/*?:"<>|]', '', name).strip()
+                
+            safe_project = clean_filename(project_name)
+            safe_exam = clean_filename(exam_name)
+            
+            # Target path on Desktop (wrapped in nested try to avoid failing download if save fails)
+            try:
+                base_desktop_dir = r'C:\Users\uri\OneDrive\Desktop\test'
+                target_dir = os.path.join(base_desktop_dir, safe_project)
+                os.makedirs(target_dir, exist_ok=True)
+                
+                local_save_path = os.path.join(target_dir, f"{safe_exam}.docx")
+                master_doc.save(local_save_path)
+                print(f"[GENERATOR] Automatically saved copy locally to: {local_save_path}", flush=True)
+            except Exception as e_save:
+                print(f"[GENERATOR WARNING] Failed to save copy locally: {e_save}", flush=True)
+        except Exception as e_main:
+            print(f"[GENERATOR ERROR] Failed resolving project/exam names: {e_main}", flush=True)
+            safe_exam = "טפסי_נבחנים"
+
         final_buf = io.BytesIO()
         master_doc.save(final_buf)
         final_buf.seek(0)
 
+        # Download with dynamic matching name
+        download_filename = f"{safe_exam}.docx"
         return send_file(
             final_buf,
             as_attachment=True,
-            download_name='טפסי_נבחנים.docx',
+            download_name=download_filename,
             mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         )
 
