@@ -230,6 +230,7 @@
     <button class="btn-sheets-import" onclick="importFromSheets()">⬇️ ייבא שינויים עכשיו</button>
     <button class="btn-sheets-approve" id="btn-approve-delete" style="display:none;" onclick="approveSheetDelete('approve')">🗑️ אשר מחיקת מסומנים</button>
     <button class="btn-sheets-cancel"  id="btn-cancel-delete"  style="display:none;" onclick="approveSheetDelete('cancel')">↩️ בטל סימוני מחיקה</button>
+    <button style="background:rgba(250,204,21,0.15);border:1px solid rgba(250,204,21,0.4);color:#facc15;padding:9px 16px;border-radius:8px;font-weight:800;cursor:pointer;font-size:0.85rem;" onclick="openDuplicatesModal()">🔍 בדוק כפילויות</button>
     <span id="sheets-status" style="font-size:0.8rem; color:#94a3b8;"></span>
     <span id="auto-sync-badge" style="font-size:0.78rem; background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.3); color:#4ade80; padding:4px 10px; border-radius:20px; margin-right:4px;">
         🔄 AUTO <span id="auto-sync-ago">...</span>
@@ -599,5 +600,72 @@
         loadAutoSyncStatus();
     });
 
+    function openDuplicatesModal() {
+        document.getElementById('dup-modal-bg').style.display = 'flex';
+        document.getElementById('dup-content').innerHTML = '⏳ בודק...';
+        document.getElementById('dup-delete-btn').style.display = 'none';
+
+        fetch('/api/find-duplicates')
+        .then(r => r.json())
+        .then(data => {
+            const content = document.getElementById('dup-content');
+            if (!data.duplicates || data.duplicates.length === 0) {
+                content.innerHTML = '<div style="text-align:center;padding:20px;color:#4ade80;font-size:1.1rem;">✅ מעולה! אין כפילויות במערכת.</div>';
+                return;
+            }
+            let html = `<div style="margin-bottom:12px;color:#facc15;font-weight:700;">נמצאו ${data.total} ברקודים כפולים:</div>`;
+            html += '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;">';
+            html += '<thead><tr style="border-bottom:1px solid var(--border);"><th style="padding:6px;text-align:right;">ברקוד</th><th style="padding:6px;text-align:center;">כמות</th><th style="padding:6px;text-align:right;">כלובים</th><th style="padding:6px;text-align:right;">סטטוסים</th></tr></thead><tbody>';
+            data.duplicates.forEach(d => {
+                const cages = (d.cages || []).join(' / ') || '—';
+                const statuses = (d.statuses || []).join(' / ') || '—';
+                html += `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <td style="padding:7px;font-weight:700;color:#facc15;">${d.barcode}</td>
+                    <td style="padding:7px;text-align:center;color:#f87171;font-weight:800;">${d.count}×</td>
+                    <td style="padding:7px;color:#94a3b8;">${cages}</td>
+                    <td style="padding:7px;color:#94a3b8;">${statuses}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            html += '<div style="margin-top:10px;font-size:0.78rem;color:#64748b;">* לחיצה על "מחק" תשמור רק את הרשומה העדכנית ביותר של כל ברקוד</div>';
+            content.innerHTML = html;
+            document.getElementById('dup-delete-btn').style.display = 'inline-block';
+        })
+        .catch(() => {
+            document.getElementById('dup-content').innerHTML = '❌ שגיאה בטעינת הנתונים';
+        });
+    }
+
+    function closeDupModal() { document.getElementById('dup-modal-bg').style.display = 'none'; }
+
+    function deleteAllDuplicates() {
+        if (!confirm('האם למחוק את כל הכפילויות?\n\nתישמר רק הרשומה העדכנית ביותר של כל מחשב.')) return;
+        fetch('/api/delete-duplicates', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('נמחקו ' + data.deleted + ' רשומות כפולות!');
+                location.reload();
+            } else {
+                alert('שגיאה: ' + data.error);
+            }
+        });
+    }
 </script>
+
+<!-- מודאל כפילויות -->
+<div id="dup-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:300;align-items:center;justify-content:center;">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:90%;max-width:620px;max-height:80vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+      <h3 style="margin:0;font-size:1.2rem;">🔍 כפילויות במערכת</h3>
+      <button onclick="closeDupModal()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;">✕</button>
+    </div>
+    <div id="dup-content">⏳ בודק...</div>
+    <div style="margin-top:18px;display:flex;gap:10px;">
+      <button id="dup-delete-btn" onclick="deleteAllDuplicates()" style="display:none;background:#ef4444;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-weight:800;cursor:pointer;font-size:0.9rem;">🗑️ מחק את כל הכפולים (שמור עדכני)</button>
+      <button onclick="closeDupModal()" style="background:rgba(255,255,255,0.07);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:10px;font-weight:700;cursor:pointer;">סגור</button>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
