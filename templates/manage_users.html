@@ -67,8 +67,8 @@
                                     <td>
                                         {% if u.username != 'admin_uri' %}
                                         <div class="d-flex gap-1 justify-content-center">
-                                            <button class="btn btn-sm btn-warning fw-bold rounded-pill px-2"
-                                                onclick="openPassModal('{{ u.username }}')" title="שנה סיסמה">🔑</button>
+                                            <button class="btn btn-sm btn-primary fw-bold rounded-pill px-2"
+                                                onclick="openEditModal('{{ u.username }}','{{ u.role }}')" title="ערוך משתמש">✏️ ערוך</button>
                                             <button class="btn btn-sm btn-danger fw-bold rounded-pill px-2"
                                                 onclick="deleteUser('{{ u.username }}')">🗑️</button>
                                         </div>
@@ -269,73 +269,99 @@
                 statusEl.textContent = '❌ שגיאת תקשורת';
             });
         }
-        function changeRole(username, role) {
-            fetch('/api/update_user_role', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username, role})
-            })
-            .then(r => r.json())
-            .then(res => {
-                if (!res.success) alert('שגיאה: ' + res.error);
-            });
+        function openEditModal(username, role) {
+            document.getElementById('edit-modal-title').textContent = '✏️ עריכת משתמש: ' + username;
+            document.getElementById('edit-modal-orig-username').value = username;
+            document.getElementById('edit-modal-username').value = username;
+            document.getElementById('edit-modal-password').value = '';
+            document.getElementById('edit-modal-role').value = role;
+            document.getElementById('edit-modal-status').textContent = '';
+            document.getElementById('edit-modal-bg').style.display = 'flex';
         }
 
-        function openPassModal(username) {
-            document.getElementById('pass-modal-user').textContent = username;
-            document.getElementById('pass-modal-input').value = '';
-            document.getElementById('pass-modal-status').textContent = '';
-            document.getElementById('pass-modal-username').value = username;
-            document.getElementById('pass-modal-bg').style.display = 'flex';
-            document.getElementById('pass-modal-input').focus();
+        function closeEditModal() {
+            document.getElementById('edit-modal-bg').style.display = 'none';
         }
 
-        function closePassModal() {
-            document.getElementById('pass-modal-bg').style.display = 'none';
-        }
+        function saveEditUser() {
+            const origUsername = document.getElementById('edit-modal-orig-username').value;
+            const newUsername  = document.getElementById('edit-modal-username').value.trim();
+            const newPassword  = document.getElementById('edit-modal-password').value.trim();
+            const newRole      = document.getElementById('edit-modal-role').value;
+            const statusEl     = document.getElementById('edit-modal-status');
 
-        function saveUserPassword() {
-            const username = document.getElementById('pass-modal-username').value;
-            const newPass  = document.getElementById('pass-modal-input').value.trim();
-            const statusEl = document.getElementById('pass-modal-status');
-            if (newPass.length < 4) {
+            if (!newUsername) {
+                statusEl.style.color = '#f87171';
+                statusEl.textContent = '❌ שם משתמש לא יכול להיות ריק';
+                return;
+            }
+            if (newPassword && newPassword.length < 4) {
                 statusEl.style.color = '#f87171';
                 statusEl.textContent = '❌ סיסמה חייבת לפחות 4 תווים';
                 return;
             }
+
             statusEl.style.color = '#94a3b8';
             statusEl.textContent = '⏳ שומר...';
-            fetch('/api/update_user_password', {
+
+            fetch('/api/update_user', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username, password: newPass})
+                body: JSON.stringify({
+                    orig_username: origUsername,
+                    new_username:  newUsername,
+                    password:      newPassword || null,
+                    role:          newRole
+                })
             })
             .then(r => r.json())
             .then(res => {
                 if (res.success) {
                     statusEl.style.color = '#4ade80';
-                    statusEl.textContent = '✅ סיסמה עודכנה!';
-                    setTimeout(closePassModal, 1000);
+                    statusEl.textContent = '✅ עודכן בהצלחה!';
+                    setTimeout(() => location.reload(), 800);
                 } else {
                     statusEl.style.color = '#f87171';
                     statusEl.textContent = '❌ ' + res.error;
                 }
+            })
+            .catch(() => {
+                statusEl.style.color = '#f87171';
+                statusEl.textContent = '❌ שגיאת תקשורת';
             });
         }
     </script>
 
-<!-- מודאל שינוי סיסמה -->
-<div id="pass-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:300;align-items:center;justify-content:center;">
-  <div style="background:#1e293b;border:1px solid #6366f1;border-radius:16px;padding:28px;width:90%;max-width:380px;">
-    <h5 style="color:#818cf8;margin-bottom:16px;">🔑 שנה סיסמה עבור: <span id="pass-modal-user" style="color:#fff;"></span></h5>
-    <input type="hidden" id="pass-modal-username">
-    <input type="password" id="pass-modal-input" placeholder="סיסמה חדשה" autocomplete="new-password"
-        style="width:100%;background:#0f172a;color:#fff;border:1px solid #475569;border-radius:10px;padding:10px;font-size:1rem;margin-bottom:12px;"
-        onkeydown="if(event.key==='Enter') saveUserPassword()">
-    <div id="pass-modal-status" style="font-size:0.85rem;margin-bottom:12px;"></div>
+<!-- מודאל עריכת משתמש -->
+<div id="edit-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:300;align-items:center;justify-content:center;">
+  <div style="background:#1e293b;border:1px solid #3b82f6;border-radius:18px;padding:28px;width:90%;max-width:420px;">
+    <h5 id="edit-modal-title" style="color:#60a5fa;margin-bottom:20px;"></h5>
+    <input type="hidden" id="edit-modal-orig-username">
+    <div class="mb-3">
+        <label style="font-size:0.78rem;color:#94a3b8;font-weight:700;display:block;margin-bottom:5px;">שם משתמש</label>
+        <input type="text" id="edit-modal-username" autocomplete="off"
+            style="width:100%;background:#0f172a;color:#fff;border:1px solid #475569;border-radius:10px;padding:10px;font-size:0.95rem;box-sizing:border-box;">
+    </div>
+    <div class="mb-3">
+        <label style="font-size:0.78rem;color:#94a3b8;font-weight:700;display:block;margin-bottom:5px;">סיסמה חדשה <span style="color:#64748b;">(השאר ריק לא לשנות)</span></label>
+        <input type="password" id="edit-modal-password" autocomplete="new-password" placeholder="••••••"
+            style="width:100%;background:#0f172a;color:#fff;border:1px solid #475569;border-radius:10px;padding:10px;font-size:0.95rem;box-sizing:border-box;">
+    </div>
+    <div class="mb-3">
+        <label style="font-size:0.78rem;color:#94a3b8;font-weight:700;display:block;margin-bottom:5px;">הרשאה</label>
+        <select id="edit-modal-role"
+            style="width:100%;background:#0f172a;color:#fff;border:1px solid #475569;border-radius:10px;padding:10px;font-size:0.95rem;box-sizing:border-box;">
+            <option value="technician">🔧 טכנאי</option>
+            <option value="scanner">📷 סורק</option>
+            <option value="manager">👁️ מנהל (צפייה)</option>
+            <option value="logistics">📦 לוגיסטיקה</option>
+            <option value="admin">👑 אדמין</option>
+        </select>
+    </div>
+    <div id="edit-modal-status" style="font-size:0.85rem;margin-bottom:12px;"></div>
     <div style="display:flex;gap:10px;">
-        <button onclick="saveUserPassword()" style="flex:2;background:#6366f1;color:#fff;border:none;padding:10px;border-radius:10px;font-weight:800;cursor:pointer;">💾 שמור</button>
-        <button onclick="closePassModal()" style="flex:1;background:rgba(255,255,255,0.07);color:#94a3b8;border:1px solid #334155;padding:10px;border-radius:10px;cursor:pointer;">ביטול</button>
+        <button onclick="saveEditUser()" style="flex:2;background:#3b82f6;color:#fff;border:none;padding:11px;border-radius:10px;font-weight:800;cursor:pointer;font-size:0.95rem;">💾 שמור שינויים</button>
+        <button onclick="closeEditModal()" style="flex:1;background:rgba(255,255,255,0.07);color:#94a3b8;border:1px solid #334155;padding:11px;border-radius:10px;cursor:pointer;">ביטול</button>
     </div>
   </div>
 </div>

@@ -1396,6 +1396,44 @@ def api_add_user():
     finally:
         release_db_connection(conn)
 
+@app.route('/api/update_user', methods=['POST'])
+@login_required
+def api_update_user():
+    if session.get('role') != 'admin' and session.get('user') not in ('uri', 'admin_uri'):
+        return {"success": False, "error": "Unauthorized"}, 403
+    data = request.json or {}
+    orig_username = data.get('orig_username', '').strip()
+    new_username  = data.get('new_username', '').strip()
+    new_password  = (data.get('password') or '').strip()
+    new_role      = data.get('role', '').strip()
+    allowed_roles = ['technician', 'scanner', 'manager', 'logistics', 'admin']
+    if not orig_username or not new_username:
+        return {"success": False, "error": "שם משתמש לא תקין"}, 400
+    if new_role and new_role not in allowed_roles:
+        return {"success": False, "error": "הרשאה לא תקינה"}, 400
+    if orig_username == 'admin_uri':
+        return {"success": False, "error": "לא ניתן לערוך admin_uri מכאן"}, 400
+    conn = get_db_connection()
+    if not conn: return {"success": False, "error": "DB connection failed"}, 500
+    try:
+        cur = get_safe_cursor(conn)
+        if new_password:
+            hashed = generate_password_hash(new_password)
+            cur.execute("UPDATE users SET username=%s, password=%s, role=%s WHERE username=%s",
+                        (new_username, hashed, new_role or 'technician', orig_username))
+        else:
+            cur.execute("UPDATE users SET username=%s, role=%s WHERE username=%s",
+                        (new_username, new_role or 'technician', orig_username))
+        conn.commit()
+        cur.close()
+        return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
+
 @app.route('/api/update_user_password', methods=['POST'])
 @login_required
 def api_update_user_password():
