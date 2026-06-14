@@ -50,6 +50,23 @@
         transform: none;
     }
 
+    /* ===== שורת תקול — הדגשה בולטת ===== */
+    tr.row-faulty td {
+        background: rgba(239, 68, 68, 0.08) !important;
+        border-bottom: 1px solid rgba(239, 68, 68, 0.25) !important;
+    }
+    tr.row-faulty:hover td {
+        background: rgba(239, 68, 68, 0.15) !important;
+    }
+    tr.row-faulty td:first-child {
+        border-right: 3px solid #ef4444 !important;
+        animation: faultPulse 2s ease-in-out infinite;
+    }
+    @keyframes faultPulse {
+        0%, 100% { border-right-color: #ef4444; }
+        50%       { border-right-color: #ff8080; }
+    }
+
     /* Undo the rounded corners on extreme cells from base.html */
     td:first-child[class],
     td:last-child[class] {
@@ -354,7 +371,10 @@
             </thead>
             <tbody>
                 {% for c in computers %}
-            <tr data-id="{{ c.id }}" {% if c.sheets_delete_request %}class="delete-flagged"{% endif %}>
+            <tr data-id="{{ c.id }}"
+                {% if c.sheets_delete_request %}class="delete-flagged"
+                {% elif c.status == 'תקול' %}class="row-faulty"
+                {% endif %}>
                 <td class="col-chk"><input type="checkbox" class="row-chk" value="{{ c.id }}"
                         onchange="updateBatchBar()"></td>
                 <td class="hide-mobile" style="color:var(--muted); font-size:.7rem;">{{ loop.index }}</td>
