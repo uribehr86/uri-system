@@ -37,29 +37,41 @@
                             <thead>
                                 <tr>
                                     <th>שם משתמש</th>
-                                    <th>תפקיד / הרשאה</th>
-                                    <th>תקיןות אחרונה</th>
+                                    <th>הרשאה</th>
+                                    <th>פעילות אחרונה</th>
                                     <th>פעולות</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for u in users %}
-                                <tr>
+                                <tr id="row-{{ u.username }}">
                                     <td class="fw-bold">{{ u.username }}</td>
                                     <td>
-                                        {% if u.role == 'admin' %}<span class="badge bg-danger px-3">מנהל על (Uri)</span>
-                                        {% elif u.role == 'technician' %}<span class="badge bg-success px-3">טכנאי</span>
-                                        {% elif u.role == 'scanner' %}<span class="badge bg-secondary px-3">סורק</span>
-                                        {% elif u.role == 'manager' %}<span class="badge bg-primary px-3">מנהל (צפייה)</span>
-                                        {% elif u.role == 'logistics' %}<span class="badge bg-info text-dark px-3">לוגיסטיקה</span>
-                                        {% else %}<span class="badge bg-dark px-3">{{ u.role }}</span>{% endif %}
+                                        {% if u.username == 'admin_uri' %}
+                                        <span class="badge bg-danger px-3">מנהל על</span>
+                                        {% else %}
+                                        <select class="form-select form-select-sm py-1"
+                                            style="background:#0f172a;color:#fff;border:1px solid #475569;border-radius:8px;width:auto;display:inline-block;"
+                                            onchange="changeRole('{{ u.username }}', this.value)">
+                                            <option value="technician" {% if u.role=='technician' %}selected{% endif %}>🔧 טכנאי</option>
+                                            <option value="scanner"    {% if u.role=='scanner'    %}selected{% endif %}>📷 סורק</option>
+                                            <option value="manager"    {% if u.role=='manager'    %}selected{% endif %}>👁️ מנהל (צפייה)</option>
+                                            <option value="logistics"  {% if u.role=='logistics'  %}selected{% endif %}>📦 לוגיסטיקה</option>
+                                            <option value="admin"      {% if u.role=='admin'      %}selected{% endif %}>👑 אדמין</option>
+                                        </select>
+                                        {% endif %}
                                     </td>
                                     <td class="text-white-50 small">
                                         {{ u.timestamp.strftime('%d/%m/%Y %H:%M') if u.timestamp else 'לא ידוע' }}
                                     </td>
                                     <td>
                                         {% if u.username != 'admin_uri' %}
-                                        <button class="btn btn-sm btn-danger fw-bold rounded-pill px-3" onclick="deleteUser('{{ u.username }}')">הסר</button>
+                                        <div class="d-flex gap-1 justify-content-center">
+                                            <button class="btn btn-sm btn-warning fw-bold rounded-pill px-2"
+                                                onclick="openPassModal('{{ u.username }}')" title="שנה סיסמה">🔑</button>
+                                            <button class="btn btn-sm btn-danger fw-bold rounded-pill px-2"
+                                                onclick="deleteUser('{{ u.username }}')">🗑️</button>
+                                        </div>
                                         {% else %}
                                         <small class="text-white-50">מוגן</small>
                                         {% endif %}
@@ -257,6 +269,76 @@
                 statusEl.textContent = '❌ שגיאת תקשורת';
             });
         }
+        function changeRole(username, role) {
+            fetch('/api/update_user_role', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username, role})
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (!res.success) alert('שגיאה: ' + res.error);
+            });
+        }
+
+        function openPassModal(username) {
+            document.getElementById('pass-modal-user').textContent = username;
+            document.getElementById('pass-modal-input').value = '';
+            document.getElementById('pass-modal-status').textContent = '';
+            document.getElementById('pass-modal-username').value = username;
+            document.getElementById('pass-modal-bg').style.display = 'flex';
+            document.getElementById('pass-modal-input').focus();
+        }
+
+        function closePassModal() {
+            document.getElementById('pass-modal-bg').style.display = 'none';
+        }
+
+        function saveUserPassword() {
+            const username = document.getElementById('pass-modal-username').value;
+            const newPass  = document.getElementById('pass-modal-input').value.trim();
+            const statusEl = document.getElementById('pass-modal-status');
+            if (newPass.length < 4) {
+                statusEl.style.color = '#f87171';
+                statusEl.textContent = '❌ סיסמה חייבת לפחות 4 תווים';
+                return;
+            }
+            statusEl.style.color = '#94a3b8';
+            statusEl.textContent = '⏳ שומר...';
+            fetch('/api/update_user_password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username, password: newPass})
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    statusEl.style.color = '#4ade80';
+                    statusEl.textContent = '✅ סיסמה עודכנה!';
+                    setTimeout(closePassModal, 1000);
+                } else {
+                    statusEl.style.color = '#f87171';
+                    statusEl.textContent = '❌ ' + res.error;
+                }
+            });
+        }
     </script>
+
+<!-- מודאל שינוי סיסמה -->
+<div id="pass-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:300;align-items:center;justify-content:center;">
+  <div style="background:#1e293b;border:1px solid #6366f1;border-radius:16px;padding:28px;width:90%;max-width:380px;">
+    <h5 style="color:#818cf8;margin-bottom:16px;">🔑 שנה סיסמה עבור: <span id="pass-modal-user" style="color:#fff;"></span></h5>
+    <input type="hidden" id="pass-modal-username">
+    <input type="password" id="pass-modal-input" placeholder="סיסמה חדשה" autocomplete="new-password"
+        style="width:100%;background:#0f172a;color:#fff;border:1px solid #475569;border-radius:10px;padding:10px;font-size:1rem;margin-bottom:12px;"
+        onkeydown="if(event.key==='Enter') saveUserPassword()">
+    <div id="pass-modal-status" style="font-size:0.85rem;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:10px;">
+        <button onclick="saveUserPassword()" style="flex:2;background:#6366f1;color:#fff;border:none;padding:10px;border-radius:10px;font-weight:800;cursor:pointer;">💾 שמור</button>
+        <button onclick="closePassModal()" style="flex:1;background:rgba(255,255,255,0.07);color:#94a3b8;border:1px solid #334155;padding:10px;border-radius:10px;cursor:pointer;">ביטול</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

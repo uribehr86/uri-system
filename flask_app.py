@@ -1396,6 +1396,58 @@ def api_add_user():
     finally:
         release_db_connection(conn)
 
+@app.route('/api/update_user_password', methods=['POST'])
+@login_required
+def api_update_user_password():
+    if session.get('role') != 'admin' and session.get('user') not in ('uri', 'admin_uri'):
+        return {"success": False, "error": "Unauthorized"}, 403
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    new_password = data.get('password', '').strip()
+    if not username or len(new_password) < 4:
+        return {"success": False, "error": "נתונים לא תקינים"}, 400
+    conn = get_db_connection()
+    if not conn: return {"success": False, "error": "DB connection failed"}, 500
+    try:
+        cur = get_safe_cursor(conn)
+        hashed = generate_password_hash(new_password)
+        cur.execute("UPDATE users SET password = %s WHERE username = %s", (hashed, username))
+        conn.commit()
+        cur.close()
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
+
+@app.route('/api/update_user_role', methods=['POST'])
+@login_required
+def api_update_user_role():
+    if session.get('role') != 'admin' and session.get('user') not in ('uri', 'admin_uri'):
+        return {"success": False, "error": "Unauthorized"}, 403
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    new_role = data.get('role', '').strip()
+    allowed_roles = ['technician', 'scanner', 'manager', 'logistics', 'admin']
+    if not username or new_role not in allowed_roles:
+        return {"success": False, "error": "נתונים לא תקינים"}, 400
+    if username == 'admin_uri':
+        return {"success": False, "error": "לא ניתן לשנות את הרשאות admin_uri"}, 400
+    conn = get_db_connection()
+    if not conn: return {"success": False, "error": "DB connection failed"}, 500
+    try:
+        cur = get_safe_cursor(conn)
+        cur.execute("UPDATE users SET role = %s WHERE username = %s", (new_role, username))
+        conn.commit()
+        cur.close()
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
+
 @app.route('/api/delete_user/<username>', methods=['DELETE'])
 @login_required
 def api_delete_user(username):
