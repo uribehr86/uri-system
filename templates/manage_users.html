@@ -101,6 +101,34 @@
             </div>
         </div>
 
+        <!-- שינוי פרטי כניסה — admin_uri בלבד -->
+        <div class="card-dark p-4 shadow-lg mt-2" style="border:1px solid #6366f1;">
+            <h4 class="mb-4 d-flex align-items-center gap-2" style="color:#818cf8;">
+                🔐 שנה את פרטי הכניסה שלי
+            </h4>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label small text-white-50 fw-bold">שם משתמש חדש</label>
+                    <input type="text" id="new_admin_user" class="form-control py-2" placeholder="השאר ריק לא לשנות" autocomplete="off">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small text-white-50 fw-bold">סיסמה חדשה</label>
+                    <input type="password" id="new_admin_pass" class="form-control py-2" placeholder="השאר ריק לא לשנות" autocomplete="new-password">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small text-white-50 fw-bold">אישור סיסמה</label>
+                    <input type="password" id="confirm_admin_pass" class="form-control py-2" placeholder="חזור על הסיסמה" autocomplete="new-password">
+                </div>
+            </div>
+            <div class="mt-3 d-flex align-items-center gap-3">
+                <button class="btn fw-bold px-4 py-2" style="background:#6366f1;color:#fff;border-radius:10px;" onclick="changeMyCredentials()">
+                    💾 שמור שינויים
+                </button>
+                <span id="cred-status" style="font-size:0.85rem;"></span>
+            </div>
+            <div class="mt-2" style="font-size:0.78rem;color:#64748b;">* השאר ריק שדות שאינך רוצה לשנות. לאחר השינוי תתנתק ותצטרך להתחבר מחדש.</div>
+        </div>
+
         <div class="card-dark p-4 shadow-lg mt-4 border-warning">
             <h4 class="mb-4 text-warning d-flex align-items-center gap-2">
                 <span>🗑️</span> מחשבים שממתינים לאישור מחיקה ({{ pending|length }})
@@ -146,12 +174,7 @@
             const user = document.getElementById('new_user').value.trim();
             const pass = document.getElementById('new_pass').value.trim();
             const role = document.getElementById('new_role').value;
-
-            if(!user || !pass) {
-                alert("חובה למלא שם משתמש וסיסמה");
-                return;
-            }
-
+            if(!user || !pass) { alert("חובה למלא שם משתמש וסיסמה"); return; }
             fetch('/api/add_user', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -159,11 +182,8 @@
             })
             .then(r => r.json())
             .then(res => {
-                if(res.success) {
-                    location.reload();
-                } else {
-                    alert("שגיאה ביצירת המשתמש. ייתכן והשם כבר קיים.");
-                }
+                if(res.success) { location.reload(); }
+                else { alert("שגיאה ביצירת המשתמש. ייתכן והשם כבר קיים."); }
             });
         }
 
@@ -171,19 +191,14 @@
             if(confirm('האם אתה בטוח שברצונך למחוק את המשתמש: ' + username + '?')) {
                 fetch('/api/delete_user/' + username, { method: 'DELETE' })
                 .then(r => r.json())
-                .then(res => {
-                    if(res.success) {
-                        location.reload();
-                    }
-                });
+                .then(res => { if(res.success) { location.reload(); } });
             }
         }
 
         function handleDelete(barcode, action) {
-            const msg = action === 'restore' ? 
-                'להחזיר את מחשב ' + barcode + ' לסטטוס תקין?' : 
+            const msg = action === 'restore' ?
+                'להחזיר את מחשב ' + barcode + ' לסטטוס תקין?' :
                 'למחוק לצמיתות את מחשב ' + barcode + ' מבסיס הנתונים?';
-
             if(confirm(msg)) {
                 fetch('/api/admin_approve_delete', {
                     method: 'POST',
@@ -191,12 +206,56 @@
                     body: JSON.stringify({barcode: barcode, action: action})
                 })
                 .then(r => r.json())
-                .then(res => {
-                    if(res.success) {
-                        location.reload();
-                    }
-                });
+                .then(res => { if(res.success) { location.reload(); } });
             }
+        }
+
+        function changeMyCredentials() {
+            const newUser = document.getElementById('new_admin_user').value.trim();
+            const newPass = document.getElementById('new_admin_pass').value.trim();
+            const confirmPass = document.getElementById('confirm_admin_pass').value.trim();
+            const statusEl = document.getElementById('cred-status');
+
+            if (!newUser && !newPass) {
+                statusEl.style.color = '#f87171';
+                statusEl.textContent = 'הזן לפחות שם משתמש חדש או סיסמה חדשה';
+                return;
+            }
+            if (newPass && newPass !== confirmPass) {
+                statusEl.style.color = '#f87171';
+                statusEl.textContent = '❌ הסיסמאות לא תואמות';
+                return;
+            }
+            if (newPass && newPass.length < 4) {
+                statusEl.style.color = '#f87171';
+                statusEl.textContent = '❌ סיסמה חייבת להיות לפחות 4 תווים';
+                return;
+            }
+            if (!confirm('האם אתה בטוח? לאחר השינוי תתנתק ותצטרך להתחבר עם הפרטים החדשים.')) return;
+
+            statusEl.textContent = '⏳ שומר...';
+            statusEl.style.color = '#94a3b8';
+
+            fetch('/api/change-admin-credentials', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ new_username: newUser || null, new_password: newPass || null })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    statusEl.style.color = '#4ade80';
+                    statusEl.textContent = '✅ ' + res.message;
+                    setTimeout(() => { window.location.href = '/logout'; }, 1500);
+                } else {
+                    statusEl.style.color = '#f87171';
+                    statusEl.textContent = '❌ ' + res.error;
+                }
+            })
+            .catch(() => {
+                statusEl.style.color = '#f87171';
+                statusEl.textContent = '❌ שגיאת תקשורת';
+            });
         }
     </script>
 </body>

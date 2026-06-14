@@ -322,18 +322,41 @@ def login():
         
         print(f"DEBUG: Login attempt - username: '{username}', password: '{password}'")
         
-        # Hardcoded super-admin fallback
-        if (username.lower() == "uri" and password == "1234") or (username.lower() == "admin_uri" and password == "uri*"):
-            session.update({
-                'user': username,
-                'user_id': 1,
-                'username': "אורי מנהל מערכת",
-                'role': 'admin'
-            })
-            session.permanent = True
-            print(f"[OK] User {username} logged in (hardcoded fallback)")
-            return redirect(url_for('portal'))
+        # בדוק admin_uri מהמסד תחילה (אם קיים שם) — אחרת fallback לקשיח
+        admin_matched = False
+        if username.lower() in ("uri", "admin_uri") or True:  # always try DB first for any user
+            pass  # falls through to DB check below
+
+        # Hardcoded super-admin fallback (only if DB has no custom admin record)
+        if username.lower() in ("uri", "admin_uri"):
+            conn_check = get_db_connection()
+            db_admin = None
+            if conn_check:
+                try:
+                    cur_check = get_safe_cursor(conn_check)
+                    cur_check.execute("SELECT username, password FROM users WHERE role='admin' AND username NOT IN ('uri','admin_uri') LIMIT 1")
+                    # נסה למצוא admin_uri בDB
+                    cur_check.execute("SELECT username, password FROM users WHERE username = %s", (username,))
+                    db_admin = cur_check.fetchone()
+                    cur_check.close()
+                except Exception:
+                    pass
+                finally:
+                    release_db_connection(conn_check)
             
+            if not db_admin:
+                # fallback hardcoded
+                if (username.lower() == "uri" and password == "1234") or (username.lower() == "admin_uri" and password == "uri*"):
+                    session.update({
+                        'user': username,
+                        'user_id': 1,
+                        'username': "אורי מנהל מערכת",
+                        'role': 'admin'
+                    })
+                    session.permanent = True
+                    print(f"[OK] User {username} logged in (hardcoded fallback)")
+                    return redirect(url_for('portal'))
+
         # Check database
         conn = get_db_connection()
         if conn:
@@ -435,6 +458,67 @@ def register():
 @login_required
 def portal():
     return render_template('portal.html')
+
+
+# ── API: שינוי פרטי כניסה של admin_uri ──────────────────────────────
+@app.route('/api/change-admin-credentials', methods=['POST'])
+@login_required
+def api_change_admin_credentials():
+    if session.get('role') != 'admin' and session.get('user') not in ('uri', 'admin_uri'):
+        return {"success": False, "error": "גישה מותרת לאדמין בלבד"}, 403
+
+    data = request.json or {}
+    new_username = (data.get('new_username') or '').strip()
+    new_password = (data.get('new_password') or '').strip()
+
+    if not new_username and not new_password:
+        return {"success": False, "error": "לא סופק שום שינוי"}
+
+    conn = get_db_connection()
+    if not conn:
+        return {"success": False, "error": "DB connection failed"}, 500
+    try:
+        cur = get_safe_cursor(conn)
+        current_username = session.get('user', 'admin_uri')
+
+        # בדוק אם קיים רשומה בDB עבור המשתמש הזה
+        cur.execute("SELECT id FROM users WHERE username = %s", (current_username,))
+        existing = cur.fetchone()
+
+        if existing:
+            # עדכן רשומה קיימת
+            if new_username and new_password:
+                hashed = generate_password_hash(new_password)
+                cur.execute("UPDATE users SET username=%s, password=%s WHERE username=%s",
+                            (new_username, hashed, current_username))
+            elif new_username:
+                cur.execute("UPDATE users SET username=%s WHERE username=%s",
+                            (new_username, current_username))
+            elif new_password:
+                hashed = generate_password_hash(new_password)
+                cur.execute("UPDATE users SET password=%s WHERE username=%s",
+                            (hashed, current_username))
+        else:
+            # צור רשומה חדשה במסד עם הפרטים החדשים
+            final_username = new_username or current_username
+            final_password = new_password or 'uri*'
+            hashed = generate_password_hash(final_password)
+            cur.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, 'admin')",
+                        (final_username, hashed))
+
+        conn.commit()
+        cur.close()
+
+        msg = []
+        if new_username: msg.append(f"שם משתמש שונה ל-{new_username}")
+        if new_password: msg.append("סיסמה עודכנה")
+        return {"success": True, "message": " | ".join(msg) + ". מתנתק..."}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
 
 @app.route('/install-cert')
 def install_cert():
