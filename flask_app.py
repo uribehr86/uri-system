@@ -1,7 +1,7 @@
 import sys
 import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', write_through=True)
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', write_through=True)
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -109,20 +109,13 @@ except Exception as e:
     print(f"[WARNING] Google AI init failed: {e}")
     genai_client = None
 
-# Initialize Connection Pool
-db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
-# הוסף connect_timeout כדי שהחיבור לא יתקע את ה-startup
-if db_url and 'connect_timeout' not in db_url:
-    db_url += ('&' if '?' in db_url else '?') + 'connect_timeout=5'
-try:
-    db_pool = psycopg2.pool.SimpleConnectionPool(1, 5, db_url)
-    print("[OK] Database connection pool created successfully")
-except Exception as e:
-    print(f"[ERROR] Error creating connection pool: {e}")
-    db_pool = None
+# Initialize Connection Pool variables (will be created lazily on first DB access)
+db_pool = None
+db_pool_initialized = False
+IS_LOCAL_MODE = False
 
-# פונקציה לחיבור לענן עם "הגנת תקיעה" ושימוש ב-Pool
-IS_LOCAL_MODE = (db_pool is None)
+# מטמון גלובלי למניעת בדיקה כפולה איטית בגוגל שיטס
+attendance_cache = {}
 
 
 class SafeCursor:
@@ -161,20 +154,47 @@ class SafeCursor:
     def __getattr__(self, name): return getattr(self.cursor, name)
 
 def get_db_connection():
-    global IS_LOCAL_MODE
-    if not db_pool:
-        # Fallback to SQLite if pool failed
+    global db_pool, db_pool_initialized, IS_LOCAL_MODE
+    
+    if not db_pool_initialized:
+        db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
+        if db_url:
+            if 'connect_timeout' not in db_url:
+                db_url += ('&' if '?' in db_url else '?') + 'connect_timeout=3'
+            try:
+                # Fast check: extract host and try resolving to prevent DNS blocking
+                import urllib.parse
+                parsed = urllib.parse.urlparse(db_url)
+                host = parsed.hostname
+                if host:
+                    import socket
+                    # Set a short timeout for socket calls
+                    socket.setdefaulttimeout(3)
+                    socket.gethostbyname(host)
+                
+                db_pool = psycopg2.pool.SimpleConnectionPool(1, 5, db_url)
+                print("[OK] Database connection pool created successfully (lazy)", flush=True)
+                IS_LOCAL_MODE = False
+            except Exception as e:
+                print(f"[FALLBACK] Cloud DB init failed: {e}. Switching to Local SQLite.", flush=True)
+                db_pool = None
+                IS_LOCAL_MODE = True
+        else:
+            db_pool = None
+            IS_LOCAL_MODE = True
+        db_pool_initialized = True
+
+    if IS_LOCAL_MODE or not db_pool:
+        # Fallback to SQLite
         try:
             conn = sqlite3.connect('system_data.db', check_same_thread=False)
             conn.row_factory = sqlite3.Row
-            IS_LOCAL_MODE = True
             return conn
         except Exception as e:
-            print(f"[CRITICAL] SQLite connection failed: {e}")
+            print(f"[CRITICAL] SQLite connection failed: {e}", flush=True)
             return None
-    
+            
     try:
-        # Attempt Postgres from pool
         conn = db_pool.getconn()
         try:
             # Ping connection to ensure it's alive
@@ -184,14 +204,12 @@ def get_db_connection():
             # Connection is dead, throw it away and get a new one
             db_pool.putconn(conn, close=True)
             conn = db_pool.getconn()
-        IS_LOCAL_MODE = False
         return conn
     except Exception as e:
-        print(f"[FALLBACK] Cloud DB Error: {e}. Switching to Local SQLite.")
+        print(f"[FALLBACK] Cloud DB checkout failed: {e}. Switching to Local SQLite.", flush=True)
         try:
             conn = sqlite3.connect('system_data.db', check_same_thread=False)
             conn.row_factory = sqlite3.Row
-            IS_LOCAL_MODE = True
             return conn
         except Exception as e2:
             print(f"[CRITICAL] All DB connections failed: {e2}")
@@ -1882,7 +1900,7 @@ def exam_attendance_import():
             elif 'סיסמ' in h or 'pass' in h_lower:                  col_map['password']   = i
             elif 'טור' in h or 'עמודה' in h:                        col_map['row_number'] = i
             elif 'כסא' in h or 'כיסא' in h or 'seat' in h_lower or 'מושב' in h:   col_map['seat_number']= i
-            elif 'מיקום' in h or 'כיתה' in h or 'location' in h_lower: col_map['location']= i
+            elif 'מיקום' in h or 'כיתה' in h or 'location' in h_lower or 'אולם' in h: col_map['location']= i
             elif 'בחינה' in h or 'exam' in h_lower:                 col_map['exam_name']  = i
             elif 'מחשב' in h or 'computer' in h_lower:              col_map['computer']   = i
             elif 'התאמות' in h or 'notes' in h_lower:               col_map['notes']      = i
@@ -1947,20 +1965,18 @@ def exam_attendance_import():
         client  = gspread.authorize(creds)
         drive   = build('drive', 'v3', credentials=creds)
 
-        PARENT_FOLDER_ID = '18-VtXbYxvT8EqVzJgdAZv54aDnRWhNvM'
+        PARENT_FOLDER_ID = '1bmoF9oe2O6hB4v2MCJEtWRWI7nnO8llv'
 
         # שם קובץ ללא סיומת
         raw_name = os.path.splitext(file.filename)[0]
 
-        # שם המשרד/פרויקט
+        # שם המשרד/פרויקט ושם המבחן
         words = raw_name.split()
         if len(words) >= 2 and words[0] == 'משרד':
-            # "משרד הבריאות מומחיות 7.6.26" → תיקיה: משרד הבריאות, טאב: מומחיות 7.6.26
+            # "משרד הבריאות רופאים 15.6.26" → תיקיה: משרד הבריאות, קובץ: רופאים 15.6.26
             ministry_name = f"{words[0]} {words[1]}"
             tab_name      = ' '.join(words[2:]).strip() or raw_name
         elif exam_title_row1:
-            # אם יש כותרת בשורה 1 → השתמש בה לשם הפרויקט
-            # דוגמה: "רישיון חשמלאים - 19.05.2026 - נוכחות" → ministry=חשמלאים, tab=19.05.2026
             title_clean   = re.sub(r'[-–]\s*נוכחות\s*$', '', exam_title_row1).strip()
             title_clean   = re.sub(r'[-–]\s*\d+\.\d+\.\d+\s*$', '', title_clean).strip()
             ministry_name = title_clean or raw_name
@@ -1969,37 +1985,38 @@ def exam_attendance_import():
             ministry_name = re.sub(r'\s*\d+[\./]\d+[\./]\d+\s*$', '', raw_name).strip() or raw_name
             tab_name      = raw_name
 
-        # ── שלב 1: מצא או צור תיקיה למשרד ──
-        q = (f"name='{ministry_name}' and "
-             f"mimeType='application/vnd.google-apps.folder' and "
-             f"'{PARENT_FOLDER_ID}' in parents and trashed=false")
-        folders = drive.files().list(q=q, fields='files(id,name)').execute().get('files', [])
-        if folders:
-            folder_id = folders[0]['id']
-        else:
-            folder_id = drive.files().create(body={
-                'name': ministry_name,
-                'mimeType': 'application/vnd.google-apps.folder',
-                'parents': [PARENT_FOLDER_ID]
-            }, fields='id').execute()['id']
+        # ── קבלת מזהה גיליון מתוך הקישור בטופס (אופציונלי - לתמיכה באפשרות ב') ──
+        sheet_id = None
+        form_sheet_url = request.form.get('sheet_url', '').strip()
+        if form_sheet_url:
+            match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', form_sheet_url)
+            if match:
+                sheet_id = match.group(1)
+                print(f"[IMPORT] Found custom Sheet ID in form: {sheet_id}")
 
-        # ── שלב 2: מצא או צור גיליון אחד למשרד ──
-        q2 = (f"name='{ministry_name}' and "
-              f"mimeType='application/vnd.google-apps.spreadsheet' and "
-              f"'{folder_id}' in parents and trashed=false")
-        sheets = drive.files().list(q=q2, fields='files(id,name)').execute().get('files', [])
-        if sheets:
-            ss_id = sheets[0]['id']
-        else:
-            ss_id = drive.files().create(body={
-                'name': ministry_name,
-                'mimeType': 'application/vnd.google-apps.spreadsheet',
-                'parents': [folder_id]
-            }, fields='id').execute()['id']
+        # ── איתור מזהה הגיליון של המשרד/פרויקט מתוך מסד הנתונים ──
+        if not sheet_id:
+            conn_check = get_db_connection()
+            if conn_check:
+                try:
+                    cur_check = get_safe_cursor(conn_check)
+                    cur_check.execute("SELECT sheets_id FROM projects WHERE name = %s OR keywords LIKE %s", (ministry_name, f"%{ministry_name}%"))
+                    row_proj = cur_check.fetchone()
+                    if row_proj:
+                        sheet_id = row_proj['sheets_id']
+                    cur_check.close()
+                except Exception as ex_db:
+                    print(f"Error checking project sheets_id: {ex_db}")
+                finally:
+                    release_db_connection(conn_check)
 
-        sh = client.open_by_key(ss_id)
+        # Fallback לגיליון ברירת המחדל הכללי
+        if not sheet_id:
+            sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
 
-        # ── שלב 3: הוסף טאב חדש לכל מבחן (אם כבר קיים הוסף מספר) ──
+        sh = client.open_by_key(sheet_id)
+
+        # ── הוסף לשונית (Worksheet) חדשה עבור המבחן ──
         existing_titles = [w.title for w in sh.worksheets()]
         unique_tab = tab_name
         counter    = 2
@@ -2009,7 +2026,7 @@ def exam_attendance_import():
 
         ws_tab = sh.add_worksheet(title=unique_tab, rows=1000, cols=15)
 
-        # ── שלב 4: כתוב נתונים לטאב ──
+        # ── שלב 4: כתוב נתונים ללשונית החדשה ──
         header_row    = ['שם נבחן', 'תעודת זהות', 'קוד משתמש', 'סיסמה',
                          'טור', 'כסא', 'מחשב', 'הערות', 'בחינה', 'מיקום',
                          'נוכחות', 'מצב מחשב', 'שעת סריקה']
@@ -2024,20 +2041,19 @@ def exam_attendance_import():
         ws_tab.update('A1', rows_to_write, value_input_option='USER_ENTERED')
 
         # ── שלב 5: שמור מיפוי פרויקט במסד לשימוש הסורק ──
-        sheet_url = f"https://docs.google.com/spreadsheets/d/{ss_id}"
+        sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}"
         conn2 = get_db_connection()
         if conn2:
             try:
                 cur2 = get_safe_cursor(conn2)
-                # בדוק אם פרויקט כבר קיים
-                cur2.execute("SELECT id FROM projects WHERE name = %s", (ministry_name,))
+                cur2.execute("SELECT id FROM projects WHERE name = %s", (unique_tab,))
                 existing = cur2.fetchone()
                 if existing:
                     cur2.execute("UPDATE projects SET sheets_id=%s, drive_url=%s WHERE name=%s",
-                                 (ss_id, sheet_url, ministry_name))
+                                 (sheet_id, sheet_url, unique_tab))
                 else:
                     cur2.execute("INSERT INTO projects (name, keywords, sheets_id, drive_url) VALUES (%s,%s,%s,%s)",
-                                 (ministry_name, ministry_name, ss_id, sheet_url))
+                                 (unique_tab, unique_tab, sheet_id, sheet_url))
                 conn2.commit()
                 cur2.close()
             except Exception:
@@ -2045,7 +2061,7 @@ def exam_attendance_import():
             finally:
                 release_db_connection(conn2)
 
-        flash(f"✅ {len(all_rows)} נבחנים נוספו! 📁 {ministry_name} → 📑 {unique_tab}", "success")
+        flash(f"✅ {len(all_rows)} נבחנים נוספו! 📑 לשונית חדשה: {unique_tab}", "success")
 
     except Exception as e:
         import traceback; traceback.print_exc()
@@ -2108,7 +2124,7 @@ def generate_word_docs():
             elif 'זהות' in h or 'ת.ז' in h or 'id' in h_lower:         col_map['id_number']  = i
             elif 'משתמש' in h or 'user' in h_lower or 'קוד' in h:      col_map['username']   = i
             elif 'סיסמ' in h or 'pass' in h_lower:                      col_map['password']   = i
-            elif 'מיקום' in h or 'כיתה' in h or 'location' in h_lower: col_map['location']   = i
+            elif 'מיקום' in h or 'כיתה' in h or 'location' in h_lower or 'אולם' in h: col_map['location']   = i
             elif 'בחינה' in h or 'exam' in h_lower:                     col_map['exam_name']  = i
             elif 'מחשב' in h or 'computer' in h_lower:                  col_map['computer']   = i
             elif 'התאמות' in h or 'notes' in h_lower:                   col_map['notes']      = i
@@ -2176,7 +2192,9 @@ def generate_word_docs():
             # Format: exam_name|id_number|name|username|password|row|seat
             # exam_name: from column or from Excel title row
             exam_title = e['exam_name'] if e['exam_name'] else (exam_title_from_header or 'EXAMINEE')
-            exam_title_clean = exam_title.replace('|', ' ').strip()  # מונע שבירת פורמט ה-QR
+            # Clean trailing "- נוכחות" or "נוכחות"
+            exam_title_clean = re.sub(r'[-–]\s*נוכחות\s*$', '', exam_title).strip()
+            exam_title_clean = exam_title_clean.replace('|', ' ').strip()  # מונע שבירת פורמט ה-QR
             qr_data = f"{exam_title_clean}|{e['id_number']}|{e['name']}|{e['username']}|{e['password']}|{e['row']}|{e['seat']}"
             # QR מ-API מבוטל — משתמשים רק ב-QR מקומי (ראה Step 2 בהמשך)
             qr_inline = ""
@@ -2204,6 +2222,92 @@ def generate_word_docs():
             rendered_buf.seek(0)
             
             doc = Document(rendered_buf)
+
+            # ---- Step 0.5: Replace static old title and location to match the imported exam ----
+            def replace_static_text(p, new_title, new_loc):
+                txt = p.text
+                title_keywords = ["משרד הבריאות", "מינהל האחיות", "מומחיות", "טיפול תומך", "רישוי חשמלאים", "חשמלאים", "כיתות חשמל", "כיתת חשמל", "חשמל"]
+                loc_keywords = ["בניין REIT1", "פתח תקווה", "מליאה", "אפעל 6", "בניין", "קומה", "כיתה"]
+                
+                is_title = any(kw in txt for kw in title_keywords) and "טופס התחברות" not in txt
+                is_loc = any(kw in txt for kw in loc_keywords) and not is_title and "טופס התחברות" not in txt
+                
+                if is_title:
+                    if p.runs:
+                        p.runs[0].text = new_title
+                        for r_item in p.runs[1:]:
+                            r_item.text = ""
+                    else:
+                        p.text = new_title
+                elif is_loc and new_loc:
+                    if p.runs:
+                        p.runs[0].text = new_loc
+                        for r_item in p.runs[1:]:
+                            r_item.text = ""
+                    else:
+                        p.text = new_loc
+
+            # Process sections (headers and footers)
+            for section in doc.sections:
+                # 1. Process headers with both heuristic and keywords
+                for hf_name in ['header', 'first_page_header', 'even_page_header']:
+                    hf = getattr(section, hf_name, None)
+                    if hf:
+                        # Heuristic index-based replacement for direct paragraphs in header
+                        non_empty_ps = [p for p in hf.paragraphs if p.text.strip()]
+                        title_p = None
+                        loc_p = None
+                        for p in non_empty_ps:
+                            if "טופס התחברות" not in p.text:
+                                if not title_p:
+                                    title_p = p
+                                elif not loc_p:
+                                    loc_p = p
+                                    break
+                        if title_p:
+                            if title_p.runs:
+                                title_p.runs[0].text = exam_title_clean
+                                for r in title_p.runs[1:]:
+                                    r.text = ""
+                            else:
+                                title_p.text = exam_title_clean
+                        if loc_p and e['location']:
+                            if loc_p.runs:
+                                loc_p.runs[0].text = e['location']
+                                for r in loc_p.runs[1:]:
+                                    r.text = ""
+                            else:
+                                loc_p.text = e['location']
+                        
+                        # Also apply keyword replacement for paragraphs and tables inside header
+                        for p in hf.paragraphs:
+                            replace_static_text(p, exam_title_clean, e['location'])
+                        for table in hf.tables:
+                            for row in table.rows:
+                                for cell in row.cells:
+                                    for p in cell.paragraphs:
+                                        replace_static_text(p, exam_title_clean, e['location'])
+
+                # 2. Process footers with keywords replacement only (no heuristic to prevent corruption)
+                for hf_name in ['footer', 'first_page_footer', 'even_page_footer']:
+                    hf = getattr(section, hf_name, None)
+                    if hf:
+                        for p in hf.paragraphs:
+                            replace_static_text(p, exam_title_clean, e['location'])
+                        for table in hf.tables:
+                            for row in table.rows:
+                                for cell in row.cells:
+                                    for p in cell.paragraphs:
+                                        replace_static_text(p, exam_title_clean, e['location'])
+
+            # Process main body paragraphs and tables
+            for p in doc.paragraphs:
+                replace_static_text(p, exam_title_clean, e['location'])
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for p in cell.paragraphs:
+                            replace_static_text(p, exam_title_clean, e['location'])
             
             # Generate QR locally
             import qrcode as qrcode_lib
@@ -2446,10 +2550,67 @@ def api_exam_scan_beacon():
     pixel = base64.b64decode('R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==')
     return send_file(io.BytesIO(pixel), mimetype='image/gif', max_age=0)
 
+@app.route('/api/check-computer-used', methods=['POST'])
+@login_required
+def api_check_computer_used():
+    """בדיקה אם מחשב כבר שויך לנבחן אחר בגיליון הנוכחי"""
+    global attendance_cache
+    data = request.json or {}
+    computer = (data.get('computer', '') or '').strip()
+    exam_name = (data.get('exam_name', '') or '').strip()
+
+    if not computer or not exam_name:
+        return jsonify({"in_use": False})
+
+    # חיפוש מהיר במטמון (אם כבר טעון)
+    # אם לא טעון — ניגש לגוגל שיטס
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+        conn_db = get_db_connection()
+        sheet_id = None
+        if conn_db:
+            try:
+                cur_db = get_safe_cursor(conn_db)
+                cur_db.execute("SELECT sheets_id FROM projects WHERE name = %s OR keywords LIKE %s", (exam_name, f"%{exam_name}%"))
+                row_proj = cur_db.fetchone()
+                if row_proj:
+                    sheet_id = row_proj['sheets_id']
+                cur_db.close()
+            except Exception:
+                pass
+            finally:
+                release_db_connection(conn_db)
+        if not sheet_id:
+            sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
+
+        scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+        sa_file = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+        creds = Credentials.from_service_account_file(sa_file, scopes=scopes)
+        client = gspread.authorize(creds)
+        try:
+            ws = client.open_by_key(sheet_id).worksheet(exam_name)
+        except Exception:
+            ws = client.open_by_key(sheet_id).sheet1
+        all_rows = ws.get_all_values()
+        for r in all_rows[1:]:
+            # עמודה C (אינדקס 2) = מחשב, עמודה D (אינדקס 3) = נוכח
+            if len(r) > 2 and str(r[2]).strip() == str(computer).strip():
+                if len(r) > 3 and r[3].strip():
+                    existing_name = r[0] if r[0] else 'נבחן'
+                    return jsonify({"in_use": True, "name": existing_name})
+        return jsonify({"in_use": False})
+    except Exception as ex:
+        print(f"[check-computer-used] Error: {ex}", flush=True)
+        return jsonify({"in_use": False})
+
+
 @app.route('/api/exam-scan-double', methods=['POST'])
 @login_required
 def api_exam_scan_double():
     """סריקה כפולה: נבחן + מחשב + סטטוסים — מקבל JSON או form data"""
+    global attendance_cache
+
     if request.is_json:
         data = request.json
     else:
@@ -2468,65 +2629,159 @@ def api_exam_scan_double():
     # קריאת נתונים ישירות מה-QR - לא תלוי ב-DB
     id_number = parts[1] if len(parts) > 1 else ''
     full_name = parts[2] if len(parts) > 2 else ''
-    exam_name = parts[0] if parts[0] != 'EXAMINEE' else ''
+    
+    # שם המבחן — מהפרמטר, ובמידת הצורך מה-QR (parts[0])
+    exam_name = (data.get('exam_name', '') or '').strip()
+    if not exam_name:
+        exam_name = parts[0] if (len(parts) > 0 and parts[0] != 'EXAMINEE') else ''
+
     scan_time_str = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
     technician = session.get('username', '')
     present_val = 1 if is_present == 1 else 0
 
+    # ── דינמי: איתור קובץ ה-Google Sheet הייעודי למבחן זה ──
+    sheet_id = None
+    if exam_name:
+        conn_db = get_db_connection()
+        if conn_db:
+            try:
+                cur_db = get_safe_cursor(conn_db)
+                cur_db.execute("SELECT sheets_id FROM projects WHERE name = %s OR keywords LIKE %s", (exam_name, f"%{exam_name}%"))
+                row_proj = cur_db.fetchone()
+                if row_proj:
+                    sheet_id = row_proj['sheets_id']
+                cur_db.close()
+            except Exception as ex_db:
+                print(f"Error looking up project sheets_id: {ex_db}")
+            finally:
+                release_db_connection(conn_db)
 
-    # בדיקת כפול בגוגל שיטס (סינכרונית — לפני השמירה)
-    duplicate_info = None
-    try:
-        import gspread, os
-        from google.oauth2.service_account import Credentials
-        scopes   = ['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/drive']
-        sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+    # Fallback למפתח ברירת המחדל
+    if not sheet_id:
         sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
-        creds    = Credentials.from_service_account_file(sa_file, scopes=scopes)
-        client   = gspread.authorize(creds)
-        ws       = client.open_by_key(sheet_id).sheet1
-        all_rows = ws.get_all_values()
-        for r in all_rows[1:]:  # דלג על שורת כותרות
-            if len(r) > 1 and str(r[1]).strip() == str(id_number).strip():
-                prev_time = r[6] if len(r) > 6 else '?'
-                duplicate_info = f"⚠️ {full_name} כבר נסרק! (קודם: {prev_time})"
-                break
-    except Exception as ex:
-        import sys
-        sys.stdout.buffer.write(f"[Sheets] Duplicate check error: {ex}\n".encode('utf-8', errors='replace'))
-        sys.stdout.flush()
 
-    # שמירה לגוגל שיטס ברקע
-    def append_to_exam_sheet(row_data):
-        import sys, traceback
-        print(f"[THREAD] Starting save: {row_data[0]} | PC: {row_data[2]}", flush=True)
+    # שמירת מפתח הגיליון והבחינה בסשן לטובת ביטול
+    session['last_exam_sheet_id'] = sheet_id
+    session['last_exam_name'] = exam_name
+    session['last_id_number'] = id_number
+
+    duplicate_info = None
+
+    # טעינת המטמון במידה ולא נטען עדיין עבור הבחינה הנוכחית
+    if exam_name not in attendance_cache:
+        print(f"[CACHE] Loading attendance cache for exam: {exam_name}", flush=True)
         try:
-            import gspread, os
+            import gspread
             from google.oauth2.service_account import Credentials
             scopes = ['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/drive']
             sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
-            sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
-            print(f"[THREAD] Connecting to sheet: {sheet_id[:20]}...", flush=True)
             creds    = Credentials.from_service_account_file(sa_file, scopes=scopes)
             client   = gspread.authorize(creds)
-            ws       = client.open_by_key(sheet_id).sheet1
-            # בדיקת כותרות נכונה - לא לפי row_count אלא לפי הערך בתא הראשון
-            first_cell = ws.acell('A1').value
-            if not first_cell or first_cell.strip() == '':
-                headers = ['שם נבחן','תעודת זהות','מחשב','נוכח','סטטוס מחשב','שם בחינה','שעת סריקה','טכנאי','טור','כסא']
-                ws.append_row(headers, value_input_option='USER_ENTERED')
-                print("[THREAD] Headers added to sheet", flush=True)
-            ws.append_row(row_data, value_input_option='USER_ENTERED')
-            print(f"[OK] Saved: {row_data[0]} | PC: {row_data[2]} | Time: {row_data[6]}", flush=True)
+            # חיפוש לפי כותרת (שם) קודם, אחרכך על פי מפתח
+            ws = None
+            if exam_name:
+                try:
+                    ws = client.open(exam_name).sheet1
+                    print(f"[CACHE] Opened spreadsheet by title: {exam_name}", flush=True)
+                except Exception:
+                    pass
+            if ws is None:
+                try:
+                    ws = client.open_by_key(sheet_id).worksheet(exam_name)
+                except Exception:
+                    ws = client.open_by_key(sheet_id).sheet1
+            all_rows = ws.get_all_values()
+
+            # מבנה עמודות גיליון:
+            # [0]שם נבחן | [1]ת.ז | [2]מחשב | [3]נוכח | [4]סטטוס | [5]שם בחינה | [6]שעת סריקה | [7]טכנאי | [8]טור | [9]כסא
+            attendance_cache[exam_name] = {}
+            for r in all_rows[1:]:
+                # בדיקה בעמודה D (אינדקס 3) = נוכח
+                if len(r) > 3 and r[3].strip() and len(r) > 1:
+                    attendance_cache[exam_name][str(r[1]).strip()] = r[6] if (len(r) > 6 and r[6].strip()) else 'נוכח'
+            print(f"[CACHE] Loaded {len(attendance_cache[exam_name])} active scans for {exam_name}", flush=True)
         except Exception as ex:
-            print(f"[ERROR] Save to sheets failed: {str(ex)}", flush=True)
+            print(f"[CACHE ERROR] Failed to build cache for {exam_name}: {ex}", flush=True)
+            attendance_cache[exam_name] = {}
+
+    # שמירה תמיד — ללא בדיקת כפולים
+    attendance_cache.setdefault(exam_name, {})[str(id_number).strip()] = scan_time_str
+
+    def save_to_exam_sheet_in_thread(target_sheet_id, target_exam_name, target_id_number, target_full_name, target_computer, target_col, target_seat, target_pc_status, target_scan_time, target_technician):
+        import sys, traceback, gspread
+        from google.oauth2.service_account import Credentials
+        print(f"[THREAD] Starting Google Sheets update for {target_full_name} ({target_id_number})...", flush=True)
+        try:
+            scopes = ['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/drive']
+            sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+            creds    = Credentials.from_service_account_file(sa_file, scopes=scopes)
+            client   = gspread.authorize(creds)
+            # חיפוש לפי כותרת (שם) קודם, אחרכך על פי מפתח
+            ws = None
+            if target_exam_name:
+                try:
+                    ws = client.open(target_exam_name).sheet1
+                    print(f"[THREAD] Opened by title: {target_exam_name}", flush=True)
+                except Exception:
+                    pass
+            if ws is None:
+                try:
+                    ws = client.open_by_key(target_sheet_id).worksheet(target_exam_name)
+                except Exception:
+                    ws = client.open_by_key(target_sheet_id).sheet1
+
+            all_rows = ws.get_all_values()
+
+            # מבנה עמודות:
+            # [0]שם נבחן | [1]ת.ז | [2]מחשב | [3]נוכח | [4]סטטוס | [5]שם בחינה | [6]שעת סריקה | [7]טכנאי | [8]טור | [9]כסא
+
+            # מציאת שורה לפי ת.ז (אינדקס 1)
+            row_idx = -1
+            for idx, r in enumerate(all_rows):
+                if len(r) > 1 and str(r[1]).strip() == str(target_id_number).strip():
+                    row_idx = idx + 1
+                    break
+
+            if row_idx != -1:
+                r_new = list(all_rows[row_idx - 1])
+                while len(r_new) < 10:
+                    r_new.append("")
+                r_new[2]  = target_computer
+                r_new[3]  = "1"
+                r_new[4]  = target_pc_status
+                r_new[5]  = target_exam_name
+                r_new[6]  = target_scan_time
+                r_new[7]  = target_technician
+                r_new[8]  = target_col
+                r_new[9]  = target_seat
+                ws.update(f"A{row_idx}", [r_new], value_input_option='USER_ENTERED')
+                print(f"[THREAD OK] Updated row {row_idx} for {target_full_name}", flush=True)
+            else:
+                new_row = [
+                    target_full_name,
+                    target_id_number,
+                    target_computer,
+                    "1",
+                    target_pc_status,
+                    target_exam_name,
+                    target_scan_time,
+                    target_technician,
+                    target_col,
+                    target_seat
+                ]
+                ws.append_row(new_row, value_input_option='USER_ENTERED')
+                print(f"[THREAD OK] Appended new row for {target_full_name}", flush=True)
+        except Exception as ex:
+            print(f"[THREAD ERROR] Save failed for {target_full_name}: {ex}", flush=True)
             traceback.print_exc()
 
     import threading
-    row = [full_name, id_number, computer, present_val, pc_status, exam_name, scan_time_str, technician, col, seat]
-    t = threading.Thread(target=append_to_exam_sheet, args=(row,), daemon=False)
+    t = threading.Thread(
+        target=save_to_exam_sheet_in_thread,
+        args=(sheet_id, exam_name, id_number, full_name, computer, col, seat, pc_status, scan_time_str, technician),
+        daemon=False
+    )
     t.start()
-    print(f"[THREAD] Started save thread for: {full_name}", flush=True)
 
     if duplicate_info:
         return jsonify({"success": True, "warning": duplicate_info})
@@ -2536,25 +2791,61 @@ def api_exam_scan_double():
 @app.route('/api/undo-last-scan', methods=['POST'])
 @login_required
 def undo_last_scan():
-    """מחיקת השורה האחרונה מגוגל שיטס (ביטול סריקה)"""
+    """ביטול סריקה אחרונה וניקוי סטטוס נוכחות בגוגל שיטס"""
+    global attendance_cache
     try:
         import gspread, os
         from google.oauth2.service_account import Credentials
         scopes   = ['https://www.googleapis.com/auth/spreadsheets',
                     'https://www.googleapis.com/auth/drive']
         sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
-        sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
         creds    = Credentials.from_service_account_file(sa_file, scopes=scopes)
         client   = gspread.authorize(creds)
-        sh       = client.open_by_key(sheet_id)
-        ws       = sh.sheet1
+        
+        sheet_id = session.get('last_exam_sheet_id') or os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
+        exam_name = session.get('last_exam_name')
+        last_id_number = session.get('last_id_number')
+        
+        # הסרה מהמטמון
+        if exam_name and last_id_number and exam_name in attendance_cache:
+            if last_id_number in attendance_cache[exam_name]:
+                del attendance_cache[exam_name][last_id_number]
+                print(f"[UNDO CACHE] Removed {last_id_number} from cache for {exam_name}", flush=True)
+
+        try:
+            ws = client.open_by_key(sheet_id).worksheet(exam_name)
+        except Exception:
+            ws = client.open_by_key(sheet_id).sheet1
+
+        if last_id_number:
+            all_vals = ws.get_all_values()
+            row_idx = -1
+            for idx, r in enumerate(all_vals):
+                if len(r) > 1 and str(r[1]).strip() == str(last_id_number).strip():
+                    row_idx = idx + 1
+                    break
+            
+            if row_idx != -1:
+                r_new = list(all_vals[row_idx - 1])
+                while len(r_new) < 13:
+                    r_new.append("")
+                # איפוס עמודות: מחשב, נוכחות, מצב מחשב, שעת סריקה
+                r_new[6]  = ""
+                r_new[10] = ""
+                r_new[11] = ""
+                r_new[12] = ""
+                ws.update(f"A{row_idx}", [r_new], value_input_option='USER_ENTERED')
+                print(f"[UNDO OK] Cleared presence on row {row_idx} for ID {last_id_number}", flush=True)
+                return {"success": True}
+        
+        # Fallback לביטול השורה האחרונה במידה ולא נמצא נתון ספציפי
         all_vals = ws.get_all_values()
         last_row = len(all_vals)
-        if last_row <= 1:   # רק כותרות - אין מה למחוק
-            return {"success": False, "error": "אין שורות למחיקה"}
+        if last_row > 1:
+            ws.delete_rows(last_row)
+            return {"success": True}
             
-        ws.delete_rows(last_row)
-        return {"success": True}
+        return {"success": False, "error": "לא נמצא נבחן לביטול"}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2914,9 +3205,18 @@ def print_cage_page(cage_id):
 # --- End of Routes ---
 
 if __name__ == '__main__':
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        local_ip = "127.0.0.1"
+
     print("\n[START] URI SYSTEM IS LIVE! (HTTPS ENABLED FOR MOBILE SCANNER)")
     print("URL Link: https://127.0.0.1:5000")
-    print("Mobile Link: https://10.0.0.31:5000\n")
+    print(f"Mobile Link: https://{local_ip}:5000\n")
     print("[WARNING] When opening on iPhone, you will see a 'Not Private' warning. Click 'Show Details' -> 'Visit this website' to bypass and test the scanner.")
     import os
     cert_file = os.path.join(os.path.dirname(__file__), 'server.crt')
