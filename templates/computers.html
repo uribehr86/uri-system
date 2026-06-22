@@ -244,7 +244,7 @@
 {% if session.get('role') == 'admin' %}
 <div class="sheets-admin-panel" id="sheets-admin-panel">
     <span class="label">🔗 גוגל שיטס:</span>
-    <button class="btn-sheets-import" onclick="importFromSheets()">⬇️ ייבא שינויים עכשיו</button>
+    <button class="btn-sheets-import" onclick="exportToSheets()">☁️ ייצא שינויים עכשיו</button>
     <button class="btn-sheets-approve" id="btn-approve-delete" style="display:none;" onclick="approveSheetDelete('approve')">🗑️ אשר מחיקת מסומנים</button>
     <button class="btn-sheets-cancel"  id="btn-cancel-delete"  style="display:none;" onclick="approveSheetDelete('cancel')">↩️ בטל סימוני מחיקה</button>
     <button style="background:rgba(250,204,21,0.15);border:1px solid rgba(250,204,21,0.4);color:#facc15;padding:9px 16px;border-radius:8px;font-weight:800;cursor:pointer;font-size:0.85rem;" onclick="openDuplicatesModal()">🔍 בדוק כפילויות</button>
@@ -552,6 +552,25 @@
         if (el) el.textContent = isLoading ? '⏳ ' + msg : msg;
     }
 
+    function exportToSheets() {
+        setSheetStatus('מסנכרן לגוגל שיטס...', true);
+        fetch('/api/sync-to-sheets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                setSheetStatus('✅ סונכרן בהצלחה!');
+                setTimeout(() => setSheetStatus(''), 4000);
+            } else {
+                setSheetStatus('❌ שגיאה: ' + (data.error || data.message || 'unknown'));
+                alert('שגיאה בייצוא: ' + (data.error || data.message || 'unknown'));
+            }
+        })
+        .catch(() => setSheetStatus('❌ שגיאת תקשורת עם השרת'));
+    }
+
     function importFromSheets() {
         if (!confirm('ייבא שינויים מגוגל שיטס?\n\nשורות שנמחקו בגיליון יסומנו בירוק זוהר ויחכו לאישורך למחיקה.')) return;
         setSheetStatus('מתחבר לגוגל שיטס...', true);
@@ -571,8 +590,8 @@
                 }
                 setTimeout(() => location.reload(), 1500);
             } else {
-                setSheetStatus('❌ שגיאה: ' + data.error);
-                alert('שגיאה בייבוא: ' + data.error);
+                setSheetStatus('❌ שגיאה: ' + (data.error || data.message || 'unknown'));
+                alert('שגיאה בייבוא: ' + (data.error || data.message || 'unknown'));
             }
         })
         .catch(() => setSheetStatus('❌ שגיאת תקשורת עם השרת'));
