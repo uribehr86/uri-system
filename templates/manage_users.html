@@ -226,7 +226,10 @@
                     body: JSON.stringify({barcode: barcode, action: action})
                 })
                 .then(r => r.json())
-                .then(res => { if(res.success) { location.reload(); } });
+                .then(res => { 
+                    if(res.success) { location.reload(); }
+                    else { alert('שגיאה: ' + (res.error || 'אין הרשאה')); }
+                });
             }
         }
 
@@ -336,6 +339,19 @@
             .catch(() => {
                 statusEl.style.color = '#f87171';
                 statusEl.textContent = '❌ שגיאת תקשורת';
+            });
+        }
+        function changeRole(username, newRole) {
+            if (!confirm(`לשנות תפקיד של ${username} ל-${newRole}?`)) return;
+            fetch('/api/update_user', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: username, role: newRole})
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) { location.reload(); }
+                else { alert('שגיאה: ' + (res.error || 'לא ידוע')); }
             });
         }
     </script>

@@ -465,7 +465,6 @@ def register():
                     conn.commit()
                     flash(f"משתמש {username} נוצר בהצלחה! כעת ניתן להתחבר.", "success")
                     cur.close()
-                    release_db_connection(conn)
                     return redirect(url_for('login'))
                 cur.close()
             except Exception as e:
@@ -1103,6 +1102,65 @@ def api_sync_to_sheets():
         return {"success": False, "error": message}, 500
 
 
+@app.route('/api/find-duplicates', methods=['GET'])
+@login_required
+def api_find_duplicates():
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"success": False, "error": "DB error"}), 500
+    try:
+        cur = get_safe_cursor(conn)
+        cur.execute("""
+            SELECT computer_number, COUNT(*) as cnt
+            FROM computers
+            GROUP BY computer_number
+            HAVING COUNT(*) > 1
+            ORDER BY cnt DESC
+        """)
+        rows = cur.fetchall()
+        duplicates = []
+        for r in rows:
+            if hasattr(r, 'keys'):
+                duplicates.append({'computer_number': r['computer_number'], 'count': r['cnt']})
+            else:
+                duplicates.append({'computer_number': r[0], 'count': r[1]})
+        cur.close()
+        return jsonify({"success": True, "duplicates": duplicates, "total": len(duplicates)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        release_db_connection(conn)
+
+
+@app.route('/api/delete-duplicates', methods=['POST'])
+@login_required
+def api_delete_duplicates():
+    if session.get('role') != 'admin' and session.get('user') != 'admin_uri':
+        return jsonify({"success": False, "error": "Admin only"}), 403
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"success": False, "error": "DB error"}), 500
+    try:
+        cur = get_safe_cursor(conn)
+        cur.execute("""
+            DELETE FROM computers
+            WHERE id NOT IN (
+                SELECT DISTINCT ON (computer_number) id
+                FROM computers
+                ORDER BY computer_number, last_scan DESC NULLS LAST
+            )
+        """)
+        deleted = cur.rowcount
+        conn.commit()
+        cur.close()
+        return jsonify({"success": True, "deleted": deleted, "message": f"נמחקו {deleted} כפולים"})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        release_db_connection(conn)
+
+
 # ── API: ייבוא מגוגל שיטס → מסד (רק admin) ──────────────────────────
 @app.route('/api/import-from-sheets', methods=['POST'])
 @login_required
@@ -1234,7 +1292,7 @@ def api_fast_scan():
     status     = data.get('status', 'תקין')
     specs      = data.get('specs', '')
     project    = data.get('project', '')
-    ministry   = data.get('ministry', '') or get_ministry_for_project(project)
+    ministry   = data.get('ministry', '')
     technician = session.get('username', 'לא ידוע')
 
     conn = get_db_connection()
@@ -1953,107 +2011,88 @@ def exam_attendance_import():
             return (row_n, seat_n)
         all_rows.sort(key=sort_key)
 
-        # ── Google Drive + Sheets: תיקיה + גיליון אחד למשרד, טאב לכל מבחן ──
-        import re, gspread, os
-        from google.oauth2.service_account import Credentials
-        from googleapiclient.discovery import build
+        # ── Google Drive: תיקייה + גיליון ייעודי לכל מבחן ──
+        from drive_manager import create_folder_and_sheet_if_not_exists
+        import re
 
-        scopes  = ['https://www.googleapis.com/auth/spreadsheets',
-                   'https://www.googleapis.com/auth/drive']
-        sa_file = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
-        creds   = Credentials.from_service_account_file(sa_file, scopes=scopes)
-        client  = gspread.authorize(creds)
-        drive   = build('drive', 'v3', credentials=creds)
-
-        PARENT_FOLDER_ID = '1bmoF9oe2O6hB4v2MCJEtWRWI7nnO8llv'
-
-        # שם קובץ ללא סיומת
         raw_name = os.path.splitext(file.filename)[0]
 
-        # שם המשרד/פרויקט ושם המבחן
-        words = raw_name.split()
-        if len(words) >= 2 and words[0] == 'משרד':
-            # "משרד הבריאות רופאים 15.6.26" → תיקיה: משרד הבריאות, קובץ: רופאים 15.6.26
-            ministry_name = f"{words[0]} {words[1]}"
-            tab_name      = ' '.join(words[2:]).strip() or raw_name
-        elif exam_title_row1:
-            title_clean   = re.sub(r'[-–]\s*נוכחות\s*$', '', exam_title_row1).strip()
-            title_clean   = re.sub(r'[-–]\s*\d+\.\d+\.\d+\s*$', '', title_clean).strip()
-            ministry_name = title_clean or raw_name
-            tab_name      = raw_name
+        # שם המשרד/בחינה — ניקוי תאריך מהשם
+        if exam_title_row1:
+            title_clean = re.sub(r'[-–]\s*נוכחות\s*$', '', exam_title_row1).strip()
+            title_clean = re.sub(r'[-–]\s*\d+\.\d+\.\d+\s*$', '', title_clean).strip()
+            exam_sheet_name = title_clean or raw_name
         else:
-            ministry_name = re.sub(r'\s*\d+[\./]\d+[\./]\d+\s*$', '', raw_name).strip() or raw_name
-            tab_name      = raw_name
+            exam_sheet_name = re.sub(r'\s*\d+[\./]\d+[\./]\d+\s*$', '', raw_name).strip() or raw_name
 
-        # ── קבלת מזהה גיליון מתוך הקישור בטופס (אופציונלי - לתמיכה באפשרות ב') ──
-        sheet_id = None
-        form_sheet_url = request.form.get('sheet_url', '').strip()
-        if form_sheet_url:
-            match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', form_sheet_url)
-            if match:
-                sheet_id = match.group(1)
-                print(f"[IMPORT] Found custom Sheet ID in form: {sheet_id}")
+        print(f"[IMPORT] Creating/finding Drive sheet for: '{exam_sheet_name}'", flush=True)
 
-        # ── איתור מזהה הגיליון של המשרד/פרויקט מתוך מסד הנתונים ──
-        if not sheet_id:
-            conn_check = get_db_connection()
-            if conn_check:
-                try:
-                    cur_check = get_safe_cursor(conn_check)
-                    cur_check.execute("SELECT sheets_id FROM projects WHERE name = %s OR keywords LIKE %s", (ministry_name, f"%{ministry_name}%"))
-                    row_proj = cur_check.fetchone()
-                    if row_proj:
-                        sheet_id = row_proj['sheets_id']
-                    cur_check.close()
-                except Exception as ex_db:
-                    print(f"Error checking project sheets_id: {ex_db}")
-                finally:
-                    release_db_connection(conn_check)
+        # יצירת תיקייה + גיליון אוטומטית ב-Drive (אם לא קיים — יוצר, אם קיים — מחזיר)
+        new_sheet_id = create_folder_and_sheet_if_not_exists(exam_sheet_name)
 
-        # Fallback לגיליון ברירת המחדל הכללי
-        if not sheet_id:
-            sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
+        if not new_sheet_id:
+            # Fallback לגיליון ברירת המחדל
+            new_sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
+            print(f"[IMPORT] Fallback to default sheet", flush=True)
 
-        sh = client.open_by_key(sheet_id)
+        import gspread
+        from google.oauth2.service_account import Credentials
+        scopes  = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+        sa_file = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+        creds   = Credentials.from_service_account_file(sa_file, scopes=scopes)
+        gs_client = gspread.authorize(creds)
+        sh = gs_client.open_by_key(new_sheet_id)
+        ws_tab = sh.sheet1
 
-        # ── הוסף לשונית (Worksheet) חדשה עבור המבחן ──
-        existing_titles = [w.title for w in sh.worksheets()]
-        unique_tab = tab_name
-        counter    = 2
-        while unique_tab in existing_titles:
-            unique_tab = f"{tab_name} ({counter})"
-            counter   += 1
-
-        ws_tab = sh.add_worksheet(title=unique_tab, rows=1000, cols=15)
-
-        # ── שלב 4: כתוב נתונים ללשונית החדשה ──
-        header_row    = ['שם נבחן', 'תעודת זהות', 'קוד משתמש', 'סיסמה',
-                         'טור', 'כסא', 'מחשב', 'הערות', 'בחינה', 'מיקום',
-                         'נוכחות', 'מצב מחשב', 'שעת סריקה']
+        # ── כתוב נתונים לגיליון — לפי מבנה האקסל ──
+        header_row = [
+            'שם פרטי', 'שם משפחה', 'ת.ז', 'התאמות', 'סיסמה',
+            'שם משתמש', 'גרסה', "סה' אולם", 'טור', 'כסא',
+            'מ.מחשב', 'נוכחות', 'שעת סריקה', 'טכנאי'
+        ]
         rows_to_write = [header_row]
         for rec in all_rows:
             rows_to_write.append([
-                rec['name'], rec['id_number'], rec['username'], rec['password'],
-                rec['row_number'], rec['seat_number'], rec['computer'],
-                rec['notes'], rec['exam_name'], rec['location'],
-                '', '', ''   # נוכחות + מצב מחשב + שעת סריקה ימולאו בסריקה
+                rec['name'],         # שם פרטי (שם מלא)
+                '',                  # שם משפחה
+                rec['id_number'],    # ת.ז
+                rec.get('notes',''), # התאמות
+                rec['password'],     # סיסמה
+                rec['username'],     # שם משתמש
+                rec.get('exam_name', exam_sheet_name),  # גרסה
+                '',                  # סה' אולם
+                rec['row_number'],   # טור
+                rec['seat_number'],  # כסא
+                '',                  # מ.מחשב ← ימולא בסריקה
+                '',                  # נוכחות ← ימולא בסריקה
+                '',                  # שעת סריקה ← ימולא בסריקה
+                '',                  # טכנאי ← ימולא בסריקה
             ])
+        ws_tab.clear()
         ws_tab.update('A1', rows_to_write, value_input_option='USER_ENTERED')
 
-        # ── שלב 5: שמור מיפוי פרויקט במסד לשימוש הסורק ──
-        sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}"
+        # עיצוב כותרות
+        last_col = chr(ord('A') + len(header_row) - 1)
+        ws_tab.format(f'A1:{last_col}1', {
+            'textFormat': {'bold': True},
+            'backgroundColor': {'red': 0.8, 'green': 0.9, 'blue': 1.0},
+            'horizontalAlignment': 'CENTER'
+        })
+
+        # ── שמור מיפוי פרויקט במסד ──
+        sheet_url = f"https://docs.google.com/spreadsheets/d/{new_sheet_id}"
         conn2 = get_db_connection()
         if conn2:
             try:
                 cur2 = get_safe_cursor(conn2)
-                cur2.execute("SELECT id FROM projects WHERE name = %s", (unique_tab,))
+                cur2.execute("SELECT id FROM projects WHERE name = %s", (exam_sheet_name,))
                 existing = cur2.fetchone()
                 if existing:
                     cur2.execute("UPDATE projects SET sheets_id=%s, drive_url=%s WHERE name=%s",
-                                 (sheet_id, sheet_url, unique_tab))
+                                 (new_sheet_id, sheet_url, exam_sheet_name))
                 else:
                     cur2.execute("INSERT INTO projects (name, keywords, sheets_id, drive_url) VALUES (%s,%s,%s,%s)",
-                                 (unique_tab, unique_tab, sheet_id, sheet_url))
+                                 (exam_sheet_name, exam_sheet_name, new_sheet_id, sheet_url))
                 conn2.commit()
                 cur2.close()
             except Exception:
@@ -2061,12 +2100,15 @@ def exam_attendance_import():
             finally:
                 release_db_connection(conn2)
 
-        flash(f"✅ {len(all_rows)} נבחנים נוספו! 📑 לשונית חדשה: {unique_tab}", "success")
+        flash(f"✅ {len(all_rows)} נבחנים יובאו! 📂 גיליון נוצר: {exam_sheet_name}", "success")
+        flash(f"🔗 <a href='{sheet_url}' target='_blank'>פתח את הגיליון ב-Google Drive</a>", "info")
 
     except Exception as e:
         import traceback; traceback.print_exc()
         flash(f"שגיאה בייבוא: {e}", "danger")
     return redirect(url_for('exam_attendance'))
+
+
 
 
 @app.route('/api/generate-word-docs', methods=['POST'])
@@ -2594,9 +2636,9 @@ def api_check_computer_used():
             ws = client.open_by_key(sheet_id).sheet1
         all_rows = ws.get_all_values()
         for r in all_rows[1:]:
-            # עמודה C (אינדקס 2) = מחשב, עמודה D (אינדקס 3) = נוכח
-            if len(r) > 2 and str(r[2]).strip() == str(computer).strip():
-                if len(r) > 3 and r[3].strip():
+            # עמודה K (אינדקס 10) = מ.מחשב, עמודה L (אינדקס 11) = נוכחות
+            if len(r) > 10 and str(r[10]).strip() == str(computer).strip():
+                if len(r) > 11 and r[11].strip():
                     existing_name = r[0] if r[0] else 'נבחן'
                     return jsonify({"in_use": True, "name": existing_name})
         return jsonify({"in_use": False})
@@ -2637,7 +2679,6 @@ def api_exam_scan_double():
 
     scan_time_str = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
     technician = session.get('username', '')
-    present_val = 1 if is_present == 1 else 0
 
     # ── דינמי: איתור קובץ ה-Google Sheet הייעודי למבחן זה ──
     sheet_id = None
@@ -2665,8 +2706,6 @@ def api_exam_scan_double():
     session['last_exam_name'] = exam_name
     session['last_id_number'] = id_number
 
-    duplicate_info = None
-
     # טעינת המטמון במידה ולא נטען עדיין עבור הבחינה הנוכחית
     if exam_name not in attendance_cache:
         print(f"[CACHE] Loading attendance cache for exam: {exam_name}", flush=True)
@@ -2692,13 +2731,13 @@ def api_exam_scan_double():
                     ws = client.open_by_key(sheet_id).sheet1
             all_rows = ws.get_all_values()
 
-            # מבנה עמודות גיליון:
-            # [0]שם נבחן | [1]ת.ז | [2]מחשב | [3]נוכח | [4]סטטוס | [5]שם בחינה | [6]שעת סריקה | [7]טכנאי | [8]טור | [9]כסא
+            # מבנה עמודות לפי האקסל:
+            # [0]שם פרטי | [1]שם משפחה | [2]ת.ז | [3]התאמות | [4]סיסמה | [5]שם משתמש | [6]גרסה | [7]סה' אולם | [8]טור | [9]כסא | [10]מ.מחשב | [11]נוכחות | [12]שעת סריקה | [13]טכנאי
             attendance_cache[exam_name] = {}
             for r in all_rows[1:]:
-                # בדיקה בעמודה D (אינדקס 3) = נוכח
-                if len(r) > 3 and r[3].strip() and len(r) > 1:
-                    attendance_cache[exam_name][str(r[1]).strip()] = r[6] if (len(r) > 6 and r[6].strip()) else 'נוכח'
+                # בדיקה בעמודה L (אינדקס 11) = נוכחות
+                if len(r) > 11 and r[11].strip() and len(r) > 2:
+                    attendance_cache[exam_name][str(r[2]).strip()] = r[12] if (len(r) > 12 and r[12].strip()) else 'נוכח'
             print(f"[CACHE] Loaded {len(attendance_cache[exam_name])} active scans for {exam_name}", flush=True)
         except Exception as ex:
             print(f"[CACHE ERROR] Failed to build cache for {exam_name}: {ex}", flush=True)
@@ -2730,47 +2769,26 @@ def api_exam_scan_double():
                 except Exception:
                     ws = client.open_by_key(target_sheet_id).sheet1
 
-            all_rows = ws.get_all_values()
+            # תמיד מוסיף שורה חדשה — כל סריקה = שורה חדשה
+            new_row = [
+                target_full_name,    # [0] שם פרטי (שם מלא)
+                "",                  # [1] שם משפחה
+                target_id_number,    # [2] ת.ז
+                "",                  # [3] התאמות
+                "",                  # [4] סיסמה
+                "",                  # [5] שם משתמש
+                target_exam_name,    # [6] גרסה/בחינה
+                "",                  # [7] סה' אולם
+                target_col,          # [8] טור
+                target_seat,         # [9] כסא
+                target_computer,     # [10] מ.מחשב ← נסרק
+                "1",                 # [11] נוכחות ← נסרק
+                target_scan_time,    # [12] שעת סריקה
+                target_technician    # [13] טכנאי
+            ]
+            ws.append_row(new_row, value_input_option='USER_ENTERED')
+            print(f"[THREAD OK] Appended new row for {target_full_name}", flush=True)
 
-            # מבנה עמודות:
-            # [0]שם נבחן | [1]ת.ז | [2]מחשב | [3]נוכח | [4]סטטוס | [5]שם בחינה | [6]שעת סריקה | [7]טכנאי | [8]טור | [9]כסא
-
-            # מציאת שורה לפי ת.ז (אינדקס 1)
-            row_idx = -1
-            for idx, r in enumerate(all_rows):
-                if len(r) > 1 and str(r[1]).strip() == str(target_id_number).strip():
-                    row_idx = idx + 1
-                    break
-
-            if row_idx != -1:
-                r_new = list(all_rows[row_idx - 1])
-                while len(r_new) < 10:
-                    r_new.append("")
-                r_new[2]  = target_computer
-                r_new[3]  = "1"
-                r_new[4]  = target_pc_status
-                r_new[5]  = target_exam_name
-                r_new[6]  = target_scan_time
-                r_new[7]  = target_technician
-                r_new[8]  = target_col
-                r_new[9]  = target_seat
-                ws.update(f"A{row_idx}", [r_new], value_input_option='USER_ENTERED')
-                print(f"[THREAD OK] Updated row {row_idx} for {target_full_name}", flush=True)
-            else:
-                new_row = [
-                    target_full_name,
-                    target_id_number,
-                    target_computer,
-                    "1",
-                    target_pc_status,
-                    target_exam_name,
-                    target_scan_time,
-                    target_technician,
-                    target_col,
-                    target_seat
-                ]
-                ws.append_row(new_row, value_input_option='USER_ENTERED')
-                print(f"[THREAD OK] Appended new row for {target_full_name}", flush=True)
         except Exception as ex:
             print(f"[THREAD ERROR] Save failed for {target_full_name}: {ex}", flush=True)
             traceback.print_exc()
@@ -2783,9 +2801,8 @@ def api_exam_scan_double():
     )
     t.start()
 
-    if duplicate_info:
-        return jsonify({"success": True, "warning": duplicate_info})
     return jsonify({"success": True})
+
 
 
 @app.route('/api/undo-last-scan', methods=['POST'])
