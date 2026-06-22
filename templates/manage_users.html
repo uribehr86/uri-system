@@ -15,6 +15,10 @@
         .form-control::placeholder { color: #94a3b8; }
         .btn-success { background-color: #10b981; border: none; }
         .btn-danger { background-color: #ef4444; border: none; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 6px #22c55e; }
+            50% { opacity: 0.6; box-shadow: 0 0 12px #22c55e; }
+        }
     </style>
 </head>
 <body>
@@ -37,6 +41,7 @@
                             <thead>
                                 <tr>
                                     <th>שם משתמש</th>
+                                    <th>סטטוס</th>
                                     <th>הרשאה</th>
                                     <th>פעילות אחרונה</th>
                                     <th>פעולות</th>
@@ -45,7 +50,19 @@
                             <tbody>
                                 {% for u in users %}
                                 <tr id="row-{{ u.username }}">
-                                    <td class="fw-bold">{{ u.username }}</td>
+                                    <td class="fw-bold">
+                                        {% if u.is_online %}
+                                        <span style="display:inline-block;width:10px;height:10px;background:#22c55e;border-radius:50%;margin-left:6px;box-shadow:0 0 6px #22c55e;animation:pulse 1.5s infinite;"></span>
+                                        {% else %}
+                                        <span style="display:inline-block;width:10px;height:10px;background:#475569;border-radius:50%;margin-left:6px;"></span>
+                                        {% endif %}
+                                        {{ u.username }}
+                                    </td>
+                                    <td>
+                                        <span style="font-size:0.8rem;padding:3px 10px;border-radius:20px;{% if u.is_online %}background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3);{% else %}background:rgba(100,116,139,0.15);color:#94a3b8;border:1px solid #334155;{% endif %}">
+                                            {% if u.is_online %}✅ מחובר{% else %}⚪ לא פעיל{% endif %}
+                                        </span>
+                                    </td>
                                     <td>
                                         {% if u.username == 'admin_uri' %}
                                         <span class="badge bg-danger px-3">מנהל על</span>

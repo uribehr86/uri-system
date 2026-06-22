@@ -100,6 +100,21 @@ def refresh_session():
     if 'user_id' in session:
         session.permanent = True
         session.modified  = True
+        # עדכן timestamp פעם ב-5 דקות לכל יותר (למנוע עומס על DB)
+        now = datetime.now()
+        last_ping = session.get('_last_ping')
+        if not last_ping or (now - datetime.fromisoformat(last_ping)).total_seconds() > 300:
+            session['_last_ping'] = now.isoformat()
+            try:
+                conn = get_db_connection()
+                if conn:
+                    cur = get_safe_cursor(conn)
+                    cur.execute("UPDATE users SET timestamp = NOW() WHERE id = %s", (session['user_id'],))
+                    conn.commit()
+                    cur.close()
+                    release_db_connection(conn)
+            except Exception:
+                pass
 
 
 # Initialize Google AI (Gemini)
@@ -1442,13 +1457,28 @@ def manage_users():
     try:
         cur = get_safe_cursor(conn)
         # 1. Fetch users
-        cur.execute("SELECT username, role, timestamp FROM users ORDER BY timestamp DESC")
-        users = cur.fetchall()
-        
+        cur.execute("SELECT username, role, timestamp FROM users ORDER BY timestamp DESC NULLS LAST")
+        users_raw = cur.fetchall()
+
+        # קבע מי מחובר (פעיל ב-30 דקות האחרונות)
+        now = datetime.now()
+        users = []
+        for u in users_raw:
+            ts = u['timestamp'] if hasattr(u, '__getitem__') else u[2]
+            is_online = False
+            if ts:
+                if hasattr(ts, 'replace'):
+                    ts_naive = ts.replace(tzinfo=None) if hasattr(ts, 'tzinfo') and ts.tzinfo else ts
+                    is_online = (now - ts_naive).total_seconds() < 1800  # 30 דקות
+            users.append({'username': u['username'] if hasattr(u, '__getitem__') else u[0],
+                          'role': u['role'] if hasattr(u, '__getitem__') else u[1],
+                          'timestamp': ts,
+                          'is_online': is_online})
+
         # 2. Fetch pending deletions
         cur.execute("SELECT barcode as computer_number, cage_number FROM computers WHERE status = 'ממתין למחיקה'")
         pending_raw = cur.fetchall()
-        
+
         # Format pending for template
         pending = []
         for p in pending_raw:
@@ -1457,7 +1487,7 @@ def manage_users():
                 'cage_number': p['cage_number'] or 'לא ידוע',
                 'scanned_by': 'טכנאי'
             })
-            
+
         cur.close()
         return render_template('manage_users.html', users=users, pending=pending)
     finally:
