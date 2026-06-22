@@ -172,7 +172,7 @@ def get_db_connection():
                     socket.setdefaulttimeout(3)
                     socket.gethostbyname(host)
                 
-                db_pool = psycopg2.pool.SimpleConnectionPool(1, 5, db_url)
+                db_pool = psycopg2.pool.SimpleConnectionPool(1, 15, db_url)
                 print("[OK] Database connection pool created successfully (lazy)", flush=True)
                 IS_LOCAL_MODE = False
             except Exception as e:
