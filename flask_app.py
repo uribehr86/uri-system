@@ -53,9 +53,9 @@ def trigger_debounced_sync():
     _sync_timer = Timer(5.0, sync_inventory_to_sheets)
     _sync_timer.start()
 
-# ── AUTO-POLLER: שיטס → אתר כל 5 דקות ─────────────────────────────
+# ── AUTO-POLLER: שיטס → אתר כל 3 דקות ─────────────────────────────
 def _auto_import_loop():
-    """לולאה ברקע: כל 5 דקות מושכת שינויים מגוגל שיטס לאתר"""
+    """לולאה ברקע: כל 3 דקות מושכת שינויים מגוגל שיטס לאתר"""
     import time
     global _last_sheets_import
     # המתן 30 שניות לפני הריצה הראשונה (לתת ל-Flask להתייצב)
@@ -75,12 +75,12 @@ def _auto_import_loop():
                 print(f"[AUTO-SYNC] ⚠️ {msg}", flush=True)
         except Exception as ex:
             print(f"[AUTO-SYNC] ❌ שגיאה: {ex}", flush=True)
-        time.sleep(300)  # 5 דקות
+        time.sleep(180)  # 3 דקות
 
 # הפעל את הפולר בתחילת האפליקציה
 _poller_thread = threading.Thread(target=_auto_import_loop, daemon=True, name="SheetsAutoPoller")
 _poller_thread.start()
-print("[AUTO-SYNC] 🔄 Auto-poller הופעל — יסנכרן שיטס→אתר כל 5 דקות", flush=True)
+print("[AUTO-SYNC] 🔄 Auto-poller הופעל — יסנכרן שיטס→אתר כל 3 דקות", flush=True)
 
 # טעינת הגדרות
 load_dotenv()
