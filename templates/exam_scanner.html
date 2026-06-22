@@ -5,6 +5,9 @@
 {% block content %}
 <style>
   .scan-page { display: flex; flex-direction: column; height: calc(100vh - 60px); overflow: hidden; background: #0a0f1e; color: #fff; font-family: 'Segoe UI', sans-serif; }
+  .mode-bar { display: flex; gap: 6px; padding: 10px 12px; background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .mode-btn { flex: 1; padding: 9px 6px; border-radius: 10px; border: none; font-weight: 700; font-size: 0.78rem; cursor: pointer; transition: all 0.2s; background: rgba(255,255,255,0.06); color: #94a3b8; text-align: center; }
+  .mode-btn.active { background: #2563eb; color: #fff; box-shadow: 0 2px 12px rgba(37,99,235,0.5); }
 
   /* Camera */
   .camera-wrap { position: relative; width: 100%; flex: 1; background: #000; overflow: hidden; max-height: 52vh; }
@@ -88,9 +91,11 @@
 
 <div class="scan-page">
 
-  <!-- Title info -->
-  <div style="padding: 10px; background: rgba(255,255,255,0.02); text-align: center; border-bottom: 1px solid rgba(255,255,255,0.06);">
-    <h3 style="margin: 0; font-size: 1.15rem; font-weight: 900; color: #60a5fa;">🎓 סורק נוכחות נבחנים (QR + מחשב)</h3>
+  <!-- Mode selector -->
+  <div class="mode-bar">
+    <a href="{{ url_for('scanner') }}?mode=area" class="mode-btn" style="text-decoration:none; display:flex; align-items:center; justify-content:center; white-space:nowrap;">🌍 סריקת שטח</a>
+    <a href="{{ url_for('scanner') }}?mode=cage" class="mode-btn" style="text-decoration:none; display:flex; align-items:center; justify-content:center; white-space:nowrap;">📦 סריקת כלוב</a>
+    <button class="mode-btn active" style="white-space:nowrap;">🎓 סריקת נוכחות נבחנים</button>
   </div>
 
   <!-- Camera -->
@@ -108,6 +113,8 @@
 
   <!-- Bottom Panel -->
   <div class="bottom-panel">
+    <!-- Exam name comes from QR automatically - no manual selection needed -->
+    <select id="exam-select" style="display:none;"></select>
     <div style="text-align:center; padding:4px 0;">
       <div class="waiting-hint"><div class="pulse-dot"></div> <span id="attend-hint-text">סרוק QR מדף הנבחן (הוורוד)</span></div>
       
@@ -161,13 +168,50 @@
 
     <div class="back-btn">
       <a href="{{ url_for('exam_attendance') }}">← חזרה לרשימת נוכחות</a>
+      <div style="font-size: 0.65rem; color: #475569; margin-top: 6px;">גרסה: 240x180 (ללא אילוץ)</div>
     </div>
   </div>
 
 </div>
 
-<!-- Hidden iframe for background forms (legacy fallback) -->
-<iframe id="save-frame" name="save-frame" style="display:none; width:0; height:0; border:none;"></iframe>
+<!-- ═══ חלון כפול: נבחן כבר נסרק ═══ -->
+<div id="duplicate-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:99998; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:#1e0a0a; border:2px solid #ef4444; border-radius:20px; padding:28px 24px; max-width:340px; width:100%; text-align:center; box-shadow:0 0 40px rgba(239,68,68,0.4);">
+    <div style="font-size:3rem; margin-bottom:10px;">⛔</div>
+    <div style="font-size:1.4rem; font-weight:900; color:#ef4444; margin-bottom:8px;" id="dup-title">כבר נסרק!</div>
+    <div style="font-size:1rem; color:#fca5a5; margin-bottom:20px;" id="dup-msg">הנבחן הזה כבר נסרק קודם לכן.</div>
+    <button onclick="closeDuplicateModal()" style="width:100%; padding:14px; border-radius:12px; background:#ef4444; color:#fff; border:none; font-weight:900; font-size:1.1rem; cursor:pointer;">✅ הבנתי — המשך</button>
+  </div>
+</div>
+
+<!-- ═══ חלון אישור לאחר סריקת מחשב ═══ -->
+<div id="confirm-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:99997; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:#0f172a; border:2px solid #2563eb; border-radius:20px; padding:24px; max-width:360px; width:100%; box-shadow:0 0 40px rgba(37,99,235,0.3);">
+    <div style="font-size:1.3rem; font-weight:900; color:#60a5fa; text-align:center; margin-bottom:16px;">📋 אישור סריקה</div>
+    <div style="background:rgba(37,99,235,0.1); border-radius:12px; padding:14px; margin-bottom:16px; border:1px solid rgba(37,99,235,0.2);">
+      <div style="color:#94a3b8; font-size:0.78rem; margin-bottom:4px;">נבחן:</div>
+      <div id="conf-name" style="color:#fff; font-weight:700; font-size:1.05rem;"></div>
+      <div style="color:#94a3b8; font-size:0.78rem; margin-top:8px; margin-bottom:4px;">מחשב:</div>
+      <div id="conf-computer" style="color:#4ade80; font-weight:900; font-size:1.3rem;"></div>
+    </div>
+    <!-- שאלות אישור -->
+    <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px;">
+      <label style="display:flex; align-items:center; gap:12px; background:rgba(255,255,255,0.04); padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.08); cursor:pointer;">
+        <input type="checkbox" id="chk-computer-ok" style="width:22px; height:22px; accent-color:#22c55e; cursor:pointer;">
+        <span style="color:#e2e8f0; font-weight:600; font-size:0.95rem;">💻 המחשב תקין</span>
+      </label>
+      <label style="display:flex; align-items:center; gap:12px; background:rgba(255,255,255,0.04); padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.08); cursor:pointer;">
+        <input type="checkbox" id="chk-verified" style="width:22px; height:22px; accent-color:#22c55e; cursor:pointer;">
+        <span style="color:#e2e8f0; font-weight:600; font-size:0.95rem;">✅ הנבחן הוכח (ת.ז / אצבע)</span>
+      </label>
+    </div>
+    <!-- כפתורים -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <button onclick="closeConfirmModal()" style="padding:14px; border-radius:12px; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.4); color:#f87171; font-weight:700; cursor:pointer; font-size:0.95rem;">❌ ביטול</button>
+      <button onclick="confirmAndSave()" style="padding:14px; border-radius:12px; background:#22c55e; color:#000; border:none; font-weight:900; cursor:pointer; font-size:0.95rem;">💾 שמור</button>
+    </div>
+  </div>
+</div>
 
 <!-- Toast notification element -->
 <div id="toast"></div>
@@ -184,16 +228,13 @@
     scanner = new Html5Qrcode("reader");
     const config = {
       fps: 10,
-      qrbox: function(width, height) {
-        return { width: Math.min(width * 0.75, 250), height: Math.min(height * 0.75, 180) };
-      },
-      aspectRatio: 1.0
+      qrbox: { width: 250, height: 250 }
     };
     return scanner.start(
       { facingMode: "environment" },
       config,
       onScanSuccess,
-      onScanFailure
+      () => {}
     ).catch(err => {
       showToast("❌ שגיאה בטעינת מצלמה", true);
       console.error(err);
@@ -325,11 +366,59 @@
     lastAttendCode = null;
     lastAttendTime = 0;
     resetFailTimer();
+    setScanBoxState('idle');
     showToast('✅ סשן אופס — מוכן לסריקה!');
   }
 
   let lastAttendCode = null;
   let lastAttendTime = 0;
+
+  // ── DUPLICATE MODAL ──────────────────────────────────────────────────────
+  function showDuplicateModal(title, msg) {
+    document.getElementById('dup-title').textContent = title;
+    document.getElementById('dup-msg').textContent = msg;
+    var el = document.getElementById('duplicate-modal');
+    el.style.display = 'flex';
+    setScanBoxState('fail');
+    playBeepDuplicate();
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  }
+
+  function closeDuplicateModal() {
+    document.getElementById('duplicate-modal').style.display = 'none';
+    setScanBoxState('idle');
+    resetFailTimer();
+  }
+
+  // ── CONFIRM MODAL ─────────────────────────────────────────────────────────
+  function showConfirmModal(name, computer) {
+    document.getElementById('conf-name').textContent = name;
+    document.getElementById('conf-computer').textContent = computer;
+    document.getElementById('chk-computer-ok').checked = false;
+    document.getElementById('chk-verified').checked = false;
+    var el = document.getElementById('confirm-modal');
+    el.style.display = 'flex';
+    isSheetOpen = true;
+  }
+
+  function closeConfirmModal() {
+    document.getElementById('confirm-modal').style.display = 'none';
+    isSheetOpen = false;
+    // איפוס הסריקה — כדי שיוכל לסרוק מחדש
+    resetAttend();
+  }
+
+  function confirmAndSave() {
+    var compOk   = document.getElementById('chk-computer-ok').checked;
+    var verified = document.getElementById('chk-verified').checked;
+    document.getElementById('confirm-modal').style.display = 'none';
+    isSheetOpen = false;
+    // is_present תמיד 1 — אם נסרק, הוא נוכח
+    // מצב המחשב: תקין / לא תקין, + אם לא הוכח מוסיפים הערה
+    var pcStatus = compOk ? 'תקין' : 'לא תקין';
+    if (!verified) pcStatus += ' (לא הוכח)';
+    saveAttendanceDouble(pcStatus, '1');
+  }
 
   function onAttendScan(code) {
     const now = Date.now();
@@ -343,12 +432,7 @@
       if (parts.length >= 3) {
         var id   = parts[3] || parts[1] || '';
         var name = parts[2] || 'נבחן לא ידוע';
-        if (id && scannedIds.has(id)) {
-          setScanBoxState('fail');
-          playBeepDuplicate();
-          showToast('⚠️ ' + name + ' כבר נסרק!', true);
-          return;
-        }
+        // אין בדיקת כפולים — סרוק חופשי
         attendQR = code;
         attendQRData = {
           examName: (parts[0] !== 'EXAMINEE' ? parts[0] : ''),
@@ -357,6 +441,10 @@
           row: parts[5] || '',
           seat: parts[6] || ''
         };
+        // ── זיהוי אוטומטי של המבחן מה-QR ──
+        if (attendQRData.examName) {
+          document.getElementById('exam-select').value = attendQRData.examName;
+        }
         onScanSuccess_visual();
         showToast('✅ ' + attendQRData.name + ' זוהה! סרוק כעת ברקוד מחשב.');
         document.getElementById('attend-hint-text').textContent = 'סרוק ברקוד מחשב עבור: ' + attendQRData.name;
@@ -380,8 +468,8 @@
 
     attendComputer = code;
     onScanSuccess_visual();
-    showToast('✅ מחשב ' + attendComputer + ' נסרק — שומר...');
-    saveAttendanceDouble();
+    // ── בדיקת מחשב כפול לפני פתיחת חלון האישור ──
+    checkComputerAndShowConfirm(code);
   }
 
   function resetAttend() {
@@ -399,11 +487,41 @@
     if (!attendQR) { showToast('סרוק תחילה QR של נבחן!', true); return; }
     if (!val) { showToast('הזן מספר מחשב!', true); return; }
     attendComputer = val;
-    showToast('✅ מחשב ' + attendComputer + ' — שומר...');
-    saveAttendanceDouble();
+    checkComputerAndShowConfirm(val);
   }
 
-  function saveAttendanceDouble() {
+  function checkComputerAndShowConfirm(computer) {
+    var examName = document.getElementById('exam-select').value || '';
+    var name = attendQRData ? attendQRData.name : 'נבחן';
+    // בדיקת מחשב כפול מהשרת
+    fetch('/api/check-computer-used', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ computer: computer, exam_name: examName })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.in_use) {
+        // מחשב כבר בשימוש!
+        showDuplicateModal(
+          '⚠️ מחשב ' + computer + ' כבר בשימוש!',
+          'המחשב הזה כבר שויך לנבחן: ' + d.name + '\nבחר מחשב אחר.'
+        );
+        // ניקוי רק של המחשב, לא של הנבחן
+        attendComputer = '';
+        document.getElementById('attend-manual-computer').value = '';
+      } else {
+        // הכל תקין — פתח חלון אישור
+        showConfirmModal(name, computer);
+      }
+    })
+    .catch(function() {
+      // במקרה של שגיאה — פתח חלון אישור בכל זאת
+      showConfirmModal(name, computer);
+    });
+  }
+
+  function saveAttendanceDouble(pcStatus, isPresent) {
     if (!attendQR) { showScanResult(false, 'אין QR — סרוק קודם!'); return; }
     var qrVal       = attendQR;
     var computerVal = attendComputer || 'QR-ONLY';
@@ -411,11 +529,23 @@
     var savedId     = attendQRData ? attendQRData.id   : '';
     var colVal      = attendQRData ? attendQRData.row  : '';
     var seatVal     = attendQRData ? attendQRData.seat : '';
+    var statusVal   = pcStatus || 'תקין';
+    var presentVal  = isPresent !== undefined ? isPresent : '1';
 
     if (savedId) scannedIds.add(savedId);
     resetAttend();
 
-    var body = JSON.stringify({ qr: qrVal, computer: computerVal, pc_status: 'תקין', is_present: '1', col: colVal, seat: seatVal });
+    // שם המבחן ישירות מה-QR
+    var examSelVal = (attendQRData && attendQRData.examName) ? attendQRData.examName : '';
+    var body = JSON.stringify({
+      qr: qrVal,
+      computer: computerVal,
+      pc_status: statusVal,
+      is_present: presentVal,
+      col: colVal,
+      seat: seatVal,
+      exam_name: examSelVal
+    });
     fetch('/api/exam-scan-double', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -540,6 +670,36 @@
 
   // Load and start scanner
   window.addEventListener('load', () => {
+    // טעינת רשימת המבחנים הפעילים משרת ה-API
+    fetch('/api/projects')
+      .then(function(r) { return r.json(); })
+      .then(function(projects) {
+        const select = document.getElementById('exam-select');
+        select.innerHTML = '<option value="">-- בחר מבחן (אופציונלי) --</option>';
+        projects.forEach(function(p) {
+          const opt = document.createElement('option');
+          opt.value = p.name;
+          opt.textContent = p.name;
+          select.appendChild(opt);
+        });
+        
+        // בחירה אוטומטית של המבחן האחרון שנבחר בעבר
+        const savedExam = localStorage.getItem('last_scanned_exam');
+        if (savedExam) {
+            select.value = savedExam;
+        }
+        
+        // שמירת המבחן הנוכחי בזיכרון המכשיר בעת שינוי
+        select.addEventListener('change', function() {
+            localStorage.setItem('last_scanned_exam', select.value);
+        });
+      })
+      .catch(function(err) {
+        console.error("Failed to load projects:", err);
+        const select = document.getElementById('exam-select');
+        select.innerHTML = '<option value="">⚠️ שגיאה בטעינת מבחנים</option>';
+      });
+
     startScanner().then(() => {
       resetFailTimer();
     });

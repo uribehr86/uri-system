@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>כרטיס כלוב {{ cage.cage_id }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Heebo', sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      padding: 40px 20px;
+      direction: rtl;
+    }
+
+    .no-print-area {
+      max-width: 800px;
+      margin: 0 auto 20px auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #fff;
+      padding: 15px 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .btn {
+      padding: 10px 20px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.2s;
+    }
+
+    .btn-print {
+      background: #1e293b;
+      color: #fff;
+    }
+    .btn-print:hover {
+      background: #0f172a;
+    }
+
+    .btn-close {
+      background: #e2e8f0;
+      color: #475569;
+    }
+    .btn-close:hover {
+      background: #cbd5e1;
+    }
+
+    /* Print card container */
+    .print-card {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #fff;
+      border: 3px solid #0f172a;
+      border-radius: 16px;
+      padding: 30px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+      position: relative;
+    }
+
+    .print-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 3px solid #0f172a;
+      padding-bottom: 20px;
+      margin-bottom: 25px;
+    }
+
+    .title-area {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .cage-tag {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .cage-title {
+      font-size: 3rem;
+      font-weight: 900;
+      color: #0f172a;
+      line-height: 1;
+    }
+
+    .meta-details {
+      margin-top: 8px;
+      font-size: 1.05rem;
+      color: #334155;
+    }
+
+    /* QR block */
+    .qr-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #cbd5e1;
+      background: #fff;
+      padding: 12px;
+      border-radius: 12px;
+      width: 210px;
+      text-align: center;
+    }
+
+    #qrcode {
+      width: 180px;
+      height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .qr-desc {
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: #475569;
+      margin-top: 8px;
+    }
+
+    /* Content Area */
+    .print-body {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+
+    .stat-badge {
+      display: inline-block;
+      background: #f1f5f9;
+      border: 2px solid #0f172a;
+      color: #0f172a;
+      padding: 8px 20px;
+      border-radius: 30px;
+      font-size: 1.2rem;
+      font-weight: 800;
+      margin-bottom: 15px;
+    }
+
+    .comps-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    .comps-table th {
+      background: #f1f5f9;
+      border: 2px solid #0f172a;
+      padding: 10px;
+      font-weight: 900;
+      font-size: 0.95rem;
+      text-align: right;
+    }
+
+    .comps-table td {
+      border: 1px solid #cbd5e1;
+      padding: 10px;
+      font-size: 0.9rem;
+    }
+
+    .comps-table tr:nth-child(even) {
+      background: #f8fafc;
+    }
+
+    .barcode-col {
+      font-weight: 800;
+      font-size: 1rem;
+      font-family: monospace;
+    }
+
+    .status-badge {
+      font-weight: 700;
+    }
+
+    /* Print styles */
+    @media print {
+      body {
+        background: #fff;
+        padding: 0;
+      }
+      .no-print-area {
+        display: none;
+      }
+      .print-card {
+        border: none;
+        padding: 0;
+        box-shadow: none;
+        max-width: 100%;
+      }
+      .comps-table th {
+        background-color: #f1f5f9 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .comps-table tr:nth-child(even) {
+        background-color: #f8fafc !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+
+  <div class="no-print-area">
+    <div style="font-weight:700; font-size:1.1rem; color:#334155;">💻 כרטיס כלוב להדפסה פיזית</div>
+    <div style="display:flex; gap:10px;">
+      <button class="btn btn-close" onclick="window.close()">❌ סגור חלון</button>
+      <button class="btn btn-print" onclick="window.print()">🖨️ הדפס כרטיס</button>
+    </div>
+  </div>
+
+  <div class="print-card">
+    <div class="print-header">
+      <div class="title-area">
+        <span class="cage-tag">כלוב אחסון / שינוע</span>
+        <h1 class="cage-title">{{ cage.name or cage.cage_id }}</h1>
+        <div class="meta-details">
+          {% if cage.location %}
+            <span>📍 <strong>מיקום:</strong> {{ cage.location }}</span>
+          {% endif %}
+          {% if cage.notes %}
+            <span style="margin-right: 15px;">📝 <strong>הערות:</strong> {{ cage.notes }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="qr-block">
+        <div id="qrcode"></div>
+        <div class="qr-desc">סריקה במצלמת טלפון למידע</div>
+      </div>
+    </div>
+
+    <div class="print-body">
+      <div>
+        <div class="stat-badge">📦 סה"כ מחשבים: {{ total }}</div>
+        
+        {% if computers %}
+          <table class="comps-table">
+            <thead>
+              <tr>
+                <th style="width: 25%;">ברקוד מחשב</th>
+                <th style="width: 25%;">מספר מארז</th>
+                <th style="width: 25%;">סטטוס פיזי</th>
+                <th style="width: 25%;">מיקום מתוכנן</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in computers %}
+                <tr>
+                  <td class="barcode-col">{{ c.barcode }}</td>
+                  <td>{{ c.case_number or '—' }}</td>
+                  <td class="status-badge">{{ c.status or 'לא ידוע' }}</td>
+                  <td>{{ c.location or '—' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div style="text-align: center; padding: 40px; color: #64748b; border: 2px dashed #cbd5e1; border-radius: 12px; font-weight: 700;">
+            אין מחשבים רשומים בכלוב זה כרגע.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Generate QR code with URL to cage details page
+    // Example: https://192.168.1.2:5000/cage-info/c-12
+    const url = "{{ url_for('cage_info_page', cage_id=cage.cage_id, _external=True) }}";
+    new QRCode(document.getElementById("qrcode"), {
+      text: url,
+      width: 180,
+      height: 180,
+      colorDark : "#000000",
+      colorLight : "#ffffff",
+      correctLevel : QRCode.CorrectLevel.H
+    });
+  </script>
+</body>
+</html>

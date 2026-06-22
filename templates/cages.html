@@ -75,6 +75,8 @@
         data-cage-location="{{ cage.location or '' }}"
         data-cage-notes="{{ cage.notes or '' }}"
         onclick="openEditModalFromBtn(this)">✏️ ערוך</button>
+      <a class="btn-sm" style="background:rgba(31, 111, 235, 0.15); border:1px solid rgba(31, 111, 235, 0.3); color:#60a5fa; text-decoration:none; display:inline-flex; align-items:center; justify-content:center;"
+         href="/cages/print/{{ cage.cage_id }}" target="_blank">🖨️ הדפס</a>
     </div>
   </div>
   {% endfor %}
@@ -92,8 +94,9 @@
   <div class="modal-box" style="max-width: 560px; max-height: 80vh; overflow-y: auto;">
     <h3 id="view-title">מחשבים בכלוב</h3>
     <div id="view-list"></div>
-    <div class="modal-btns">
-      <button class="btn btn-ghost" onclick="closeModals()">סגור</button>
+    <div class="modal-btns" style="display:flex; gap:10px;">
+      <a id="modal-view-details-btn" class="btn btn-blue" style="flex:2; text-decoration:none; text-align:center; display:inline-flex; align-items:center; justify-content:center;" href="#">🔍 דף פרטים והדפסה</a>
+      <button class="btn btn-ghost" style="flex:1;" onclick="closeModals()">סגור</button>
     </div>
   </div>
 </div>
@@ -202,6 +205,8 @@
   function viewCageComputers(cageId) {
     document.getElementById('view-title').textContent = '📦 כלוב ' + cageId + ' — טוען...';
     document.getElementById('view-list').innerHTML = '<div style="text-align:center;padding:20px;">⏳ טוען...</div>';
+    const btn = document.getElementById('modal-view-details-btn');
+    if (btn) btn.href = '/cage-info/' + encodeURIComponent(cageId);
     document.getElementById('view-modal').classList.add('show');
 
     fetch('/api/cage/' + encodeURIComponent(cageId))

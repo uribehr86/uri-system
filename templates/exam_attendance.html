@@ -17,8 +17,9 @@
         <h3 style="margin-bottom:14px; font-size:1rem;">📂 ייבוא נבחנים מ-Excel → Google Sheets</h3>
         <form method="POST" action="{{ url_for('exam_attendance_import') }}" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:12px;">
             <input type="file" name="excel_file" accept=".xlsx,.xls" class="form-control" required>
+            <input type="text" name="sheet_url" placeholder="השאר ריק! המערכת תזהה אוטומטית (אופציונלי)" class="form-control" style="background:#0d1117; border:1px solid #30363d; color:#c9d1d9; padding:10px 14px; border-radius:10px; font-family:inherit;">
             <button type="submit" style="padding:10px 20px; background:rgba(31,111,235,0.2); border:1px solid var(--accent2); color:#58a6ff; border-radius:10px; cursor:pointer; font-weight:700; font-family:inherit;">⬆️ העלה ל-Google Sheets</button>
-            <span style="color:var(--muted); font-size:0.82rem;">שם הקובץ → תיקיה ב-Drive + גיליון חדש</span>
+            <span style="color:var(--muted); font-size:0.82rem;"><strong>השאר ריק:</strong> המערכת משייכת אוטומטית לגליון המתאים לפי שם קובץ האקסל (למשל: "חשמל" או "משרד הבריאות"). השתמש בשדה זה רק אם ברצונך לעקוף את הזיהוי האוטומטי ולהעלות לגליון ספציפי אחר.</span>
         </form>
     </div>
 

@@ -9,7 +9,7 @@ creds  = Credentials.from_service_account_file(sa_file, scopes=scopes)
 client = gspread.authorize(creds)
 ws     = client.open_by_key(sheet_id).sheet1
 
-headers = ['שם נבחן','תעודת זהות','מחשב','נוכח','סטטוס מחשב','שם בחינה','שעת סריקה','טכנאי','טור','כסא']
+headers = ['שם פרטי','שם משפחה','ת.ז','התאמות','סיסמה','שם משתמש','גרסה','סה\' אולם','טור','כסא','מ.מחשב','נוכחות','שעת סריקה','טכנאי']
 
-ws.update(values=[headers], range_name='A1:J1')
+ws.update(values=[headers], range_name='A1:N1')
 print('[OK] Headers set! Columns: ' + ', '.join(headers))

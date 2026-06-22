@@ -1,0 +1,457 @@
+{% extends 'base.html' %}
+
+{% block title %}פרטי כלוב {{ cage.cage_id }}{% endblock %}
+
+{% block content %}
+<style>
+  .cage-info-container {
+    animation: fadeIn 0.4s ease-out forwards;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 10px;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.9rem;
+    margin-bottom: 18px;
+    transition: color 0.2s;
+  }
+  .back-link:hover {
+    color: var(--text);
+  }
+
+  /* Main Glass Card */
+  .info-glass-card {
+    background: var(--surface);
+    backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .info-glass-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+  }
+
+  .info-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .info-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .info-title {
+    font-size: 2rem;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+  }
+
+  .info-badge {
+    background: rgba(31, 111, 235, 0.15);
+    border: 1px solid rgba(31, 111, 235, 0.4);
+    color: #60a5fa;
+    font-size: 0.9rem;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 30px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 0 10px rgba(31, 111, 235, 0.15);
+  }
+
+  .info-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 16px;
+  }
+
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .meta-label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .meta-val {
+    font-size: 0.95rem;
+    color: var(--text);
+  }
+
+  /* Action Buttons Block */
+  .actions-block {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+
+  .btn-action {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 20px;
+    font-size: 1rem;
+    font-weight: 800;
+    border-radius: var(--radius);
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    border: none;
+    text-align: center;
+  }
+
+  .btn-action:active {
+    transform: scale(0.98);
+  }
+
+  .btn-action-green {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+  }
+  .btn-action-green:hover {
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+    opacity: 0.95;
+  }
+
+  .btn-action-blue {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+  }
+  .btn-action-blue:hover {
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+    opacity: 0.95;
+  }
+
+  /* Status distribution cards */
+  .statuses-summary {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .status-summary-card {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 12px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .status-summary-card.ok {
+    border-color: rgba(34, 197, 94, 0.2);
+    background: rgba(34, 197, 94, 0.05);
+  }
+  .status-summary-card.broken {
+    border-color: rgba(239, 68, 68, 0.2);
+    background: rgba(239, 68, 68, 0.05);
+  }
+
+  .status-num {
+    font-size: 1.4rem;
+    font-weight: 900;
+  }
+  .status-num.ok { color: #4ade80; }
+  .status-num.broken { color: #f87171; }
+  .status-num.other { color: #facc15; }
+
+  .status-lbl {
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  /* Computer Table */
+  .table-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 30px;
+  }
+
+  .table-header-group {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .table-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .table-search {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 14px;
+    color: #fff;
+    font-size: 0.88rem;
+    outline: none;
+    width: 220px;
+    transition: border-color 0.2s;
+  }
+  .table-search:focus {
+    border-color: var(--accent2);
+  }
+
+  .computer-table-wrapper {
+    overflow-x: auto;
+  }
+
+  .comp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    text-align: right;
+  }
+
+  .comp-table th {
+    color: var(--muted);
+    font-weight: 700;
+    padding: 10px;
+    border-bottom: 2px solid var(--border);
+    text-transform: uppercase;
+    font-size: 0.78rem;
+  }
+
+  .comp-table td {
+    padding: 12px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    color: var(--text);
+  }
+
+  .comp-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .comp-barcode {
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .comp-status {
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+  }
+  .comp-status.ok {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+  }
+  .comp-status.broken {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+  }
+  .comp-status.other {
+    background: rgba(250, 204, 21, 0.1);
+    color: #facc15;
+  }
+
+  .comp-time {
+    color: var(--muted);
+    font-size: 0.78rem;
+  }
+
+  .empty-table-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 480px) {
+    .info-title {
+      font-size: 1.6rem;
+    }
+    .btn-action {
+      font-size: 0.95rem;
+      padding: 12px;
+    }
+    .table-search {
+      width: 100%;
+    }
+  }
+</style>
+
+<div class="cage-info-container">
+  <a href="/cages" class="back-link">
+    <span>➡️</span> חזרה לניהול כלובים
+  </a>
+
+  <!-- Main Glass Card -->
+  <div class="info-glass-card">
+    <div class="info-card-header">
+      <div class="info-title-group">
+        <span class="info-title">{{ cage.name or cage.cage_id }}</span>
+        <span style="font-size: 0.85rem; color: var(--muted);">מזהה כלוב: <strong>{{ cage.cage_id }}</strong></span>
+      </div>
+      <div class="info-badge">
+        <span>📦</span>
+        <span>{{ total }} מחשבים</span>
+      </div>
+    </div>
+
+    <div class="info-meta">
+      <div class="meta-item">
+        <span class="meta-label">📍 מיקום</span>
+        <span class="meta-val">{{ cage.location or 'לא הוגדר' }}</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">📝 הערות</span>
+        <span class="meta-val">{{ cage.notes or 'אין הערות' }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status Distribution -->
+  <div class="statuses-summary">
+    {% set ok = namespace(count=0) %}
+    {% set broken = namespace(count=0) %}
+    {% set other = namespace(count=0) %}
+    {% for c in computers %}
+      {% if c.status == 'תקין' %}
+        {% set ok.count = ok.count + 1 %}
+      {% elif c.status == 'תקול' %}
+        {% set broken.count = broken.count + 1 %}
+      {% else %}
+        {% set other.count = other.count + 1 %}
+      {% endif %}
+    {% endfor %}
+
+    <div class="status-summary-card ok">
+      <span class="status-num ok">{{ ok.count }}</span>
+      <span class="status-lbl">תקינים</span>
+    </div>
+    <div class="status-summary-card broken">
+      <span class="status-num broken">{{ broken.count }}</span>
+      <span class="status-lbl">תקולים</span>
+    </div>
+    <div class="status-summary-card">
+      <span class="status-num other">{{ other.count }}</span>
+      <span class="status-lbl">אחר/לא סווג</span>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions-block">
+    <a href="/scanner?mode=cage&cage={{ cage.cage_id }}" class="btn-action btn-action-green">
+      📥 המשך סריקת מחשבים לכלוב
+    </a>
+    <a href="/cages/print/{{ cage.cage_id }}" target="_blank" class="btn-action btn-action-blue">
+      🖨️ הדפסת מדבקה / כרטיס כלוב
+    </a>
+  </div>
+
+  <!-- Computer List Card -->
+  <div class="table-card">
+    <div class="table-header-group">
+      <span class="table-title">תכולת הכלוב</span>
+      <input type="text" class="table-search" placeholder="חיפוש מחשב לפי ברקוד/מארז..." oninput="filterTable(this.value)">
+    </div>
+
+    <div class="computer-table-wrapper">
+      {% if computers %}
+        <table class="comp-table">
+          <thead>
+            <tr>
+              <th>ברקוד</th>
+              <th>מארז</th>
+              <th>סטטוס</th>
+              <th>מיקום</th>
+              <th>נסרק בתאריך</th>
+            </tr>
+          </thead>
+          <tbody id="comp-rows">
+            {% for c in computers %}
+              <tr data-barcode="{{ c.barcode }}" data-case="{{ c.case_number or '' }}">
+                <td class="comp-barcode">{{ c.barcode }}</td>
+                <td>{{ c.case_number or '—' }}</td>
+                <td>
+                  {% if c.status == 'תקין' %}
+                    <span class="comp-status ok">✅ תקין</span>
+                  {% elif c.status == 'תקול' %}
+                    <span class="comp-status broken">❌ תקול</span>
+                  {% else %}
+                    <span class="comp-status other">⚠️ {{ c.status or 'אחר' }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ c.location or '—' }}</td>
+                <td class="comp-time">
+                  {% if c.scan_time is string %}
+                    {{ c.scan_time[:16].replace('T', ' ') }}
+                  {% else %}
+                    {{ c.scan_time or '—' }}
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div class="empty-table-state">
+          <span>📦</span>
+          <p>אין מחשבים בכלוב זה עדיין.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+  function filterTable(q) {
+    q = q.toLowerCase().trim();
+    document.querySelectorAll('#comp-rows tr').forEach(row => {
+      const barcode = row.dataset.barcode.toLowerCase();
+      const caseNum = row.dataset.case.toLowerCase();
+      row.style.display = (barcode.includes(q) || caseNum.includes(q)) ? '' : 'none';
+    });
+  }
+</script>
+{% endblock %}
