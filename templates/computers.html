@@ -458,13 +458,24 @@
     </div>
     {% endif %}
     {% else %}
-    <p style="color:var(--muted); text-align:center; padding:40px;">
+    <div style="text-align:center; padding: 60px 20px;">
         {% if search or status_filter %}
-        לא נמצאו תוצאות לחיפוש.
+        <div style="font-size:3rem; margin-bottom:16px;">🔍</div>
+        <p style="color:var(--muted); font-size:1.1rem; margin-bottom:28px;">לא נמצאו תוצאות לחיפוש.</p>
         {% else %}
-        אין מחשבים רשומים. <a href="{{ url_for('add_computer') }}" style="color:var(--accent2)">הוסף מחשב ראשון ›</a>
+        <div style="font-size:3rem; margin-bottom:16px;">🖥️</div>
+        <p style="color:var(--muted); font-size:1.1rem; margin-bottom:28px;">אין מחשבים רשומים במערכת.</p>
         {% endif %}
-    </p>
+        <a href="{{ url_for('add_computer') }}"
+           style="display:inline-block; background:linear-gradient(135deg,#3b82f6,#6366f1); color:#fff;
+                  padding:12px 32px; border-radius:12px; font-weight:700; font-size:1rem;
+                  text-decoration:none; box-shadow:0 4px 15px rgba(99,102,241,0.4);
+                  transition:transform 0.2s,box-shadow 0.2s;"
+           onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 20px rgba(99,102,241,0.5)'"
+           onmouseout="this.style.transform='';this.style.boxShadow='0 4px 15px rgba(99,102,241,0.4)'">
+            ➕ הוסף מחשב
+        </a>
+    </div>
     {% endif %}
 </div>
 
