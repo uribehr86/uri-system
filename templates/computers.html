@@ -402,7 +402,17 @@
                         {% endif %}
                     </td>
                     <td>{{ c.location or '—' }}</td>
-                    <td style="color:var(--accent2); font-weight:600;">{{ c.specs or '—' }}</td>
+                    <td style="color:var(--accent2); font-weight:600;">
+                        {% set spec = get_computer_spec(c.barcode) %}
+                        {% if spec %}
+                        <span title="{{ spec.manufacturer }} | {{ spec.cpu }} | {{ spec.ram }}" style="cursor:pointer;"
+                              onclick="showSpecPopup('{{ c.barcode }}', '{{ spec.manufacturer }}', '{{ spec.cpu }}', '{{ spec.ram }}')"
+                        ><span style="color:#94a3b8;font-size:0.75rem;">{{ spec.manufacturer }}</span><br>
+                        <span style="font-size:0.78rem;">{{ spec.cpu[:12] }}... | {{ spec.ram }}</span></span>
+                        {% else %}
+                        <span style="color:var(--muted);">{{ c.specs or '—' }}</span>
+                        {% endif %}
+                    </td>
                     <td style="color:var(--accent); font-weight:700;">{{ c.project or '—' }}</td>
                     <td style="max-width:220px;">
                         <div style="color:var(--muted); max-height:4.5em; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:3; line-clamp:3; -webkit-box-orient:vertical; word-wrap:break-word; white-space:pre-wrap;"
@@ -479,11 +489,45 @@
     {% endif %}
 </div>
 
+<!-- Spec Detail Popup -->
+<div id="spec-popup" onclick="this.style.display='none'"
+     style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center;">
+    <div onclick="event.stopPropagation()"
+         style="background:#1e293b; border:1px solid #334155; border-radius:16px; padding:32px 40px;
+                min-width:300px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+        <div style="font-size:2.5rem; margin-bottom:8px;">🖥️</div>
+        <div id="spec-popup-title" style="font-size:1.3rem; font-weight:800; color:#fff; margin-bottom:4px;"></div>
+        <div id="spec-popup-maker" style="font-size:0.9rem; color:#94a3b8; margin-bottom:20px;"></div>
+        <div style="background:#0f172a; border-radius:12px; padding:16px; text-align:right;">
+            <div style="margin-bottom:10px;">
+                <span style="color:#64748b; font-size:0.8rem;">מעבד</span><br>
+                <span id="spec-popup-cpu" style="color:#60a5fa; font-weight:700;"></span>
+            </div>
+            <div>
+                <span style="color:#64748b; font-size:0.8rem;">זיכרון RAM</span><br>
+                <span id="spec-popup-ram" style="color:#4ade80; font-weight:700; font-size:1.2rem;"></span>
+            </div>
+        </div>
+        <button onclick="document.getElementById('spec-popup').style.display='none'"
+                style="margin-top:20px; background:#334155; border:none; color:#fff; padding:8px 24px;
+                       border-radius:8px; cursor:pointer; font-size:0.9rem;">סגור</button>
+    </div>
+</div>
+
 <script>
     function toggleAll(source) {
         const checkboxes = document.querySelectorAll('.row-chk');
         checkboxes.forEach(chk => chk.checked = source.checked);
         updateBatchBar();
+    }
+
+    function showSpecPopup(computerNum, manufacturer, cpu, ram) {
+        document.getElementById('spec-popup-title').textContent = 'מחשב ' + computerNum;
+        document.getElementById('spec-popup-maker').textContent = manufacturer;
+        document.getElementById('spec-popup-cpu').textContent = cpu;
+        document.getElementById('spec-popup-ram').textContent = ram;
+        const popup = document.getElementById('spec-popup');
+        popup.style.display = 'flex';
     }
 
     function updateBatchBar() {

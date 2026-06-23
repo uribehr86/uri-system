@@ -306,7 +306,27 @@ def utility_processor():
         val = sum(ord(c) for c in str(cage))
         hue = (val * 137) % 360
         return f"hsl({hue}, 70%, 65%)"
-    return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE)
+
+    def get_computer_spec(computer_number):
+        """מחזיר מפרט לפי מספר מחשב"""
+        try:
+            num = int(str(computer_number).strip())
+        except (ValueError, TypeError):
+            return None
+        if 1 <= num <= 600:
+            return {'manufacturer': 'Dell', 'cpu': 'i7-8550U @ 1.80GHz', 'ram': '32GB', 'icon': '🖥️'}
+        elif 1001 <= num <= 1600:
+            return {'manufacturer': 'HP', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': '🖥️'}
+        elif 2001 <= num <= 2400:
+            return {'manufacturer': 'HP', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': '🖥️'}
+        elif 3001 <= num <= 3200:
+            return {'manufacturer': 'Dell', 'cpu': 'i7-8550U @ 1.80GHz', 'ram': '16GB', 'icon': '🖥️'}
+        elif 4001 <= num <= 4300:
+            return {'manufacturer': 'Lenovo', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': '🖥️'}
+        return None
+
+    return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, get_computer_spec=get_computer_spec)
+
 
 
 @app.template_filter('format_history')
