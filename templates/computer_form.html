@@ -6,29 +6,68 @@
     <a href="{{ url_for('computers') }}" class="btn btn-ghost">← חזרה</a>
 </div>
 
+{% if existing_barcode %}
+<!-- התראת מחשב קיים -->
+<div style="max-width:650px; margin:0 auto 20px; background:rgba(234,179,8,0.12); border:1px solid rgba(234,179,8,0.4);
+            border-radius:14px; padding:20px 24px;">
+    <div style="font-size:1.3rem; font-weight:800; color:#facc15; margin-bottom:8px;">
+        ⚠️ מחשב {{ existing_barcode }} כבר קיים במערכת
+    </div>
+    <div style="color:#fde68a; font-size:0.95rem; margin-bottom:16px;">
+        נמצא כרגע בכלוב: <strong>{{ existing_cage }}</strong><br>
+        האם לעדכן את הפרטים לכלוב החדש?
+    </div>
+    <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <form method="POST" style="display:inline;">
+            <input type="hidden" name="force_update" value="1">
+            <input type="hidden" name="barcode" value="{{ existing_barcode }}">
+            <input type="hidden" name="case_number" value="{{ prefill.get('case_number','') if prefill else '' }}">
+            <input type="hidden" name="cage_number" value="{{ prefill.get('cage_number','') if prefill else '' }}">
+            <input type="hidden" name="status" value="{{ prefill.get('status','תקין') if prefill else 'תקין' }}">
+            <input type="hidden" name="location" value="{{ prefill.get('location','') if prefill else '' }}">
+            <input type="hidden" name="specs" value="{{ prefill.get('specs','') if prefill else '' }}">
+            <input type="hidden" name="project" value="{{ prefill.get('project','') if prefill else '' }}">
+            <input type="hidden" name="notes" value="{{ prefill.get('notes','') if prefill else '' }}">
+            <button type="submit"
+                    style="background:linear-gradient(135deg,#22c55e,#16a34a); color:#fff; border:none;
+                           padding:12px 28px; border-radius:10px; font-weight:800; font-size:1rem; cursor:pointer;">
+                ✅ כן, עדכן
+            </button>
+        </form>
+        <a href="{{ url_for('add_computer') }}"
+           style="background:rgba(255,255,255,0.08); color:#94a3b8; border:1px solid #334155;
+                  padding:12px 28px; border-radius:10px; font-weight:700; font-size:1rem;
+                  text-decoration:none; display:inline-block;">
+            ❌ לא, בטל
+        </a>
+    </div>
+</div>
+{% endif %}
+
 <div class="card" style="max-width: 650px; margin: 0 auto; animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);">
-    <form method="POST">
+    <form method="POST" id="computer-form">
+        <input type="hidden" name="force_update" value="0">
         <div class="form-grid">
             <div class="form-group">
                 <label for="barcode">מחשב *</label>
                 <input type="text" id="barcode" name="barcode" class="form-control"
-                    value="{{ computer.barcode if computer else '' }}" required {{ 'readonly' if action=='edit' else ''
-                    }} />
+                    value="{{ computer.barcode if computer else (prefill.get('barcode','') if prefill else '') }}"
+                    required {{ 'readonly' if action=='edit' else '' }} />
             </div>
             <div class="form-group">
                 <label for="case_number">מספר תיק</label>
                 <input type="text" id="case_number" name="case_number" class="form-control"
-                    value="{{ computer.case_number if computer else '' }}" />
+                    value="{{ computer.case_number if computer else (prefill.get('case_number','') if prefill else '') }}" />
             </div>
             <div class="form-group">
                 <label for="cage_number">מספר כלוב</label>
                 <input type="text" id="cage_number" name="cage_number" class="form-control"
-                    value="{{ computer.cage_number if computer else '' }}" />
+                    value="{{ computer.cage_number if computer else (prefill.get('cage_number','') if prefill else '') }}" />
             </div>
             <div class="form-group">
                 <label for="status">סטטוס</label>
                 <select id="status" name="status" class="form-control">
-                    {% set cur_status = computer.status if computer else 'תקין' %}
+                    {% set cur_status = computer.status if computer else (prefill.get('status','תקין') if prefill else 'תקין') %}
                     <option value="תקין" {% if cur_status=='תקין' %}selected{% endif %}>✅ תקין</option>
                     <option value="תקול" {% if cur_status=='תקול' %}selected{% endif %}>❌ תקול</option>
                     <option value="בתיקון" {% if cur_status=='בתיקון' %}selected{% endif %}>🔧 בתיקון</option>
@@ -38,22 +77,18 @@
             <div class="form-group">
                 <label for="location">מיקום</label>
                 <input type="text" id="location" name="location" class="form-control"
-                    value="{{ computer.location if computer else '' }}" />
-            </div>
-            <div class="form-group">
-                <label for="exam_appeal">מבחן \ ערעור</label>
-                <input type="text" id="exam_appeal" name="exam_appeal" class="form-control"
-                    value="{{ computer.exam_appeal if computer else '' }}" />
+                    value="{{ computer.location if computer else (prefill.get('location','') if prefill else '') }}" />
             </div>
             <div class="form-group">
                 <label for="specs">מפרט (Specs)</label>
                 <input type="text" id="specs" name="specs" class="form-control"
-                    value="{{ computer.specs if computer else '' }}" placeholder="למשל: 16GB RAM, Dell 2018" />
+                    value="{{ computer.specs if computer else (prefill.get('specs','') if prefill else '') }}"
+                    placeholder="יתמלא אוטומטית לפי מספר מחשב" />
             </div>
             <div class="form-group">
                 <label for="project">📂 פרויקט</label>
                 <input type="text" id="project" name="project" class="form-control" list="project-list"
-                    value="{{ computer.project if computer else '' }}" />
+                    value="{{ computer.project if computer else (prefill.get('project','') if prefill else '') }}" />
                 <datalist id="project-list">
                     <option value="רופאים">
                     <option value="שיניים">
@@ -66,7 +101,7 @@
         <div class="form-group" style="margin-top: 20px;">
             <label for="notes">הערות</label>
             <textarea id="notes" name="notes" class="form-control"
-                style="min-height: 120px;">{{ computer.notes if computer else '' }}</textarea>
+                style="min-height: 120px;">{{ computer.notes if computer else (prefill.get('notes','') if prefill else '') }}</textarea>
         </div>
         <div style="display:flex; gap:16px; margin-top:24px; justify-content: flex-end; flex-wrap: wrap;">
             <a href="{{ url_for('computers') }}" class="btn btn-ghost" style="flex: 1; text-align: center; min-width: 120px;">ביטול</a>

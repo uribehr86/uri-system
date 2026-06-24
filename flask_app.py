@@ -337,6 +337,26 @@ def format_history_filter(val_str):
 def summarize_history_filter(entry):
     return summarize_history(entry)
 
+
+def get_auto_spec(barcode):
+    """מחזיר מפרט אוטומטי לפי מספר מחשב"""
+    try:
+        num = int(str(barcode).strip())
+    except (ValueError, TypeError):
+        return ''
+    if 1 <= num <= 600:
+        return 'Dell | i7-8550U @ 1.80GHz | 32GB RAM'
+    elif 1001 <= num <= 1600:
+        return 'HP | i5-7200U @ 2.50GHz | 8GB RAM'
+    elif 2001 <= num <= 2400:
+        return 'HP | i5-7200U @ 2.50GHz | 8GB RAM'
+    elif 3001 <= num <= 3200:
+        return 'Dell | i7-8550U @ 1.80GHz | 16GB RAM'
+    elif 4001 <= num <= 4300:
+        return 'Lenovo | i5-7200U @ 2.50GHz | 8GB RAM'
+    return ''
+
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -708,19 +728,50 @@ def add_computer():
         try:
             cur = get_safe_cursor(conn)
             barcode = re.sub(r'^0+(?=\d)', '', data['barcode'].strip())
-            
+            force_update = data.get('force_update', '0') == '1'
+
             # Check for existing barcode
-            cur.execute("SELECT id FROM computers WHERE barcode = %s", (barcode,))
-            if cur.fetchone():
-                flash(f"שגיאה: מחשב {barcode} כבר קיים במערכת!", "danger")
-                return redirect(url_for('add_computer'))
+            cur.execute("SELECT id, cage_number, location FROM computers WHERE barcode = %s", (barcode,))
+            existing = cur.fetchone()
+
+            if existing and not force_update:
+                existing_cage = existing['cage_number'] or 'לא ידוע'
+                flash(f"⚠️ מחשב {barcode} כבר קיים בכלוב {existing_cage}", "warning")
+                return render_template('computer_form.html', action='add', computer=None,
+                                       existing_barcode=barcode, existing_cage=existing_cage,
+                                       existing_id=existing['id'], prefill=data)
 
             project = data.get('project', '').strip()
+            auto_spec = get_auto_spec(barcode)
+            specs_val = data.get('specs', '').strip() or auto_spec
+
+            if existing and force_update:
+                # עדכן את הרשומה הקיימת
+                cur.execute("""
+                    UPDATE computers
+                    SET case_number=%s, cage_number=%s, status=%s, location=%s,
+                        specs=%s, project=%s, notes=%s, last_technician=%s, scan_time=NOW()
+                    WHERE id=%s
+                """, (data.get('case_number',''), data.get('cage_number',''),
+                       data.get('status','תקין'), data.get('location',''),
+                       specs_val, project, data.get('notes',''),
+                       session.get('username'), existing['id']))
+                cur.execute("""
+                    INSERT INTO inventory_history (computer_id, technician, change_type, new_value)
+                    VALUES (%s, %s, 'Updated via Add Form', %s)
+                """, (existing['id'], session.get('username'),
+                       f"כלוב שונה ל: {data.get('cage_number','')}" ))
+                conn.commit()
+                cur.close()
+                flash(f"מחשב {barcode} עודכן בהצלחה!", "success")
+                return redirect(url_for('computers'))
 
             cur.execute("""
-                INSERT INTO computers (barcode, case_number, cage_number, status, location, exam_appeal, specs, project, notes, scan_time, last_technician)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s)
-            """, (barcode, data['case_number'], data['cage_number'], data['status'], data['location'], data['exam_appeal'], data['specs'], project, data['notes'], session.get('username')))
+                INSERT INTO computers (barcode, case_number, cage_number, status, location, specs, project, notes, scan_time, last_technician)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s)
+            """, (barcode, data.get('case_number',''), data.get('cage_number',''),
+                  data.get('status','תקין'), data.get('location',''),
+                  specs_val, project, data.get('notes',''), session.get('username')))
             conn.commit()
             cur.close()
             flash("מחשב נוסף בהצלחה!", "success")
@@ -730,7 +781,7 @@ def add_computer():
             flash(f"שגיאה בהוספת מחשב: {e}", "danger")
         finally:
             release_db_connection(conn)
-            
+
     return render_template('computer_form.html', action='add', computer=None)
 
 @app.route('/edit-computer/<int:cid>', methods=['GET', 'POST'])
@@ -886,11 +937,14 @@ def process_scan():
         
         if computer:
             # Update the existing record instead of inserting a duplicate
+            auto_spec = get_auto_spec(barcode)
             cur.execute("""
                 UPDATE computers 
                 SET scan_time = NOW(), last_technician = %s
+                    {}
                 WHERE id = %s
-            """, (session.get('username'), computer['id'],))
+            """.format(", specs = %s" if auto_spec else ""),
+                (session.get('username'),) + ((auto_spec, computer['id']) if auto_spec else (computer['id'],)))
             
             # Fetch the updated record (SQLite doesn't support RETURNING)
             cur.execute("SELECT * FROM computers WHERE id = %s", (computer['id'],))
@@ -916,10 +970,11 @@ def process_scan():
             return {"exists": True, "computer": new_computer}
         else:
             # Create completely new record
+            auto_spec = get_auto_spec(barcode)
             cur.execute("""
-                INSERT INTO computers (barcode, status, scan_time, notes, last_technician) 
-                VALUES (%s, 'תקין', NOW(), %s, %s) 
-            """, (barcode, None, session.get('username')))
+                INSERT INTO computers (barcode, status, scan_time, specs, notes, last_technician) 
+                VALUES (%s, 'תקין', NOW(), %s, %s, %s) 
+            """, (barcode, auto_spec or None, None, session.get('username')))
             
             last_id = cur.lastrowid if hasattr(cur, 'lastrowid') else None
             if last_id:
@@ -1325,7 +1380,7 @@ def api_fast_scan():
     cage_number = data.get('cage_number', '')
     cage_name  = data.get('cage_name', cage_number)
     status     = data.get('status', 'תקין')
-    specs      = data.get('specs', '')
+    specs      = data.get('specs', '') or get_auto_spec(barcode)
     project    = data.get('project', '')
     ministry   = data.get('ministry', '')
     technician = session.get('username', 'לא ידוע')
