@@ -132,6 +132,18 @@
   .manual-input-wrap { margin-top: 8px; display: flex; gap: 6px; }
   .manual-input-wrap input { flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(239,68,68,0.5); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.9rem; outline: none; }
   .manual-input-wrap button { background: #ef4444; color: #fff; border: none; padding: 9px 14px; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
+  /* Shared Session UI */
+  .shared-session-bar { background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.35); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .shared-session-bar .ss-label { color: #a5b4fc; font-size: 0.82rem; font-weight: 700; flex: 1; min-width: 80px; }
+  .ss-code-display { background: rgba(0,0,0,0.4); border: 1px solid rgba(99,102,241,0.5); border-radius: 8px; padding: 5px 12px; font-size: 1.2rem; font-weight: 900; color: #fff; letter-spacing: 0.15em; cursor: pointer; }
+  .ss-btn { border: none; border-radius: 8px; padding: 7px 13px; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+  .ss-btn-share  { background: linear-gradient(135deg,#6366f1,#4f46e5); color: #fff; }
+  .ss-btn-join   { background: rgba(99,102,241,0.2); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.4); }
+  .ss-btn-stop   { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+  .ss-input      { background: rgba(0,0,0,0.4); border: 1px solid rgba(99,102,241,0.4); border-radius: 8px; color: #fff; padding: 6px 10px; font-size: 1rem; font-weight: 900; letter-spacing: 0.12em; width: 80px; text-align: center; text-transform: uppercase; outline: none; }
+  .ss-joined-info { color: #4ade80; font-size: 0.8rem; font-weight: 700; }
+  @keyframes ss-pulse { 0%,100%{opacity:0.7} 50%{opacity:1} }
+  .ss-live-dot { display: inline-block; width: 7px; height: 7px; background:#4ade80; border-radius: 50%; margin-left: 4px; animation: ss-pulse 1.5s infinite; }
 </style>
 
 <div class="scan-page">
@@ -160,6 +172,41 @@
 
   <!-- Bottom panel -->
   <div class="bottom-panel">
+
+    <!-- SHARED SESSION BAR -->
+    <div id="shared-session-bar" class="shared-session-bar" style="display:none;">
+      <!-- Owner view: showing code -->
+      <div id="ss-owner-view" style="display:none; width:100%; display:none;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <span class="ss-label">🔗 קוד שיתוף:</span>
+          <span class="ss-code-display" id="ss-code-text" onclick="copySessionCode()" title="לחץ להעתקה">----</span>
+          <span style="font-size:0.75rem; color:#64748b;">לחץ להעתקה</span>
+          <button class="ss-btn ss-btn-stop" onclick="stopSharedSession()">✕ סיים שיתוף</button>
+        </div>
+        <div style="font-size:0.75rem; color:#94a3b8; margin-top:5px;">שאר הטכנאים יכנסו לסורק וילחצו "הצטרף לסשן" עם הקוד הזה</div>
+      </div>
+      <!-- Joiner view: connected to session -->
+      <div id="ss-joiner-view" style="display:none; width:100%;">
+        <span class="ss-joined-info"><span class="ss-live-dot"></span> מחובר לסשן של <span id="ss-owner-name"></span> | קוד: <span id="ss-joined-code"></span></span>
+        <button class="ss-btn ss-btn-stop" style="margin-right:10px;" onclick="leaveSharedSession()">✕ עזוב</button>
+      </div>
+    </div>
+
+    <!-- SHARED SESSION BUTTONS (idle state) -->
+    <div id="ss-idle-bar" style="display:flex; gap:8px; margin-bottom:8px;">
+      <button class="ss-btn ss-btn-share" onclick="startSharedSession()" style="flex:1;">🔗 שתף הגדרות לצוות</button>
+      <button class="ss-btn ss-btn-join" onclick="showJoinPanel()" style="flex:1;">📲 הצטרף לסשן</button>
+    </div>
+
+    <!-- JOIN PANEL -->
+    <div id="ss-join-panel" style="display:none; background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.3); border-radius:12px; padding:12px; margin-bottom:8px;">
+      <div style="font-size:0.85rem; color:#a5b4fc; font-weight:700; margin-bottom:8px;">📲 הזן קוד שקיבלת מהמנהל:</div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input class="ss-input" id="ss-join-input" maxlength="4" placeholder="XXXX" oninput="this.value=this.value.toUpperCase()" onkeypress="if(event.key==='Enter') joinSharedSession()" />
+        <button class="ss-btn ss-btn-share" onclick="joinSharedSession()">התחבר</button>
+        <button class="ss-btn ss-btn-stop" onclick="hideJoinPanel()">ביטול</button>
+      </div>
+    </div>
 
     <!-- AREA SCAN (formerly Full/Fast) -->
     <div id="panel-area">
@@ -1107,6 +1154,143 @@
       ministry: ''
   };
 
+  // ── SHARED SESSION ──────────────────────────────────────────────────────
+  let _ssCode = null;        // הקוד של הסשן שיצרנו
+  let _ssJoinedCode = null;  // הקוד שהצטרפנו אליו
+  let _ssPollInterval = null;
+
+  function startSharedSession() {
+    // לוקח את ההגדרות הנוכחיות ויוצר סשן
+    const settings = {
+      location: lastAreaSettings.location,
+      cage: lastAreaSettings.cage,
+      status: lastAreaSettings.status,
+      exam: lastAreaSettings.exam,
+      specs: lastAreaSettings.specs,
+      project: lastAreaSettings.project,
+      ministry: lastAreaSettings.ministry
+    };
+    fetch('/api/shared-session/create', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(settings)
+    }).then(r=>r.json()).then(data => {
+      if (data.success) {
+        _ssCode = data.code;
+        document.getElementById('ss-code-text').textContent = _ssCode;
+        document.getElementById('ss-idle-bar').style.display = 'none';
+        document.getElementById('ss-join-panel').style.display = 'none';
+        document.getElementById('shared-session-bar').style.display = 'block';
+        document.getElementById('ss-owner-view').style.display = 'block';
+        document.getElementById('ss-joiner-view').style.display = 'none';
+        showToast('✅ קוד שיתוף נוצר: ' + _ssCode + ' — תשתף עם הצוות!');
+        // כל פעם שמשה שומר מחשב — מעדכן את הסשן אוטומטית
+      } else {
+        showToast('שגיאה ביצירת סשן', true);
+      }
+    }).catch(() => showToast('שגיאת חיבור', true));
+  }
+
+  function copySessionCode() {
+    if (!_ssCode) return;
+    navigator.clipboard.writeText(_ssCode).then(() => showToast('✅ קוד הועתק: ' + _ssCode));
+  }
+
+  function stopSharedSession() {
+    if (_ssCode) {
+      fetch('/api/shared-session/' + _ssCode + '/close', {method:'POST'});
+      _ssCode = null;
+    }
+    document.getElementById('shared-session-bar').style.display = 'none';
+    document.getElementById('ss-owner-view').style.display = 'none';
+    document.getElementById('ss-idle-bar').style.display = 'flex';
+    showToast('🔴 שיתוף הופסק');
+  }
+
+  function showJoinPanel() {
+    document.getElementById('ss-join-panel').style.display = 'block';
+    document.getElementById('ss-join-input').focus();
+  }
+
+  function hideJoinPanel() {
+    document.getElementById('ss-join-panel').style.display = 'none';
+  }
+
+  function joinSharedSession() {
+    const code = document.getElementById('ss-join-input').value.trim().toUpperCase();
+    if (code.length !== 4) { showToast('הזן קוד בן 4 תווים', true); return; }
+    fetch('/api/shared-session/' + code)
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          _ssJoinedCode = code;
+          // Apply settings immediately
+          _applySharedSettings(data.settings);
+          // Update UI
+          document.getElementById('ss-owner-name').textContent = data.owner;
+          document.getElementById('ss-joined-code').textContent = code;
+          document.getElementById('ss-idle-bar').style.display = 'none';
+          document.getElementById('ss-join-panel').style.display = 'none';
+          document.getElementById('shared-session-bar').style.display = 'block';
+          document.getElementById('ss-owner-view').style.display = 'none';
+          document.getElementById('ss-joiner-view').style.display = 'block';
+          // Poll for updates every 10 seconds
+          if (_ssPollInterval) clearInterval(_ssPollInterval);
+          _ssPollInterval = setInterval(_pollSharedSession, 10000);
+          showToast('✅ מחובר לסשן של ' + data.owner + '!');
+        } else {
+          showToast('❌ קוד לא נמצא: ' + (data.error || ''), true);
+        }
+      }).catch(() => showToast('שגיאת חיבור', true));
+  }
+
+  function leaveSharedSession() {
+    _ssJoinedCode = null;
+    if (_ssPollInterval) { clearInterval(_ssPollInterval); _ssPollInterval = null; }
+    document.getElementById('shared-session-bar').style.display = 'none';
+    document.getElementById('ss-joiner-view').style.display = 'none';
+    document.getElementById('ss-idle-bar').style.display = 'flex';
+    showToast('👋 עזבת את הסשן');
+  }
+
+  function _pollSharedSession() {
+    if (!_ssJoinedCode) return;
+    fetch('/api/shared-session/' + _ssJoinedCode)
+      .then(r => { if (r.status === 404) { leaveSharedSession(); showToast('⚠️ הסשן הסתיים', true); return null; } return r.json(); })
+      .then(data => { if (data && data.success) _applySharedSettings(data.settings); })
+      .catch(() => {});
+  }
+
+  function _applySharedSettings(settings) {
+    // שומר בזיכרון המקומי
+    if (settings.location) lastAreaSettings.location = settings.location;
+    if (settings.cage)     lastAreaSettings.cage     = settings.cage;
+    if (settings.status)   lastAreaSettings.status   = settings.status;
+    if (settings.exam)     lastAreaSettings.exam     = settings.exam;
+    if (settings.specs)    lastAreaSettings.specs    = settings.specs;
+    if (settings.project)  lastAreaSettings.project  = settings.project;
+    if (settings.ministry) lastAreaSettings.ministry = settings.ministry;
+  }
+
+  // כשמשה שומר מחשב — מעדכן את הסשן שלו (אם פעיל)
+  function _pushSettingsToSession(settingsData) {
+    if (!_ssCode) return;
+    fetch('/api/shared-session/' + _ssCode + '/update', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        location: settingsData.location,
+        cage: settingsData.cage_number,
+        status: settingsData.status,
+        exam: settingsData.exam_appeal,
+        specs: settingsData.specs,
+        project: settingsData.project,
+        ministry: settingsData.ministry
+      })
+    }).catch(() => {});
+  }
+  // ────────────────────────────────────────────────────────────────────────
+
   function openSheet(computer, isNew) {
     isSheetOpen = true;
     if (failTimer) clearTimeout(failTimer);
@@ -1268,6 +1452,9 @@
     lastAreaSettings.specs = data.specs;
     lastAreaSettings.project = data.project;
     lastAreaSettings.ministry = data.ministry;
+
+    // אם יש סשן פעיל — מעדכן את כל המצטרפים אוטומטית
+    _pushSettingsToSession(data);
 
     fetch('/api/update-computer', {
       method: 'POST',

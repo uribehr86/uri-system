@@ -718,6 +718,11 @@ def computers():
         release_db_connection(conn)
 
 # נתיבים נוספים שנדרשים בטמפלייט base.html
+@app.route('/quick-add', methods=['GET'])
+@login_required
+def quick_add():
+    return render_template('batch_add.html')
+
 @app.route('/add-computer', methods=['GET', 'POST'])
 @login_required
 def add_computer():
@@ -903,6 +908,87 @@ def history_page():
         return render_template('history.html', history=processed_history)
     finally:
         release_db_connection(conn)
+
+# ── SHARED SCAN SESSION ─────────────────────────────────────────────────────
+# מאפשר לטכנאי אחד להגדיר הגדרות, והשאר מצטרפים עם קוד קצר
+import random
+import string
+import time as _time
+
+_shared_sessions = {}  # { code: { settings, owner, created_at } }
+
+def _generate_code():
+    """מייצר קוד קצר ייחודי בן 4 תווים"""
+    while True:
+        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+        if code not in _shared_sessions:
+            return code
+
+def _cleanup_old_sessions():
+    """מוחק sessions ישנות (מעל 8 שעות)"""
+    now = _time.time()
+    expired = [c for c, s in _shared_sessions.items() if now - s['created_at'] > 28800]
+    for c in expired:
+        del _shared_sessions[c]
+
+@app.route('/api/shared-session/create', methods=['POST'])
+@login_required
+def create_shared_session():
+    """יוצר session חדש עם הגדרות — מחזיר קוד קצר לשיתוף"""
+    _cleanup_old_sessions()
+    data = request.json or {}
+    settings = {
+        'location': data.get('location', ''),
+        'cage': data.get('cage', ''),
+        'status': data.get('status', 'תקין'),
+        'exam': data.get('exam', ''),
+        'specs': data.get('specs', ''),
+        'project': data.get('project', ''),
+        'ministry': data.get('ministry', ''),
+    }
+    code = _generate_code()
+    _shared_sessions[code] = {
+        'settings': settings,
+        'owner': session.get('username', ''),
+        'created_at': _time.time()
+    }
+    print(f"[SharedSession] Created session {code} by {session.get('username')}")
+    return {'success': True, 'code': code}
+
+@app.route('/api/shared-session/<code>', methods=['GET'])
+@login_required
+def get_shared_session(code):
+    """מחזיר את הגדרות ה-session לפי קוד"""
+    sess = _shared_sessions.get(code.upper())
+    if not sess:
+        return {'success': False, 'error': 'קוד לא נמצא או פג תוקף'}, 404
+    return {'success': True, 'settings': sess['settings'], 'owner': sess['owner']}
+
+@app.route('/api/shared-session/<code>/update', methods=['POST'])
+@login_required
+def update_shared_session(code):
+    """מעדכן הגדרות session קיים (רק הבעלים)"""
+    sess = _shared_sessions.get(code.upper())
+    if not sess:
+        return {'success': False, 'error': 'קוד לא נמצא'}, 404
+    if sess['owner'] != session.get('username'):
+        return {'success': False, 'error': 'רק הבעלים יכול לעדכן'}, 403
+    data = request.json or {}
+    for key in ['location', 'cage', 'status', 'exam', 'specs', 'project', 'ministry']:
+        if key in data:
+            sess['settings'][key] = data[key]
+    return {'success': True}
+
+@app.route('/api/shared-session/<code>/close', methods=['POST'])
+@login_required
+def close_shared_session(code):
+    """סוגר session"""
+    code = code.upper()
+    if code in _shared_sessions:
+        if _shared_sessions[code]['owner'] == session.get('username'):
+            del _shared_sessions[code]
+    return {'success': True}
+# ────────────────────────────────────────────────────────────────────────────
 
 @app.route('/api/process-scan', methods=['POST'])
 @login_required

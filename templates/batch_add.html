@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+{% block title %}הוספה מהירה – URI System{% endblock %}
+{% block content %}
+<style>
+  .batch-page { max-width: 600px; margin: 0 auto; padding: 10px; }
+
+  /* Settings card */
+  .settings-card {
+    background: #1e293b; border: 1px solid #334155; border-radius: 16px;
+    padding: 18px; margin-bottom: 14px;
+  }
+  .settings-title { font-size: 0.75rem; font-weight: 700; color: #64748b;
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .settings-row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .settings-field { flex: 1; min-width: 120px; }
+  .settings-field label { display: block; font-size: 0.72rem; color: #94a3b8;
+    margin-bottom: 4px; font-weight: 600; }
+  .settings-field input, .settings-field select {
+    width: 100%; background: rgba(255,255,255,0.06); border: 1px solid #334155;
+    color: #fff; padding: 9px 11px; border-radius: 10px; font-size: 0.9rem;
+    outline: none; box-sizing: border-box;
+  }
+  .settings-field input:focus, .settings-field select:focus {
+    border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+  }
+
+  /* Locked badge */
+  .locked-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3);
+    border-radius: 10px; padding: 8px 14px; font-size: 0.9rem; color: #4ade80;
+    font-weight: 700; margin-bottom: 12px; cursor: pointer;
+  }
+  .locked-badge:hover { background: rgba(34,197,94,0.18); }
+
+  /* Scan input */
+  .scan-input-wrap {
+    background: #1e293b; border: 2px solid #3b82f6; border-radius: 16px;
+    padding: 20px; margin-bottom: 14px; text-align: center;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .scan-input-wrap.success { border-color: #22c55e; box-shadow: 0 0 20px rgba(34,197,94,0.3); }
+  .scan-input-wrap.error   { border-color: #ef4444; box-shadow: 0 0 20px rgba(239,68,68,0.3); }
+  .scan-input-wrap label { display: block; font-size: 0.8rem; color: #64748b;
+    margin-bottom: 10px; font-weight: 600; }
+  #barcode-input {
+    width: 100%; background: rgba(255,255,255,0.06); border: 1px solid #475569;
+    color: #fff; padding: 14px 16px; border-radius: 12px; font-size: 1.2rem;
+    font-weight: 700; text-align: center; outline: none; box-sizing: border-box;
+    letter-spacing: 2px;
+  }
+  #barcode-input:focus { border-color: #3b82f6; }
+
+  /* Counter + controls */
+  .controls-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #1e293b; border: 1px solid #334155; border-radius: 14px;
+    padding: 14px 18px; margin-bottom: 14px;
+  }
+  .counter-wrap { text-align: center; }
+  .counter-num { font-size: 2.5rem; font-weight: 900; color: #60a5fa; line-height: 1; }
+  .counter-label { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+  .ctrl-btns { display: flex; gap: 8px; }
+  .btn-ctrl { border: none; padding: 10px 18px; border-radius: 10px;
+    font-weight: 800; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
+  .btn-ctrl:hover { transform: scale(1.05); }
+  .btn-pause  { background: #facc15; color: #000; }
+  .btn-resume { background: #22c55e; color: #000; display: none; }
+  .btn-change { background: rgba(99,102,241,0.2); border: 1px solid rgba(99,102,241,0.4);
+    color: #a5b4fc; }
+
+  /* Recent list */
+  .recent-card {
+    background: #1e293b; border: 1px solid #334155; border-radius: 14px;
+    padding: 14px; max-height: 260px; overflow-y: auto;
+  }
+  .recent-title { font-size: 0.75rem; color: #64748b; font-weight: 700;
+    text-transform: uppercase; margin-bottom: 10px; }
+  .recent-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 10px; border-radius: 8px; margin-bottom: 6px; font-size: 0.88rem;
+    animation: slideIn 0.3s ease;
+  }
+  .recent-item.ok  { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); }
+  .recent-item.dup { background: rgba(250,204,21,0.08); border: 1px solid rgba(250,204,21,0.2); }
+  .recent-item.err { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); }
+  .recent-num  { font-weight: 800; color: #e2e8f0; }
+  .recent-cage { font-size: 0.75rem; color: #94a3b8; }
+  .recent-status { font-size: 0.78rem; font-weight: 700; }
+  .recent-status.ok  { color: #4ade80; }
+  .recent-status.dup { color: #facc15; }
+  .recent-status.err { color: #f87171; }
+
+  /* Paused overlay */
+  #pause-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    z-index: 100; align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px;
+  }
+  #pause-overlay.show { display: flex; }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+</style>
+
+<div class="batch-page">
+  <div class="page-header" style="margin-bottom:16px;">
+    <h1 style="font-size:1.4rem;">⚡ הוספה מהירה</h1>
+    <a href="{{ url_for('computers') }}" class="btn btn-ghost" style="font-size:0.85rem;">← חזרה</a>
+  </div>
+
+  <!-- Settings (editable) -->
+  <div class="settings-card" id="settings-panel">
+    <div class="settings-title">⚙️ הגדרות – מגדיר פעם אחת</div>
+    <div class="settings-row">
+      <div class="settings-field">
+        <label>מספר כלוב *</label>
+        <input type="text" id="set-cage" placeholder="לדוג׳ 7" />
+      </div>
+      <div class="settings-field">
+        <label>מיקום</label>
+        <select id="set-location">
+          <option value="">לא נבחר</option>
+          <option value="מחסן">מחסן</option>
+          <option value="אפעל 6">אפעל 6</option>
+          <option value="אקספו">אקספו</option>
+          <option value="בנייני האומה">בנייני האומה</option>
+          <option value="שיבא">שיבא</option>
+          <option value="מכביה">מכביה</option>
+          <option value="בית">בית</option>
+          <option value="חוץ">חוץ</option>
+        </select>
+      </div>
+    </div>
+    <div class="settings-row">
+      <div class="settings-field">
+        <label>סטטוס</label>
+        <select id="set-status">
+          <option value="תקין">✅ תקין</option>
+          <option value="תקול">❌ תקול</option>
+          <option value="בתיקון">🔧 בתיקון</option>
+        </select>
+      </div>
+      <div class="settings-field">
+        <label>פרויקט</label>
+        <input type="text" id="set-project" list="project-list" placeholder="שם פרויקט..." />
+        <datalist id="project-list">
+          <option value="רופאים">
+          <option value="שיניים">
+          <option value="משרד המשפטים">
+          <option value="משרד העבודה">
+          <option value="משרד החינוך">
+        </datalist>
+      </div>
+    </div>
+    <button onclick="lockSettings()"
+      style="width:100%; background:linear-gradient(135deg,#3b82f6,#6366f1); color:#fff;
+             border:none; padding:13px; border-radius:12px; font-weight:800; font-size:1rem; cursor:pointer; margin-top:4px;">
+      🔒 נעל הגדרות והתחל סריקה
+    </button>
+  </div>
+
+  <!-- Locked settings badge (hidden until locked) -->
+  <div id="locked-badge" class="locked-badge" style="display:none;" onclick="unlockSettings()">
+    🔒 כלוב <span id="badge-cage">—</span> &nbsp;|&nbsp;
+    <span id="badge-location">—</span> &nbsp;|&nbsp;
+    <span id="badge-status">—</span>
+    &nbsp;&nbsp;<span style="color:#64748b; font-size:0.78rem;">לחץ לשינוי</span>
+  </div>
+
+  <!-- Barcode input (hidden until locked) -->
+  <div class="scan-input-wrap" id="scan-wrap" style="display:none;">
+    <label>📷 סרוק או הקלד מספר מחשב</label>
+    <input type="text" id="barcode-input" placeholder="מספר מחשב..."
+      autofocus autocomplete="off"
+      onkeypress="if(event.key==='Enter') submitBarcode()"
+      oninput="resetInputStyle()" />
+    <div style="margin-top:10px; font-size:0.8rem; color:#475569;">לחץ Enter לשמירה</div>
+  </div>
+
+  <!-- Counter + controls (hidden until locked) -->
+  <div class="controls-row" id="controls-row" style="display:none;">
+    <div class="counter-wrap">
+      <div class="counter-num" id="counter">0</div>
+      <div class="counter-label">מחשבים נוספו</div>
+    </div>
+    <div class="ctrl-btns">
+      <button class="btn-ctrl btn-change" onclick="unlockSettings()">🔄 שנה כלוב</button>
+      <button class="btn-ctrl btn-pause"  id="btn-pause"  onclick="togglePause()">⏸️ השהה</button>
+      <button class="btn-ctrl btn-resume" id="btn-resume" onclick="togglePause()">▶️ המשך</button>
+    </div>
+  </div>
+
+  <!-- Recent scans list -->
+  <div class="recent-card" id="recent-card" style="display:none;">
+    <div class="recent-title">📋 אחרונים</div>
+    <div id="recent-list"></div>
+  </div>
+</div>
+
+<!-- Pause overlay -->
+<div id="pause-overlay">
+  <div style="font-size:4rem;">⏸️</div>
+  <div style="font-size:1.5rem; font-weight:800; color:#fff;">הסריקה מושהית</div>
+  <button onclick="togglePause()"
+    style="background:#22c55e; color:#000; border:none; padding:14px 40px;
+           border-radius:14px; font-weight:800; font-size:1.1rem; cursor:pointer;">
+    ▶️ המשך
+  </button>
+</div>
+
+<script>
+  let isPaused = false;
+  let count = 0;
+  let settings = {};
+
+  function lockSettings() {
+    const cage = document.getElementById('set-cage').value.trim();
+    if (!cage) {
+      alert('חובה למלא מספר כלוב!');
+      document.getElementById('set-cage').focus();
+      return;
+    }
+    settings = {
+      cage:     cage,
+      location: document.getElementById('set-location').value,
+      status:   document.getElementById('set-status').value,
+      project:  document.getElementById('set-project').value.trim(),
+    };
+
+    // Update locked badge
+    document.getElementById('badge-cage').textContent     = settings.cage;
+    document.getElementById('badge-location').textContent = settings.location || '—';
+    document.getElementById('badge-status').textContent   = settings.status;
+
+    // Show/hide panels
+    document.getElementById('settings-panel').style.display = 'none';
+    document.getElementById('locked-badge').style.display   = 'inline-flex';
+    document.getElementById('scan-wrap').style.display      = 'block';
+    document.getElementById('controls-row').style.display   = 'flex';
+    document.getElementById('recent-card').style.display    = 'block';
+
+    document.getElementById('barcode-input').focus();
+  }
+
+  function unlockSettings() {
+    document.getElementById('settings-panel').style.display = 'block';
+    document.getElementById('locked-badge').style.display   = 'none';
+    document.getElementById('scan-wrap').style.display      = 'none';
+    document.getElementById('controls-row').style.display   = 'none';
+    document.getElementById('set-cage').focus();
+  }
+
+  function togglePause() {
+    isPaused = !isPaused;
+    document.getElementById('btn-pause').style.display  = isPaused ? 'none'  : 'inline-block';
+    document.getElementById('btn-resume').style.display = isPaused ? 'inline-block' : 'none';
+    document.getElementById('pause-overlay').classList.toggle('show', isPaused);
+    if (!isPaused) document.getElementById('barcode-input').focus();
+  }
+
+  function resetInputStyle() {
+    const wrap = document.getElementById('scan-wrap');
+    wrap.classList.remove('success', 'error');
+  }
+
+  async function submitBarcode() {
+    if (isPaused) return;
+
+    const input = document.getElementById('barcode-input');
+    let barcode = input.value.trim().replace(/^0+(?=\d)/, '');
+    if (!barcode) return;
+
+    input.value = '';
+    input.focus();
+
+    try {
+      const res = await fetch('/api/quick-add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barcode:  barcode,
+          cage:     settings.cage,
+          location: settings.location,
+          status:   settings.status,
+          project:  settings.project,
+        })
+      });
+      const data = await res.json();
+
+      const wrap = document.getElementById('scan-wrap');
+      if (data.success) {
+        if (data.updated) {
+          // קיים — עודכן
+          setInputState('success');
+          addRecent(barcode, settings.cage, 'dup', '🔄 עודכן');
+        } else {
+          // חדש — נוסף
+          count++;
+          document.getElementById('counter').textContent = count;
+          setInputState('success');
+          addRecent(barcode, settings.cage, 'ok', '✅ נוסף');
+        }
+      } else {
+        setInputState('error');
+        addRecent(barcode, settings.cage, 'err', '❌ ' + (data.error || 'שגיאה'));
+      }
+    } catch(e) {
+      setInputState('error');
+      addRecent(barcode, settings.cage, 'err', '❌ שגיאת תקשורת');
+    }
+  }
+
+  function setInputState(state) {
+    const wrap = document.getElementById('scan-wrap');
+    wrap.classList.remove('success', 'error');
+    wrap.classList.add(state);
+    setTimeout(() => wrap.classList.remove(state), 1200);
+  }
+
+  function addRecent(barcode, cage, type, statusText) {
+    const list = document.getElementById('recent-list');
+    const item = document.createElement('div');
+    item.className = `recent-item ${type}`;
+    item.innerHTML = `
+      <div>
+        <div class="recent-num">#${barcode}</div>
+        <div class="recent-cage">כלוב ${cage}</div>
+      </div>
+      <div class="recent-status ${type}">${statusText}</div>
+    `;
+    list.insertBefore(item, list.firstChild);
+    // שמור רק 20 אחרונים
+    while (list.children.length > 20) list.removeChild(list.lastChild);
+  }
+</script>
+{% endblock %}
