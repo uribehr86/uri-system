@@ -807,7 +807,7 @@ def edit_computer(cid):
                 UPDATE computers 
                 SET case_number=%s, cage_number=%s, status=%s, location=%s, exam_appeal=%s, specs=%s, project=%s, notes=%s, last_technician=%s
                 WHERE id=%s
-            """, (data['case_number'], data['cage_number'], data['status'], data['location'], data['exam_appeal'], data['specs'], project, data['notes'], session.get('username'), cid))
+            """, (data.get('case_number',''), data.get('cage_number',''), data.get('status','תקין'), data.get('location',''), data.get('exam_appeal',''), data.get('specs',''), project, data.get('notes',''), session.get('username'), cid))
             
             cur.execute("""
                 INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
