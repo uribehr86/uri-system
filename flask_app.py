@@ -43,22 +43,22 @@ except ImportError as e:
     DocxTemplate = InlineImage = Mm = Composer = Document = None
 
 _sync_timer = None
-_last_sheets_import = None   # Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¡ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¨
+_last_sheets_import = None   # זמן הסנכרון האחרון שיטס→אתר
 
 def trigger_debounced_sync():
     global _sync_timer
     if _sync_timer is not None:
         _sync_timer.cancel()
-    # Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…â€œ 5 Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â£ Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª
+    # דיליי של 5 שניות כדי לא להציף את גוגל בבקשות
     _sync_timer = Timer(5.0, sync_inventory_to_sheets)
     _sync_timer.start()
 
-# ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ AUTO-POLLER: Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¡ ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œ 3 Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+# ── AUTO-POLLER: שיטס → אתר כל 3 דקות ─────────────────────────────
 def _auto_import_loop():
-    """Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¢: Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œ 3 Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¡ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¨"""
+    """לולאה ברקע: כל 3 דקות מושכת שינויים מגוגל שיטס לאתר"""
     import time
     global _last_sheets_import
-    # Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¸ 30 Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â (Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂªÃƒâ€”Ã‚Âª Ãƒâ€”Ã…â€œ-Flask Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â‚¬Ëœ)
+    # המתן 30 שניות לפני הריצה הראשונה (לתת ל-Flask להתייצב)
     time.sleep(30)
     while True:
         try:
@@ -68,21 +68,21 @@ def _auto_import_loop():
             if success:
                 updated = stats.get('updated', 0)
                 if updated > 0:
-                    print(f"[AUTO-SYNC] ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ {_last_sheets_import.strftime('%H:%M:%S')} ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢ {updated} Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¡", flush=True)
+                    print(f"[AUTO-SYNC] ✅ {_last_sheets_import.strftime('%H:%M:%S')} — עודכנו {updated} רשומות מגיליון שיטס", flush=True)
                 else:
-                    print(f"[AUTO-SYNC] ÃƒÂ¢Ã‚ÂÃ‚Â³ {_last_sheets_import.strftime('%H:%M:%S')} ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¡", flush=True)
+                    print(f"[AUTO-SYNC] ⏳ {_last_sheets_import.strftime('%H:%M:%S')} — אין שינויים בשיטס", flush=True)
             else:
-                print(f"[AUTO-SYNC] ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â {msg}", flush=True)
+                print(f"[AUTO-SYNC] ⚠️ {msg}", flush=True)
         except Exception as ex:
-            print(f"[AUTO-SYNC] ÃƒÂ¢Ã‚ÂÃ…â€™ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â: {ex}", flush=True)
-        time.sleep(180)  # 3 Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª
+            print(f"[AUTO-SYNC] ❌ שגיאה: {ex}", flush=True)
+        time.sleep(180)  # 3 דקות
 
-# Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂÃƒâ€”Ã‚Â¤Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â
+# הפעל את הפולר בתחילת האפליקציה
 _poller_thread = threading.Thread(target=_auto_import_loop, daemon=True, name="SheetsAutoPoller")
 _poller_thread.start()
-print("[AUTO-SYNC] ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â‚¬Å¾ Auto-poller Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¨Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¡ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œ 3 Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª", flush=True)
+print("[AUTO-SYNC] 🔄 Auto-poller הופעל — יסנכרן שיטס→אתר כל 3 דקות", flush=True)
 
-# Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª
+# טעינת הגדרות
 load_dotenv()
 
 app = Flask(__name__)
@@ -96,11 +96,11 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 @app.before_request
 def refresh_session():
-    """Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â„¢"""
+    """מרענן את הסשן בכל בקשה כדי שלא יפוג"""
     if 'user_id' in session:
         session.permanent = True
         session.modified  = True
-        # Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…Â¸ timestamp Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Ëœ-5 Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œ Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¨ (Ãƒâ€”Ã…â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¢ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œ DB)
+        # עדכן timestamp פעם ב-5 דקות לכל יותר (למנוע עומס על DB)
         now = datetime.now()
         last_ping = session.get('_last_ping')
         if not last_ping or (now - datetime.fromisoformat(last_ping)).total_seconds() > 300:
@@ -129,7 +129,7 @@ db_pool = None
 db_pool_initialized = False
 IS_LOCAL_MODE = False
 
-# Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‹Å“Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã…â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¡
+# מטמון גלובלי למניעת בדיקה כפולה איטית בגוגל שיטס
 attendance_cache = {}
 
 
@@ -250,13 +250,13 @@ def close_db(error):
     pass
 
 def run_startup_migrations():
-    """Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª"""
+    """הוספת עמודות חדשות למסד אם עדיין לא קיימות"""
     conn = get_db_connection()
     if not conn:
         return
     try:
         cur = get_safe_cursor(conn)
-        # Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â£ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Âª sheets_delete_request Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Âª
+        # הוסף עמודת sheets_delete_request אם לא קיימת
         try:
             if IS_LOCAL_MODE:
                 cur.execute("ALTER TABLE computers ADD COLUMN sheets_delete_request INTEGER DEFAULT 0")
@@ -266,7 +266,7 @@ def run_startup_migrations():
             print("[OK] Migration: added sheets_delete_request column")
         except Exception:
             conn.rollback()
-        # Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…â€œÃƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Âª
+        # צור טבלת פרויקטים אם לא קיימת
         try:
             if IS_LOCAL_MODE:
                 cur.execute("""CREATE TABLE IF NOT EXISTS projects (
@@ -299,6 +299,22 @@ with app.app_context():
     run_startup_migrations()
 
 
+def get_google_creds(scopes):
+    """Load Google credentials from env var (Render) or local file."""
+    from google.oauth2.service_account import Credentials
+    import json as _json
+    sa_json = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
+    if sa_json:
+        try:
+            return Credentials.from_service_account_info(_json.loads(sa_json), scopes=scopes)
+        except Exception as e:
+            print(f"[CREDS] GOOGLE_SERVICE_ACCOUNT_JSON error: {e}")
+    sa_file = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+    if os.path.exists(sa_file):
+        return Credentials.from_service_account_file(sa_file, scopes=scopes)
+    raise FileNotFoundError(f"Google credentials not found. Set GOOGLE_SERVICE_ACCOUNT_JSON on Render.")
+
+
 @app.context_processor
 def utility_processor():
     def get_cage_color(cage):
@@ -308,21 +324,21 @@ def utility_processor():
         return f"hsl({hue}, 70%, 65%)"
 
     def get_computer_spec(computer_number):
-        """Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ"""
+        """מחזיר מפרט לפי מספר מחשב"""
         try:
             num = int(str(computer_number).strip())
         except (ValueError, TypeError):
             return None
         if 1 <= num <= 600:
-            return {'manufacturer': 'Dell', 'cpu': 'i7-8550U @ 1.80GHz', 'ram': '32GB', 'icon': 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â€œÃ‚Â¥ÃƒÂ¯Ã‚Â¸Ã‚Â'}
+            return {'manufacturer': 'Dell', 'cpu': 'i7-8550U @ 1.80GHz', 'ram': '32GB', 'icon': '🖥️'}
         elif 1001 <= num <= 1600:
-            return {'manufacturer': 'HP', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â€œÃ‚Â¥ÃƒÂ¯Ã‚Â¸Ã‚Â'}
+            return {'manufacturer': 'HP', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': '🖥️'}
         elif 2001 <= num <= 2400:
-            return {'manufacturer': 'HP', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â€œÃ‚Â¥ÃƒÂ¯Ã‚Â¸Ã‚Â'}
+            return {'manufacturer': 'HP', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': '🖥️'}
         elif 3001 <= num <= 3200:
-            return {'manufacturer': 'Dell', 'cpu': 'i7-8550U @ 1.80GHz', 'ram': '16GB', 'icon': 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â€œÃ‚Â¥ÃƒÂ¯Ã‚Â¸Ã‚Â'}
+            return {'manufacturer': 'Dell', 'cpu': 'i7-8550U @ 1.80GHz', 'ram': '16GB', 'icon': '🖥️'}
         elif 4001 <= num <= 4300:
-            return {'manufacturer': 'Lenovo', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â€œÃ‚Â¥ÃƒÂ¯Ã‚Â¸Ã‚Â'}
+            return {'manufacturer': 'Lenovo', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': '🖥️'}
         return None
 
     return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, get_computer_spec=get_computer_spec)
@@ -338,38 +354,8 @@ def summarize_history_filter(entry):
     return summarize_history(entry)
 
 
-def get_google_creds(scopes):
-    """
-    Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¸ credentials Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…â€œ Google Ãƒâ€”Ã…Â¾:
-    1. GOOGLE_SERVICE_ACCOUNT_JSON  - JSON string Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢ (Ãƒâ€”Ã…â€œRender)
-    2. GOOGLE_SERVICE_ACCOUNT_FILE  - Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Ëœ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¥
-    3. service_account.json         - Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã…â€œ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Âª
-    """
-    from google.oauth2.service_account import Credentials
-    import json as _json
-
-    # Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª 1: JSON Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Ëœ-env var (Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¥ Ãƒâ€”Ã…â€œRender)
-    sa_json = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
-    if sa_json:
-        try:
-            info = _json.loads(sa_json)
-            return Credentials.from_service_account_info(info, scopes=scopes)
-        except Exception as e:
-            print(f"[CREDS] Failed to load from GOOGLE_SERVICE_ACCOUNT_JSON: {e}")
-
-    # Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª 2: Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Ëœ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¥
-    sa_file = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
-    if os.path.exists(sa_file):
-        return Credentials.from_service_account_file(sa_file, scopes=scopes)
-
-    raise FileNotFoundError(
-        "Google credentials not found. Set GOOGLE_SERVICE_ACCOUNT_JSON env var on Render "
-        f"or place service_account.json locally (looked for: {sa_file})"
-    )
-
-
 def get_auto_spec(barcode):
-    """Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“ Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ"""
+    """מחזיר מפרט אוטומטי לפי מספר מחשב"""
     try:
         num = int(str(barcode).strip())
     except (ValueError, TypeError):
@@ -397,7 +383,7 @@ def login_required(f):
 @app.route('/api/projects')
 @login_required
 def api_projects():
-    """Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â + Sheet IDs Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â§"""
+    """מחזיר רשימת פרויקטים + Sheet IDs לסורק"""
     conn = get_db_connection()
     projects = []
     if conn:
@@ -425,7 +411,7 @@ def login():
         
         print(f"DEBUG: Login attempt - username: '{username}', password: '{password}'")
         
-        # Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â§ admin_uri Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â (Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª fallback Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬â€
+        # בדוק admin_uri מהמסד תחילה (אם קיים שם) — אחרת fallback לקשיח
         admin_matched = False
         if username.lower() in ("uri", "admin_uri") or True:  # always try DB first for any user
             pass  # falls through to DB check below
@@ -438,7 +424,7 @@ def login():
                 try:
                     cur_check = get_safe_cursor(conn_check)
                     cur_check.execute("SELECT username, password FROM users WHERE role='admin' AND username NOT IN ('uri','admin_uri') LIMIT 1")
-                    # Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â admin_uri Ãƒâ€”Ã¢â‚¬ËœDB
+                    # נסה למצוא admin_uri בDB
                     cur_check.execute("SELECT username, password FROM users WHERE username = %s", (username,))
                     db_admin = cur_check.fetchone()
                     cur_check.close()
@@ -453,7 +439,7 @@ def login():
                     session.update({
                         'user': username,
                         'user_id': 1,
-                        'username': "Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…â€œ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Âª",
+                        'username': "אורי מנהל מערכת",
                         'role': 'admin'
                     })
                     session.permanent = True
@@ -514,16 +500,16 @@ def login():
                             return redirect(next_page)
                         return redirect(url_for('portal'))
                     else:
-                        flash("Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â© Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢ Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â", "danger")
+                        flash("שם משתמש או סיסמה שגויים", "danger")
                 else:
-                    flash("Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â© Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢ Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â", "danger")
+                    flash("שם משתמש או סיסמה שגויים", "danger")
             except Exception as e:
                 print(f"DB Login Error: {e}")
-                flash("Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â", "danger")
+                flash("שגיאה בהתחברות למסד הנתונים", "danger")
             finally:
                 release_db_connection(conn)
         else:
-            flash("Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â", "danger")
+            flash("שגיאת חיבור למסד הנתונים", "danger")
             
     return render_template('login.html')
 
@@ -534,7 +520,7 @@ def register():
         password = request.form.get('password', '').strip()
         
         if not username or not password:
-            flash("Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â© Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â© Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â", "warning")
+            flash("יש להזין שם משתמש וסיסמה", "warning")
             return redirect(url_for('register'))
             
         conn = get_db_connection()
@@ -543,22 +529,22 @@ def register():
                 cur = get_safe_cursor(conn)
                 cur.execute("SELECT * FROM users WHERE username = %s", (username,))
                 if cur.fetchone():
-                    flash("Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â© Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Âª, Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨", "warning")
+                    flash("שם המשתמש כבר קיים במערכת, בחר שם אחר או התחבר", "warning")
                 else:
                     hashed_pass = generate_password_hash(password)
                     cur.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, 'technician')", (username, hashed_pass))
                     conn.commit()
-                    flash(f"Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â© {username} Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¦Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â! Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¸ Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨.", "success")
+                    flash(f"משתמש {username} נוצר בהצלחה! כעת ניתן להתחבר.", "success")
                     cur.close()
                     return redirect(url_for('login'))
                 cur.close()
             except Exception as e:
                 print(f"DB Register Error: {e}")
-                flash("Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©", "danger")
+                flash("שגיאה ביצירת המשתמש", "danger")
             finally:
                 release_db_connection(conn)
         else:
-            flash("Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â", "danger")
+            flash("שגיאת חיבור למסד הנתונים", "danger")
             
     return render_template('register.html')
 
@@ -568,19 +554,19 @@ def portal():
     return render_template('portal.html')
 
 
-# ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ API: Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…â€œ admin_uri ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+# ── API: שינוי פרטי כניסה של admin_uri ──────────────────────────────
 @app.route('/api/change-admin-credentials', methods=['POST'])
 @login_required
 def api_change_admin_credentials():
     if session.get('role') != 'admin' and session.get('user') not in ('uri', 'admin_uri'):
-        return {"success": False, "error": "Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Å“"}, 403
+        return {"success": False, "error": "גישה מותרת לאדמין בלבד"}, 403
 
     data = request.json or {}
     new_username = (data.get('new_username') or '').strip()
     new_password = (data.get('new_password') or '').strip()
 
     if not new_username and not new_password:
-        return {"success": False, "error": "Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â§ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢"}
+        return {"success": False, "error": "לא סופק שום שינוי"}
 
     conn = get_db_connection()
     if not conn:
@@ -589,12 +575,12 @@ def api_change_admin_credentials():
         cur = get_safe_cursor(conn)
         current_username = session.get('user', 'admin_uri')
 
-        # Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â§ Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ËœDB Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â© Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â‚¬Â
+        # בדוק אם קיים רשומה בDB עבור המשתמש הזה
         cur.execute("SELECT id FROM users WHERE username = %s", (current_username,))
         existing = cur.fetchone()
 
         if existing:
-            # Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…Â¸ Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Âª
+            # עדכן רשומה קיימת
             if new_username and new_password:
                 hashed = generate_password_hash(new_password)
                 cur.execute("UPDATE users SET username=%s, password=%s WHERE username=%s",
@@ -607,7 +593,7 @@ def api_change_admin_credentials():
                 cur.execute("UPDATE users SET password=%s WHERE username=%s",
                             (hashed, current_username))
         else:
-            # Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â
+            # צור רשומה חדשה במסד עם הפרטים החדשים
             final_username = new_username or current_username
             final_password = new_password or 'uri*'
             hashed = generate_password_hash(final_password)
@@ -618,9 +604,9 @@ def api_change_admin_credentials():
         cur.close()
 
         msg = []
-        if new_username: msg.append(f"Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â© Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…â€œ-{new_username}")
-        if new_password: msg.append("Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â")
-        return {"success": True, "message": " | ".join(msg) + ". Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§..."}
+        if new_username: msg.append(f"שם משתמש שונה ל-{new_username}")
+        if new_password: msg.append("סיסמה עודכנה")
+        return {"success": True, "message": " | ".join(msg) + ". מתנתק..."}
     except Exception as e:
         conn.rollback()
         return {"success": False, "error": str(e)}, 500
@@ -630,7 +616,7 @@ def api_change_admin_credentials():
 
 @app.route('/install-cert')
 def install_cert():
-    """Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Âª Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â‚¬Â-SSL"""
+    """מאפשר לאייפון להוריד ולהתקין את אישור ה-SSL"""
     cert_path = os.path.join(os.path.dirname(__file__), 'server.crt')
     if not os.path.exists(cert_path):
         return "Certificate not found", 404
@@ -641,7 +627,7 @@ def install_cert():
 
 @app.route('/dashboard')
 @app.route('/manage-computers')
-@app.route('/computers') # Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª
+@app.route('/computers') # תמיכה בשני השמות
 @login_required
 def computers():
     search = request.args.get('q', '').strip()
@@ -671,7 +657,7 @@ def computers():
     sort_dir = 'ASC' if direction == 'asc' else 'DESC'
     
     conn = get_db_connection()
-    if not conn: return "<h1>ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Âª Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¸. Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â§ Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â Ãƒâ€”Ã‹Å“.</h1>"
+    if not conn: return "<h1>⚠️ המערכת לא מצליחה להתחבר לענן. בדוק חיבור אינטרנט.</h1>"
     try:
         cur = get_safe_cursor(conn)
         
@@ -682,7 +668,7 @@ def computers():
         cur.execute("SELECT status, COUNT(*) as count FROM computers GROUP BY status")
         stats = cur.fetchall()
         stats_dict = {row['status']: row['count'] for row in stats}
-        faulty_count = stats_dict.get('Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œ', 0)
+        faulty_count = stats_dict.get('תקול', 0)
         # Count computers with no cage assigned
         cur.execute("SELECT COUNT(*) as count FROM computers WHERE (cage_number IS NULL OR TRIM(cage_number) = '') AND (cage_name IS NULL OR TRIM(cage_name) = '')")
         not_in_cage_count = cur.fetchone()['count']
@@ -747,7 +733,7 @@ def computers():
     finally:
         release_db_connection(conn)
 
-# Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‹Å“Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“ base.html
+# נתיבים נוספים שנדרשים בטמפלייט base.html
 @app.route('/quick-add', methods=['GET'])
 @login_required
 def quick_add():
@@ -770,8 +756,8 @@ def add_computer():
             existing = cur.fetchone()
 
             if existing and not force_update:
-                existing_cage = existing['cage_number'] or 'Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¢'
-                flash(f"ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ {barcode} Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Ëœ {existing_cage}", "warning")
+                existing_cage = existing['cage_number'] or 'לא ידוע'
+                flash(f"⚠️ מחשב {barcode} כבר קיים בכלוב {existing_cage}", "warning")
                 return render_template('computer_form.html', action='add', computer=None,
                                        existing_barcode=barcode, existing_cage=existing_cage,
                                        existing_id=existing['id'], prefill=data)
@@ -781,39 +767,39 @@ def add_computer():
             specs_val = data.get('specs', '').strip() or auto_spec
 
             if existing and force_update:
-                # Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…Â¸ Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Âª
+                # עדכן את הרשומה הקיימת
                 cur.execute("""
                     UPDATE computers
                     SET case_number=%s, cage_number=%s, status=%s, location=%s,
                         specs=%s, project=%s, notes=%s, last_technician=%s, scan_time=NOW()
                     WHERE id=%s
                 """, (data.get('case_number',''), data.get('cage_number',''),
-                       data.get('status','Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸'), data.get('location',''),
+                       data.get('status','תקין'), data.get('location',''),
                        specs_val, project, data.get('notes',''),
                        session.get('username'), existing['id']))
                 cur.execute("""
                     INSERT INTO inventory_history (computer_id, technician, change_type, new_value)
                     VALUES (%s, %s, 'Updated via Add Form', %s)
                 """, (existing['id'], session.get('username'),
-                       f"Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Ëœ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…â€œ: {data.get('cage_number','')}" ))
+                       f"כלוב שונה ל: {data.get('cage_number','')}" ))
                 conn.commit()
                 cur.close()
-                flash(f"Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ {barcode} Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¦Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â!", "success")
+                flash(f"מחשב {barcode} עודכן בהצלחה!", "success")
                 return redirect(url_for('computers'))
 
             cur.execute("""
                 INSERT INTO computers (barcode, case_number, cage_number, status, location, specs, project, notes, scan_time, last_technician)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s)
             """, (barcode, data.get('case_number',''), data.get('cage_number',''),
-                  data.get('status','Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸'), data.get('location',''),
+                  data.get('status','תקין'), data.get('location',''),
                   specs_val, project, data.get('notes',''), session.get('username')))
             conn.commit()
             cur.close()
-            flash("Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â£ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¦Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â!", "success")
+            flash("מחשב נוסף בהצלחה!", "success")
             return redirect(url_for('computers'))
         except Exception as e:
             conn.rollback()
-            flash(f"Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ: {e}", "danger")
+            flash(f"שגיאה בהוספת מחשב: {e}", "danger")
         finally:
             release_db_connection(conn)
 
@@ -837,7 +823,7 @@ def edit_computer(cid):
                 UPDATE computers 
                 SET case_number=%s, cage_number=%s, status=%s, location=%s, exam_appeal=%s, specs=%s, project=%s, notes=%s, last_technician=%s
                 WHERE id=%s
-            """, (data.get('case_number',''), data.get('cage_number',''), data.get('status','Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸'), data.get('location',''), data.get('exam_appeal',''), data.get('specs',''), project, data.get('notes',''), session.get('username'), cid))
+            """, (data.get('case_number',''), data.get('cage_number',''), data.get('status','תקין'), data.get('location',''), data.get('exam_appeal',''), data.get('specs',''), project, data.get('notes',''), session.get('username'), cid))
             
             cur.execute("""
                 INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
@@ -851,7 +837,7 @@ def edit_computer(cid):
             
             conn.commit()
             cur.close()
-            flash("Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢!", "success")
+            flash("פרטי המחשב עודכנו!", "success")
             return redirect(url_for('computers'))
             
         cur.execute("SELECT * FROM computers WHERE id = %s", (cid,))
@@ -871,15 +857,15 @@ def delete_computer(cid):
         # Only admin_uri can hard delete
         if session.get('user') == 'admin_uri':
             cur.execute("DELETE FROM computers WHERE id = %s", (cid,))
-            flash("Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â§ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Âª (admin_uri)", "warning")
+            flash("המחשב נמחק מהמערכת סופית (admin_uri)", "warning")
         else:
-            cur.execute("UPDATE computers SET status = 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã…â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â' WHERE id = %s", (cid,))
-            flash("Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œ (admin_uri)", "info")
+            cur.execute("UPDATE computers SET status = 'ממתין למחיקה' WHERE id = %s", (cid,))
+            flash("הבקשה למחיקת המחשב הועברה לאישור מנהל העל (admin_uri)", "info")
             
         conn.commit()
         cur.close()
     except Exception as e:
-        flash(f"Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â: {e}", "danger")
+        flash(f"שגיאה במחיקה: {e}", "danger")
     finally:
         release_db_connection(conn)
     return redirect(url_for('computers'))
@@ -939,8 +925,8 @@ def history_page():
     finally:
         release_db_connection(conn)
 
-# ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ SHARED SCAN SESSION ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
-# Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…â€œÃƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª, Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â¨ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‚Â¨
+# ── SHARED SCAN SESSION ─────────────────────────────────────────────────────
+# מאפשר לטכנאי אחד להגדיר הגדרות, והשאר מצטרפים עם קוד קצר
 import random
 import string
 import time as _time
@@ -948,14 +934,14 @@ import time as _time
 _shared_sessions = {}  # { code: { settings, owner, created_at } }
 
 def _generate_code():
-    """Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…Â¸ 4 Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â"""
+    """מייצר קוד קצר ייחודי בן 4 תווים"""
     while True:
         code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
         if code not in _shared_sessions:
             return code
 
 def _cleanup_old_sessions():
-    """Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â§ sessions Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª (Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œ 8 Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª)"""
+    """מוחק sessions ישנות (מעל 8 שעות)"""
     now = _time.time()
     expired = [c for c, s in _shared_sessions.items() if now - s['created_at'] > 28800]
     for c in expired:
@@ -964,13 +950,13 @@ def _cleanup_old_sessions():
 @app.route('/api/shared-session/create', methods=['POST'])
 @login_required
 def create_shared_session():
-    """Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‚Â¨ session Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â© Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â£"""
+    """יוצר session חדש עם הגדרות — מחזיר קוד קצר לשיתוף"""
     _cleanup_old_sessions()
     data = request.json or {}
     settings = {
         'location': data.get('location', ''),
         'cage': data.get('cage', ''),
-        'status': data.get('status', 'Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸'),
+        'status': data.get('status', 'תקין'),
         'exam': data.get('exam', ''),
         'specs': data.get('specs', ''),
         'project': data.get('project', ''),
@@ -988,21 +974,21 @@ def create_shared_session():
 @app.route('/api/shared-session/<code>', methods=['GET'])
 @login_required
 def get_shared_session(code):
-    """Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬Â-session Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“"""
+    """מחזיר את הגדרות ה-session לפי קוד"""
     sess = _shared_sessions.get(code.upper())
     if not sess:
-        return {'success': False, 'error': 'Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢ Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬â„¢ Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â£'}, 404
+        return {'success': False, 'error': 'קוד לא נמצא או פג תוקף'}, 404
     return {'success': True, 'settings': sess['settings'], 'owner': sess['owner']}
 
 @app.route('/api/shared-session/<code>/update', methods=['POST'])
 @login_required
 def update_shared_session(code):
-    """Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª session Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â (Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â§ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â)"""
+    """מעדכן הגדרות session קיים (רק הבעלים)"""
     sess = _shared_sessions.get(code.upper())
     if not sess:
-        return {'success': False, 'error': 'Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‚Â'}, 404
+        return {'success': False, 'error': 'קוד לא נמצא'}, 404
     if sess['owner'] != session.get('username'):
-        return {'success': False, 'error': 'Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â§ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…Â¸'}, 403
+        return {'success': False, 'error': 'רק הבעלים יכול לעדכן'}, 403
     data = request.json or {}
     for key in ['location', 'cage', 'status', 'exam', 'specs', 'project', 'ministry']:
         if key in data:
@@ -1012,13 +998,13 @@ def update_shared_session(code):
 @app.route('/api/shared-session/<code>/close', methods=['POST'])
 @login_required
 def close_shared_session(code):
-    """Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã‚Â¨ session"""
+    """סוגר session"""
     code = code.upper()
     if code in _shared_sessions:
         if _shared_sessions[code]['owner'] == session.get('username'):
             del _shared_sessions[code]
     return {'success': True}
-# ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+# ────────────────────────────────────────────────────────────────────────────
 
 @app.route('/api/process-scan', methods=['POST'])
 @login_required
@@ -1028,20 +1014,20 @@ def process_scan():
         return {"error": "No barcode provided"}, 400
     barcode = re.sub(r'^0+(?=\d)', '', barcode)
 
-    # ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Âª QR Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
-    # Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â: Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œ | (pipe) Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â, Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬â€ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…â€œ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸/Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨/Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸
-    EXAM_KEYWORDS = ['Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸', 'Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨', 'Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸', 'Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â', 'Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â']
+    # ── חסימת QR קודים של נבחנים ──────────────────────────────────────
+    # מזהים: מכיל | (pipe) עם נתוני בחינה, מילות מפתח של מבחן/ערעור/נבחן
+    EXAM_KEYWORDS = ['במבחן', 'ערעור', 'נבחן', 'בחינה', 'תעודה']
     is_exam_qr = (
-        '|' in barcode and len(barcode) > 20  # Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â QR Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸: data|data|data
+        '|' in barcode and len(barcode) > 20  # מבנה QR נבחן: data|data|data
         or any(kw in barcode for kw in EXAM_KEYWORDS)
     )
     if is_exam_qr:
         print(f"[BLOCKED] Examinee QR rejected: {barcode[:30]}...")
         return {
-            "error": "ÃƒÂ¢Ã‚ÂÃ…â€™ QR Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¡ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¸ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â§ Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ!",
+            "error": "❌ QR זה שייך לנבחן — לא ניתן לסרוק אותו כמחשב!",
             "blocked": True
         }, 400
-    # ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+    # ──────────────────────────────────────────────────────────────────
 
     conn = get_db_connection()
     if not conn: return {"error": "DB connection failed"}, 500
@@ -1069,7 +1055,7 @@ def process_scan():
             # Fetch last technician and time
             cur.execute("SELECT technician, timestamp FROM inventory_history WHERE computer_id = %s ORDER BY timestamp DESC LIMIT 1", (new_computer['id'],))
             hist = cur.fetchone()
-            new_computer['last_technician'] = hist['technician'] if hist and hist['technician'] else "Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¢"
+            new_computer['last_technician'] = hist['technician'] if hist and hist['technician'] else "לא ידוע"
             
             ts = hist['timestamp'] if hist else None
             if ts and not isinstance(ts, str):
@@ -1082,14 +1068,14 @@ def process_scan():
             # Trigger Google Sheets sync in background
             trigger_debounced_sync()
             
-            # Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¢ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¡ Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸
+            # מחזירים את המידע הקיים כדי שהטופס יתמלא נכון
             return {"exists": True, "computer": new_computer}
         else:
             # Create completely new record
             auto_spec = get_auto_spec(barcode)
             cur.execute("""
                 INSERT INTO computers (barcode, status, scan_time, specs, notes, last_technician) 
-                VALUES (%s, 'Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸', NOW(), %s, %s, %s) 
+                VALUES (%s, 'תקין', NOW(), %s, %s, %s) 
             """, (barcode, auto_spec or None, None, session.get('username')))
             
             last_id = cur.lastrowid if hasattr(cur, 'lastrowid') else None
@@ -1171,7 +1157,7 @@ def api_update_computer():
     finally:
         release_db_connection(conn)
 
-# ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ AI ASSISTANT (GEMINI) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+# ── AI ASSISTANT (GEMINI) ───────────────────────────────────────────
 @app.route('/api/ai-chat', methods=['POST'])
 @login_required
 def api_ai_chat():
@@ -1194,14 +1180,14 @@ def api_ai_chat():
         
         # Build system context
         system_prompt = f"""
-        Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â‚¬Â-AI Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…â€œ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Âª URI Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â. 
-        Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â:
-        - Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â"Ãƒâ€”Ã¢â‚¬Âº Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â: {total}
-        - Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â: {status_desc}
+        אתה עוזר ה-AI של מערכת URI לניהול מלאי מחשבים. 
+        הנתונים הנוכחיים במערכת הם:
+        - סה"כ מחשבים: {total}
+        - סטטוסים: {status_desc}
         
-        Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â© Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª, Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â. 
-        Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â© Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â‚¬Ëœ, Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â© Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œ.
-        Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â© Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢: {session.get('username')}
+        ענה למשתמש בעברית בצורה עוזרת, מקצועית וקצרה. 
+        אם המשתמש שואל על המצב, השתמש בנתונים שלעיל.
+        משתמש נוכחי: {session.get('username')}
         """
         
         response = genai_client.models.generate_content(
@@ -1217,7 +1203,7 @@ def api_ai_chat():
     finally:
         release_db_connection(conn)
 
-# ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ API: Batch Operations ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+# ── API: Batch Operations ──────────────────────────────────────────────
 @app.route('/api/batch-update', methods=['POST'])
 @login_required
 def api_batch_update():
@@ -1292,7 +1278,7 @@ def api_batch_delete():
         release_db_connection(conn)
 
 
-# ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ API: Google Sheets Sync ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+# ── API: Google Sheets Sync ──────────────────────────────────────────
 @app.route('/api/sync-to-sheets', methods=['POST'])
 @login_required
 def api_sync_to_sheets():
@@ -1359,7 +1345,7 @@ def api_delete_duplicates():
         deleted = cur.rowcount
         conn.commit()
         cur.close()
-        return jsonify({"success": True, "deleted": deleted, "message": f"Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢ {deleted} Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â"})
+        return jsonify({"success": True, "deleted": deleted, "message": f"נמחקו {deleted} כפולים"})
     except Exception as e:
         conn.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
@@ -1367,31 +1353,31 @@ def api_delete_duplicates():
         release_db_connection(conn)
 
 
-# ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ API: Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¡ ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Å“ (Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â§ admin) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+# ── API: ייבוא מגוגל שיטס → מסד (רק admin) ──────────────────────────
 @app.route('/api/import-from-sheets', methods=['POST'])
 @login_required
 def api_import_from_sheets():
     if session.get('role') != 'admin' and session.get('user') != 'admin_uri':
-        return {"success": False, "error": "Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Å“"}, 403
+        return {"success": False, "error": "גישה מותרת לאדמין בלבד"}, 403
     from google_sheets_sync import import_from_sheets
     success, message, stats = import_from_sheets()
     return {"success": success, "message": message, "stats": stats}
 
 
-# ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ API: Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Âª (Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â§ admin) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+# ── API: אישור מחיקה סופית (רק admin) ───────────────────────────────
 @app.route('/api/approve-sheets-delete', methods=['POST'])
 @login_required
 def api_approve_sheets_delete():
-    """Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â§ admin_uri Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂÃƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…â€œ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Âº-sheets_delete_request"""
+    """רק admin_uri יכול לאשר מחיקה סופית של מחשבים שמסומנים כ-sheets_delete_request"""
     if session.get('user') != 'admin_uri' and session.get('role') != 'admin':
-        return {"success": False, "error": "Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Å“"}, 403
+        return {"success": False, "error": "גישה מותרת לאדמין בלבד"}, 403
 
     data = request.json or {}
     action = data.get('action')  # 'approve' or 'cancel'
     computer_ids = data.get('ids', [])
 
     if not computer_ids:
-        # Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢ IDs ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â
+        # אם לא נשלחו IDs — פעל על כולם המסומנים
         conn = get_db_connection()
         if not conn:
             return {"success": False, "error": "DB connection failed"}, 500
@@ -1405,7 +1391,7 @@ def api_approve_sheets_delete():
             release_db_connection(conn)
 
     if not computer_ids:
-        return {"success": True, "message": "Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â", "count": 0}
+        return {"success": True, "message": "אין מחשבים הממתינים לאישור מחיקה", "count": 0}
 
     conn = get_db_connection()
     if not conn:
@@ -1415,40 +1401,40 @@ def api_approve_sheets_delete():
         placeholders = ','.join(['%s'] * len(computer_ids))
 
         if action == 'approve':
-            # Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Âª
+            # מחיקה סופית
             cur.execute(f"DELETE FROM computers WHERE id IN ({placeholders}) AND sheets_delete_request = TRUE", computer_ids)
             conn.commit()
             count = cur.rowcount
             cur.close()
-            return {"success": True, "message": f"Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢ {count} Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¦Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª", "count": count}
+            return {"success": True, "message": f"נמחקו {count} מחשבים לצמיתות", "count": count}
         else:
-            # Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Å“
+            # ביטול סימון — המחשב נשאר במסד
             cur.execute(f"UPDATE computers SET sheets_delete_request = FALSE WHERE id IN ({placeholders})", computer_ids)
             conn.commit()
             count = cur.rowcount
             cur.close()
-            return {"success": True, "message": f"Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ {count} Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â", "count": count}
+            return {"success": True, "message": f"בוטל סימון המחיקה עבור {count} מחשבים", "count": count}
     except Exception as e:
         return {"success": False, "error": str(e)}, 500
     finally:
         release_db_connection(conn)
 
 
-# ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ API: Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¢ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Ëœ ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+# ── API: שליפת מידע כלוב ──────────────────────────────────────────────
 @app.route('/api/cage/<cage_id>', methods=['GET'])
 @login_required
 def api_get_cage(cage_id):
-    """Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¢ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Ëœ + Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢"""
+    """מחזיר מידע על כלוב + רשימת המחשבים בו"""
     conn = get_db_connection()
     if not conn: return {"error": "DB connection failed"}, 500
     try:
         cur = get_safe_cursor(conn)
 
-        # Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Ëœ (Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…â€œÃƒâ€”Ã‚Âª cages)
+        # שליפת פרטי הכלוב (אם קיים בטבלת cages)
         cur.execute("SELECT * FROM cages WHERE cage_id = %s", (cage_id,))
         cage = cur.fetchone()
 
-        # Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Ëœ Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â‚¬Â
+        # שליפת מחשבים בכלוב זה
         cur.execute("""
             SELECT id, barcode, status, location, specs, scan_time, notes
             FROM computers
@@ -1457,17 +1443,17 @@ def api_get_cage(cage_id):
         """, (cage_id, cage_id))
         computers_in_cage = cur.fetchall()
 
-        # Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª
+        # סטטיסטיקות
         total = len(computers_in_cage)
         status_counts = {}
         for c in computers_in_cage:
             s_val = c.get('status')
-            s = s_val if s_val is not None else 'Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¢'
+            s = s_val if s_val is not None else 'לא ידוע'
             status_counts[s] = status_counts.get(s, 0) + 1  # type: ignore
 
         cur.close()
         return {
-            "cage": dict(cage) if cage else {"cage_id": cage_id, "name": f"Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Ëœ {cage_id}"},
+            "cage": dict(cage) if cage else {"cage_id": cage_id, "name": f"כלוב {cage_id}"},
             "computers": [dict(c) for c in computers_in_cage],
             "total": total,
             "status_counts": status_counts
@@ -1478,28 +1464,28 @@ def api_get_cage(cage_id):
     finally:
         release_db_connection(conn)
 
-# ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ API: Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â (Ãƒâ€”Ã…â€œÃƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+# ── API: סריקה מהירה (ללא חלון) ───────────────────────────────────────
 @app.route('/api/fast-scan', methods=['POST'])
 @login_required
 def api_fast_scan():
     """
-    Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â - Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…Â¸ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…â€œÃƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã‚Âª UI Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Âª.
-    user Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬â€: barcode, location, cage_number, cage_name, status
+    סריקה מהירה - מעדכן מחשב ישירות ללא תצוגת UI מפורטת.
+    user שולח: barcode, location, cage_number, cage_name, status
     """
     data = request.json
     barcode = data.get('barcode', '').strip()
     if not barcode:
-        return {"success": False, "error": "Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨"}, 400
+        return {"success": False, "error": "ברקוד חסר"}, 400
     barcode = re.sub(r'^0+(?=\d)', '', barcode)
 
     location   = data.get('location', '')
     cage_number = data.get('cage_number', '')
     cage_name  = data.get('cage_name', cage_number)
-    status     = data.get('status', 'Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸')
+    status     = data.get('status', 'תקין')
     specs      = data.get('specs', '') or get_auto_spec(barcode)
     project    = data.get('project', '')
     ministry   = data.get('ministry', '')
-    technician = session.get('username', 'Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¢')
+    technician = session.get('username', 'לא ידוע')
 
     conn = get_db_connection()
     if not conn: return {"success": False, "error": "DB connection failed"}, 500
@@ -1509,7 +1495,7 @@ def api_fast_scan():
         computer = cur.fetchone()
 
         old_val = dict(computer) if computer else None
-        last_technician = "Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¢"
+        last_technician = "לא ידוע"
         notes_val = ""
 
         if old_val:
@@ -1526,10 +1512,10 @@ def api_fast_scan():
             if 'project' in data and 'ministry' not in data:
                 project_name = data['project']
                 ministry = ''
-                if 'Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢' in project_name or 'Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â' in project_name: ministry = 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª'
-                elif 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â' in project_name: ministry = 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â'
-                elif 'Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â' in project_name: ministry = 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â'
-                elif 'Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¡' in project_name: ministry = 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¡'
+                if 'רופאי' in project_name or 'שיניים' in project_name: ministry = 'משרד הבריאות'
+                elif 'משפטים' in project_name: ministry = 'משרד המשפטים'
+                elif 'עבודה' in project_name: ministry = 'משרד העבודה'
+                elif 'חינוך' in project_name: ministry = 'משרד החינוך'
                 fields_to_update.append("ministry = %s")
                 params.append(ministry)
                 
@@ -1558,15 +1544,15 @@ def api_fast_scan():
                 fields.append('ministry')
                 project_name = data['project']
                 ministry = ''
-                if 'Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢' in project_name or 'Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â' in project_name: ministry = 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª'
-                elif 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â' in project_name: ministry = 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â'
-                elif 'Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â' in project_name: ministry = 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â'
-                elif 'Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¡' in project_name: ministry = 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¡'
+                if 'רופאי' in project_name or 'שיניים' in project_name: ministry = 'משרד הבריאות'
+                elif 'משפטים' in project_name: ministry = 'משרד המשפטים'
+                elif 'עבודה' in project_name: ministry = 'משרד העבודה'
+                elif 'חינוך' in project_name: ministry = 'משרד החינוך'
                 params.append(ministry)
                 
             if 'status' not in data:
                 fields.append('status')
-                params.append('Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸')
+                params.append('תקין')
                 
             placeholders = ', '.join(['%s'] * len(fields))
             query = f"INSERT INTO computers ({', '.join(fields)}) VALUES ({placeholders}) RETURNING *"
@@ -1586,7 +1572,7 @@ def api_fast_scan():
         conn.commit()
         cur.close()
         
-        # Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢ (Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã…Â¸) Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â
+        # טריגר לסנכרון אוטומטי (מתוזמן) עבור סריקה מהירה
         trigger_debounced_sync()
         
         return {
@@ -1625,7 +1611,7 @@ def admin_approve_delete():
         if action == 'hard_delete':
             cur.execute("DELETE FROM computers WHERE barcode = %s", (barcode,))
         elif action == 'restore':
-            cur.execute("UPDATE computers SET status = 'Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸' WHERE barcode = %s", (barcode,))
+            cur.execute("UPDATE computers SET status = 'תקין' WHERE barcode = %s", (barcode,))
             
         conn.commit()
         cur.close()
@@ -1640,7 +1626,7 @@ def admin_approve_delete():
 @login_required
 def manage_users():
     if session.get('role') != 'admin' and session.get('user') != 'admin_uri':
-        flash("Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã…â€œÃƒâ€”Ã…Â¡ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â‚¬Â", "danger")
+        flash("אין לך הרשאה לגשת לעמוד זה", "danger")
         return redirect(url_for('portal'))
         
     conn = get_db_connection()
@@ -1651,7 +1637,7 @@ def manage_users():
         cur.execute("SELECT username, role, timestamp FROM users ORDER BY timestamp DESC NULLS LAST")
         users_raw = cur.fetchall()
 
-        # Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¢ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨ (Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬Ëœ-30 Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª)
+        # קבע מי מחובר (פעיל ב-30 דקות האחרונות)
         now = datetime.now()
         users = []
         for u in users_raw:
@@ -1660,14 +1646,14 @@ def manage_users():
             if ts:
                 if hasattr(ts, 'replace'):
                     ts_naive = ts.replace(tzinfo=None) if hasattr(ts, 'tzinfo') and ts.tzinfo else ts
-                    is_online = (now - ts_naive).total_seconds() < 1800  # 30 Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª
+                    is_online = (now - ts_naive).total_seconds() < 1800  # 30 דקות
             users.append({'username': u['username'] if hasattr(u, '__getitem__') else u[0],
                           'role': u['role'] if hasattr(u, '__getitem__') else u[1],
                           'timestamp': ts,
                           'is_online': is_online})
 
         # 2. Fetch pending deletions
-        cur.execute("SELECT barcode as computer_number, cage_number FROM computers WHERE status = 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã…â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â'")
+        cur.execute("SELECT barcode as computer_number, cage_number FROM computers WHERE status = 'ממתין למחיקה'")
         pending_raw = cur.fetchall()
 
         # Format pending for template
@@ -1675,8 +1661,8 @@ def manage_users():
         for p in pending_raw:
             pending.append({
                 'computer_number': p['computer_number'],
-                'cage_number': p['cage_number'] or 'Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¢',
-                'scanned_by': 'Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢'
+                'cage_number': p['cage_number'] or 'לא ידוע',
+                'scanned_by': 'טכנאי'
             })
 
         cur.close()
@@ -1726,11 +1712,11 @@ def api_update_user():
     new_role      = data.get('role', '').strip()
     allowed_roles = ['technician', 'scanner', 'manager', 'logistics', 'admin']
     if not orig_username or not new_username:
-        return {"success": False, "error": "Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â© Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸"}, 400
+        return {"success": False, "error": "שם משתמש לא תקין"}, 400
     if new_role and new_role not in allowed_roles:
-        return {"success": False, "error": "Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â"}, 400
+        return {"success": False, "error": "הרשאה לא תקינה"}, 400
     if orig_username == 'admin_uri':
-        return {"success": False, "error": "Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¸ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¡ admin_uri Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚ÂÃƒâ€”Ã…Â¸"}, 400
+        return {"success": False, "error": "לא ניתן לערוך admin_uri מכאן"}, 400
     conn = get_db_connection()
     if not conn: return {"success": False, "error": "DB connection failed"}, 500
     try:
@@ -1761,7 +1747,7 @@ def api_update_user_password():
     username = data.get('username', '').strip()
     new_password = data.get('password', '').strip()
     if not username or len(new_password) < 4:
-        return {"success": False, "error": "Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â"}, 400
+        return {"success": False, "error": "נתונים לא תקינים"}, 400
     conn = get_db_connection()
     if not conn: return {"success": False, "error": "DB connection failed"}, 500
     try:
@@ -1787,9 +1773,9 @@ def api_update_user_role():
     new_role = data.get('role', '').strip()
     allowed_roles = ['technician', 'scanner', 'manager', 'logistics', 'admin']
     if not username or new_role not in allowed_roles:
-        return {"success": False, "error": "Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â"}, 400
+        return {"success": False, "error": "נתונים לא תקינים"}, 400
     if username == 'admin_uri':
-        return {"success": False, "error": "Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¸ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª admin_uri"}, 400
+        return {"success": False, "error": "לא ניתן לשנות את הרשאות admin_uri"}, 400
     conn = get_db_connection()
     if not conn: return {"success": False, "error": "DB connection failed"}, 500
     try:
@@ -1839,9 +1825,9 @@ def cages_page():
             SELECT
                 c.cage_id, c.name, c.location, c.notes,
                 COUNT(comp.id) AS computer_count,
-                SUM(CASE WHEN comp.status = 'Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸' THEN 1 ELSE 0 END) AS ok_count,
-                SUM(CASE WHEN comp.status = 'Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œ' THEN 1 ELSE 0 END) AS broken_count,
-                SUM(CASE WHEN comp.status NOT IN ('Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸','Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œ') AND comp.status IS NOT NULL THEN 1 ELSE 0 END) AS other_count
+                SUM(CASE WHEN comp.status = 'תקין' THEN 1 ELSE 0 END) AS ok_count,
+                SUM(CASE WHEN comp.status = 'תקול' THEN 1 ELSE 0 END) AS broken_count,
+                SUM(CASE WHEN comp.status NOT IN ('תקין','תקול') AND comp.status IS NOT NULL THEN 1 ELSE 0 END) AS other_count
             FROM cages c
             LEFT JOIN computers comp ON comp.cage_number = c.cage_id OR comp.cage_name = c.cage_id
             GROUP BY c.id, c.cage_id, c.name, c.location, c.notes
@@ -1933,7 +1919,7 @@ def api_pack_cage_photo():
             "details": []
         }
         
-        technician = session.get('username', 'Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¢')
+        technician = session.get('username', 'לא ידוע')
         
         # Process each extracted number
         for barcode in extracted_numbers:
@@ -1980,7 +1966,7 @@ def api_pack_cage_photo():
                 # New computer
                 cur.execute("""
                     INSERT INTO computers (barcode, cage_number, cage_name, status, scan_time, last_technician)
-                    VALUES (%s, %s, %s, 'Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸', NOW(), %s) RETURNING id
+                    VALUES (%s, %s, %s, 'תקין', NOW(), %s) RETURNING id
                 """, (barcode, cage_id, cage_id, technician))
                 new_id = cur.fetchone()['id']
                 
@@ -1991,7 +1977,7 @@ def api_pack_cage_photo():
                     new_id,
                     technician,
                     None,
-                    json.dumps({"cage_number": cage_id, "cage_name": cage_id, "status": "Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸"}, default=str)
+                    json.dumps({"cage_number": cage_id, "cage_name": cage_id, "status": "תקין"}, default=str)
                 ))
                 
                 results["new_count"] += 1
@@ -2037,7 +2023,7 @@ def api_scan_stats():
         today_total = cur.fetchone()['cnt']
         cur.execute("SELECT COUNT(*) as cnt FROM computers")
         total_computers = cur.fetchone()['cnt']
-        cur.execute("SELECT COUNT(*) as cnt FROM computers WHERE status = 'Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œ'")
+        cur.execute("SELECT COUNT(*) as cnt FROM computers WHERE status = 'תקול'")
         broken = cur.fetchone()['cnt']
         cur.execute("SELECT technician, COUNT(*) as count, MAX(timestamp) as last_scan FROM inventory_history WHERE timestamp::date = CURRENT_DATE AND change_type IN ('Fast Scan', 'Update via Scan') GROUP BY technician ORDER BY count DESC")
         workers = [dict(r) for r in cur.fetchall()]
@@ -2058,9 +2044,9 @@ def export_computers():
         
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â'
+        ws.title = 'מחשבים'
         ws.sheet_view.rightToLeft = True
-        headers = ['Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“', 'Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Ëœ', 'Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Ëœ', 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â', 'Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¡', 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§', 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸/Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨', 'Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª', 'Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â§ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â']
+        headers = ['ברקוד', 'כלוב', 'שם כלוב', 'מיקום', 'סטטוס', 'מספר תיק', 'מבחן/ערעור', 'הערות', 'נסרק לאחרונה']
         for col_num, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col_num, value=header)
             cell.font = Font(bold=True)
@@ -2071,14 +2057,14 @@ def export_computers():
         return send_file(buf, as_attachment=True, download_name=f"inventory_{datetime.now().strftime('%Y%m%d')}.xlsx", mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     finally: release_db_connection(conn)
 
-# ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
-# Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â
-# ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
+# ══════════════════════════════════════════════════════════════
+# מערכת נוכחות נבחנים
+# ══════════════════════════════════════════════════════════════
 
 @app.route('/exam-attendance')
 @login_required
 def exam_attendance():
-    """Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â"""
+    """דשבורד נוכחות נבחנים"""
     conn = get_db_connection()
     if not conn: return "DB Error", 500
     try:
@@ -2104,7 +2090,7 @@ def exam_attendance():
 @app.route('/exam-attendance/add', methods=['GET', 'POST'])
 @login_required
 def exam_attendance_add():
-    """Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Âª"""
+    """הוספת נבחן ידנית"""
     if request.method == 'POST':
         data = request.form
         conn = get_db_connection()
@@ -2128,10 +2114,10 @@ def exam_attendance_add():
             ))
             conn.commit()
             cur.close()
-            flash(f"Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸ {data.get('name','')} Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â£ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¦Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â! ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦", "success")
+            flash(f"נבחן {data.get('name','')} נוסף בהצלחה! ✅", "success")
             return redirect(url_for('exam_attendance'))
         except Exception as e:
-            flash(f"Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â: {e}", "danger")
+            flash(f"שגיאה: {e}", "danger")
         finally:
             release_db_connection(conn)
     return render_template('exam_attendance_add.html')
@@ -2139,17 +2125,17 @@ def exam_attendance_add():
 @app.route('/exam-attendance/import', methods=['POST'])
 @login_required
 def exam_attendance_import():
-    """Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾-Excel"""
+    """ייבוא נבחנים מ-Excel"""
     file = request.files.get('excel_file')
     if not file or not file.filename.endswith(('.xlsx', '.xls')):
-        flash("Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â© Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¥ Excel (.xlsx / .xls)", "danger")
+        flash("יש להעלות קובץ Excel (.xlsx / .xls)", "danger")
         return redirect(url_for('exam_attendance'))
 
     try:
         wb = openpyxl.load_workbook(file)
         ws = wb.active
         
-        # Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â 1
+        # קריאת כותרת הבחינה משורה 1
         exam_title_row1 = ''
         for cell in ws[1]:
             if cell.value and str(cell.value).strip():
@@ -2160,39 +2146,39 @@ def exam_attendance_import():
         header_row_idx = 1
         for row_idx, r in enumerate(ws.iter_rows(min_row=1, max_row=10, values_only=True), start=1):
             row_strs = [str(c).strip() if c else '' for c in r]
-            if any('Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â' in s or 'Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Âª' in s or 'Ãƒâ€”Ã‚Âª.Ãƒâ€”Ã¢â‚¬â€œ' in s or 'id' in s.lower() or 'Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢' in s for s in row_strs):
+            if any('שם' in s or 'תעודת' in s or 'ת.ז' in s or 'id' in s.lower() or 'פרטי' in s for s in row_strs):
                 headers = row_strs
                 header_row_idx = row_idx
                 break
         if not headers:
             headers = [str(cell.value).strip() if cell.value else '' for cell in ws[1]]
 
-        # Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â© ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢ + Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â
+        # מיפוי עמודות גמיש — כולל שם פרטי + שם משפחה
         col_map = {}
         for i, h in enumerate(headers):
             h_lower = h.lower()
-            if 'Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢' in h:                                          col_map['first_name'] = i
-            elif 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â' in h or 'family' in h_lower:               col_map['last_name']  = i
-            elif ('Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â' in h or 'name' in h_lower) and 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©' not in h: col_map['name'] = i
-            elif 'Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª' in h or 'Ãƒâ€”Ã‚Âª.Ãƒâ€”Ã¢â‚¬â€œ' in h or 'id' in h_lower:     col_map['id_number']  = i
-            elif 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©' in h or 'user' in h_lower or 'Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“' in h:  col_map['username']   = i
-            elif 'Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾' in h or 'pass' in h_lower:                  col_map['password']   = i
-            elif 'Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨' in h or 'Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â' in h:                        col_map['row_number'] = i
-            elif 'Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â' in h or 'Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â' in h or 'seat' in h_lower or 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ' in h:   col_map['seat_number']= i
-            elif 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â' in h or 'Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â' in h or 'location' in h_lower or 'Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â' in h: col_map['location']= i
-            elif 'Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â' in h or 'exam' in h_lower:                 col_map['exam_name']  = i
-            elif 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ' in h or 'computer' in h_lower:              col_map['computer']   = i
-            elif 'Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã‚ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª' in h or 'notes' in h_lower:               col_map['notes']      = i
+            if 'פרטי' in h:                                          col_map['first_name'] = i
+            elif 'משפחה' in h or 'family' in h_lower:               col_map['last_name']  = i
+            elif ('שם' in h or 'name' in h_lower) and 'משתמש' not in h: col_map['name'] = i
+            elif 'זהות' in h or 'ת.ז' in h or 'id' in h_lower:     col_map['id_number']  = i
+            elif 'משתמש' in h or 'user' in h_lower or 'קוד' in h:  col_map['username']   = i
+            elif 'סיסמ' in h or 'pass' in h_lower:                  col_map['password']   = i
+            elif 'טור' in h or 'עמודה' in h:                        col_map['row_number'] = i
+            elif 'כסא' in h or 'כיסא' in h or 'seat' in h_lower or 'מושב' in h:   col_map['seat_number']= i
+            elif 'מיקום' in h or 'כיתה' in h or 'location' in h_lower or 'אולם' in h: col_map['location']= i
+            elif 'בחינה' in h or 'exam' in h_lower:                 col_map['exam_name']  = i
+            elif 'מחשב' in h or 'computer' in h_lower:              col_map['computer']   = i
+            elif 'התאמות' in h or 'notes' in h_lower:               col_map['notes']      = i
 
         def safe_val(val):
-            """Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã…Â¡ Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â/Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Âª"""
+            """המרת ערך תא — מטפל במספרים גדולים/נוטציה מדעית"""
             if val is None: return ''
             if isinstance(val, float):
                 if val == int(val): return str(int(val))
                 return str(val)
             return str(val).strip()
 
-        # Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â£ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª
+        # איסוף כל השורות
         all_rows = []
         for row in ws.iter_rows(min_row=header_row_idx + 1, values_only=True):
             if not any(row): continue
@@ -2201,7 +2187,7 @@ def exam_attendance_import():
                 if idx is None: return ''
                 return safe_val(r[idx])
 
-            # Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â: Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â© Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢ + Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Å“
+            # שם מלא: אם יש שם פרטי + משפחה — מאחד
             first = get_val('first_name')
             last  = get_val('last_name')
             if first or last:
@@ -2223,7 +2209,7 @@ def exam_attendance_import():
                 'seat_number': get_val('seat_number'),
             })
 
-        # Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â
+        # מיון לפי טור → כסא
         def sort_key(r):
             try:    row_n  = int(float(r['row_number']))  if r['row_number']  else 9999
             except: row_n  = 9999
@@ -2232,70 +2218,67 @@ def exam_attendance_import():
             return (row_n, seat_n)
         all_rows.sort(key=sort_key)
 
-        # ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Google Drive: Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â + Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸ ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
-        # ÃƒÂ¢Ã¢â‚¬Â Ã¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬Â Ã¢â€šÂ¬ Google Drive: Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â  + Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€ Ãƒâ€”Ã…Â¸ ÃƒÂ¢Ã¢â‚¬Â Ã¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬Â Ã¢â€šÂ¬
+        # ── Google Drive: תיקייה + גיליון ייעודי לכל מבחן ──
         from drive_manager import create_folder_and_sheet_if_not_exists
         import re
 
         raw_name = os.path.splitext(file.filename)[0]
 
-        # Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â  Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Å“/Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€ Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â  ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â  Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¡ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â 
-        scopes = ['https://www.googleapis.com/auth/spreadsheets',
-                  'https://www.googleapis.com/auth/drive']
-        creds = get_google_creds(scopes)
+        # שם המשרד/בחינה — ניקוי תאריך מהשם
         if exam_title_row1:
-            title_clean = re.sub(r'[-ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“]\s*Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€ Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª\s*$', '', exam_title_row1).strip()
-            title_clean = re.sub(r'[-ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“]\s*\d+\.\d+\.\d+\s*$', '', title_clean).strip()
+            title_clean = re.sub(r'[-–]\s*נוכחות\s*$', '', exam_title_row1).strip()
+            title_clean = re.sub(r'[-–]\s*\d+\.\d+\.\d+\s*$', '', title_clean).strip()
             exam_sheet_name = title_clean or raw_name
         else:
             exam_sheet_name = re.sub(r'\s*\d+[\./]\d+[\./]\d+\s*$', '', raw_name).strip() or raw_name
 
         print(f"[IMPORT] Creating/finding Drive sheet for: '{exam_sheet_name}'", flush=True)
 
-        # Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â + Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬Ëœ-Drive (Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‚Â¨, Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨)
+        # יצירת תיקייה + גיליון אוטומטית ב-Drive (אם לא קיים — יוצר, אם קיים — מחזיר)
         new_sheet_id = create_folder_and_sheet_if_not_exists(exam_sheet_name)
 
         if not new_sheet_id:
-            # Fallback Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã…â€œ
+            # Fallback לגיליון ברירת המחדל
             new_sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
             print(f"[IMPORT] Fallback to default sheet", flush=True)
 
         import gspread
-        scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-        creds = get_google_creds(scopes)
-
+        from google.oauth2.service_account import Credentials
+        scopes  = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+        sa_file = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+        creds   = Credentials.from_service_account_file(sa_file, scopes=scopes)
         gs_client = gspread.authorize(creds)
         sh = gs_client.open_by_key(new_sheet_id)
         ws_tab = sh.sheet1
 
-        # ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Ëœ Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂÃƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…â€œ ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+        # ── כתוב נתונים לגיליון — לפי מבנה האקסל ──
         header_row = [
-            'Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢', 'Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â', 'Ãƒâ€”Ã‚Âª.Ãƒâ€”Ã¢â‚¬â€œ', 'Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã‚ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª', 'Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â',
-            'Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©', 'Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â', "Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â' Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â", 'Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨', 'Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â',
-            'Ãƒâ€”Ã…Â¾.Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ', 'Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª', 'Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â', 'Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢'
+            'שם פרטי', 'שם משפחה', 'ת.ז', 'התאמות', 'סיסמה',
+            'שם משתמש', 'גרסה', "סה' אולם", 'טור', 'כסא',
+            'מ.מחשב', 'נוכחות', 'שעת סריקה', 'טכנאי'
         ]
         rows_to_write = [header_row]
         for rec in all_rows:
             rows_to_write.append([
-                rec['name'],         # Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢ (Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â)
-                '',                  # Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â
-                rec['id_number'],    # Ãƒâ€”Ã‚Âª.Ãƒâ€”Ã¢â‚¬â€œ
-                rec.get('notes',''), # Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã‚ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª
-                rec['password'],     # Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â
-                rec['username'],     # Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©
-                rec.get('exam_name', exam_sheet_name),  # Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â
-                '',                  # Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â' Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â
-                rec['row_number'],   # Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨
-                rec['seat_number'],  # Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â
-                '',                  # Ãƒâ€”Ã…Â¾.Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ ÃƒÂ¢Ã¢â‚¬Â Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â
-                '',                  # Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª ÃƒÂ¢Ã¢â‚¬Â Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â
-                '',                  # Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â ÃƒÂ¢Ã¢â‚¬Â Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â
-                '',                  # Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢ ÃƒÂ¢Ã¢â‚¬Â Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â
+                rec['name'],         # שם פרטי (שם מלא)
+                '',                  # שם משפחה
+                rec['id_number'],    # ת.ז
+                rec.get('notes',''), # התאמות
+                rec['password'],     # סיסמה
+                rec['username'],     # שם משתמש
+                rec.get('exam_name', exam_sheet_name),  # גרסה
+                '',                  # סה' אולם
+                rec['row_number'],   # טור
+                rec['seat_number'],  # כסא
+                '',                  # מ.מחשב ← ימולא בסריקה
+                '',                  # נוכחות ← ימולא בסריקה
+                '',                  # שעת סריקה ← ימולא בסריקה
+                '',                  # טכנאי ← ימולא בסריקה
             ])
         ws_tab.clear()
         ws_tab.update('A1', rows_to_write, value_input_option='USER_ENTERED')
 
-        # Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Ëœ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª
+        # עיצוב כותרות
         last_col = chr(ord('A') + len(header_row) - 1)
         ws_tab.format(f'A1:{last_col}1', {
             'textFormat': {'bold': True},
@@ -2303,7 +2286,7 @@ def exam_attendance_import():
             'horizontalAlignment': 'CENTER'
         })
 
-        # ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‹Å“ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Å“ ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+        # ── שמור מיפוי פרויקט במסד ──
         sheet_url = f"https://docs.google.com/spreadsheets/d/{new_sheet_id}"
         conn2 = get_db_connection()
         if conn2:
@@ -2324,12 +2307,12 @@ def exam_attendance_import():
             finally:
                 release_db_connection(conn2)
 
-        flash(f"ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ {len(all_rows)} Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢! ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Å¡ Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‚Â¨: {exam_sheet_name}", "success")
-        flash(f"ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â‚¬â€ <a href='{sheet_url}' target='_blank'>Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬â€ Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬Ëœ-Google Drive</a>", "info")
+        flash(f"✅ {len(all_rows)} נבחנים יובאו! 📂 גיליון נוצר: {exam_sheet_name}", "success")
+        flash(f"🔗 <a href='{sheet_url}' target='_blank'>פתח את הגיליון ב-Google Drive</a>", "info")
 
     except Exception as e:
         import traceback; traceback.print_exc()
-        flash(f"Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â: {e}", "danger")
+        flash(f"שגיאה בייבוא: {e}", "danger")
     return redirect(url_for('exam_attendance'))
 
 
@@ -2338,12 +2321,12 @@ def exam_attendance_import():
 @app.route('/api/generate-word-docs', methods=['POST'])
 @login_required
 def generate_word_docs():
-    """Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¥ Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Å“"""
+    """מחולל דפי נבחנים מקובץ אקסל ותבנית וורד"""
     excel_file = request.files.get('excel_file')
     word_template = request.files.get('word_template')
     
     if not excel_file:
-        flash("Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â© Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¥ Excel", "danger")
+        flash("יש להעלות קובץ Excel", "danger")
         return redirect(url_for('exam_attendance'))
         
     try:
@@ -2351,7 +2334,7 @@ def generate_word_docs():
         wb = openpyxl.load_workbook(excel_file)
         ws = wb.active
         
-        # Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â 1 (Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â£) Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â
+        # קריאת שם הבחינה משורה 1 (כותרת הדף) אם קיים
         exam_title_from_header = ''
         first_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
         for cell in first_row:
@@ -2361,8 +2344,8 @@ def generate_word_docs():
 
         headers = []
         header_row_idx = 1
-        # Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª: Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¡ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª 2 Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª (Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¢ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢ "Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â"ÃƒÂ¢Ã…Â Ã†â€™"Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â")
-        HEADER_KEYS = ['Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â', 'Ãƒâ€”Ã‚Âª.Ãƒâ€”Ã¢â‚¬â€œ', 'Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Âª', 'Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾', 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©', 'Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨', 'Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â', 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ', 'Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã‚ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª', 'Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢', 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â', 'id', 'pass', 'user', 'seat', 'name']
+        # זיהוי שורת כותרות: צריך לפחות 2 עמודות מוכרות (מונע שגיאות כמו "חשמלאים"⊃"שם")
+        HEADER_KEYS = ['שם', 'ת.ז', 'תעודת', 'סיסמ', 'משתמש', 'טור', 'כסא', 'מחשב', 'התאמות', 'פרטי', 'משפחה', 'id', 'pass', 'user', 'seat', 'name']
         for row_idx, r in enumerate(ws.iter_rows(min_row=1, max_row=10, values_only=True), start=1):
             row_strs = [str(c).strip() if c else '' for c in r]
             matches = sum(1 for s in row_strs if any(k in s.lower() for k in HEADER_KEYS))
@@ -2374,7 +2357,7 @@ def generate_word_docs():
             headers = [str(cell.value).strip() if cell.value else '' for cell in ws[1]]
 
         def safe_val(val):
-            """Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã…Â¡ Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â/Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Âª"""
+            """המרת ערך תא — מטפל במספרים גדולים/נוטציה מדעית"""
             if val is None: return ''
             if isinstance(val, float):
                 if val == int(val): return str(int(val))
@@ -2384,18 +2367,18 @@ def generate_word_docs():
         col_map = {}
         for i, h in enumerate(headers):
             h_lower = h.lower()
-            if 'Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢' in h:                                              col_map['first_name'] = i
-            elif 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â' in h or 'family' in h_lower:                   col_map['last_name']  = i
-            elif ('Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â' in h or 'name' in h_lower) and 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©' not in h: col_map['name']       = i
-            elif 'Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª' in h or 'Ãƒâ€”Ã‚Âª.Ãƒâ€”Ã¢â‚¬â€œ' in h or 'id' in h_lower:         col_map['id_number']  = i
-            elif 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©' in h or 'user' in h_lower or 'Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“' in h:      col_map['username']   = i
-            elif 'Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾' in h or 'pass' in h_lower:                      col_map['password']   = i
-            elif 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â' in h or 'Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â' in h or 'location' in h_lower or 'Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â' in h: col_map['location']   = i
-            elif 'Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â' in h or 'exam' in h_lower:                     col_map['exam_name']  = i
-            elif 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ' in h or 'computer' in h_lower:                  col_map['computer']   = i
-            elif 'Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã‚ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª' in h or 'notes' in h_lower:                   col_map['notes']      = i
-            elif 'Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨' in h or 'Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â' in h:                            col_map['row']        = i
-            elif 'Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â' in h or 'Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â' in h or 'seat' in h_lower or 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ' in h:       col_map['seat']       = i
+            if 'פרטי' in h:                                              col_map['first_name'] = i
+            elif 'משפחה' in h or 'family' in h_lower:                   col_map['last_name']  = i
+            elif ('שם' in h or 'name' in h_lower) and 'משתמש' not in h: col_map['name']       = i
+            elif 'זהות' in h or 'ת.ז' in h or 'id' in h_lower:         col_map['id_number']  = i
+            elif 'משתמש' in h or 'user' in h_lower or 'קוד' in h:      col_map['username']   = i
+            elif 'סיסמ' in h or 'pass' in h_lower:                      col_map['password']   = i
+            elif 'מיקום' in h or 'כיתה' in h or 'location' in h_lower or 'אולם' in h: col_map['location']   = i
+            elif 'בחינה' in h or 'exam' in h_lower:                     col_map['exam_name']  = i
+            elif 'מחשב' in h or 'computer' in h_lower:                  col_map['computer']   = i
+            elif 'התאמות' in h or 'notes' in h_lower:                   col_map['notes']      = i
+            elif 'טור' in h or 'עמודה' in h:                            col_map['row']        = i
+            elif 'כסא' in h or 'כיסא' in h or 'seat' in h_lower or 'מושב' in h:       col_map['seat']       = i
 
         examinees = []
         for row in ws.iter_rows(min_row=header_row_idx + 1, values_only=True):
@@ -2405,7 +2388,7 @@ def generate_word_docs():
                 if idx is None: return ''
                 return safe_val(r[idx])
 
-            # DEBUG ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¥ (Ãƒâ€”Ã…â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Âª charmap Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã…â€œ)
+            # DEBUG — שומר מיפוי לקובץ (למניעת שגיאת charmap בטרמינל)
             if len(examinees) == 0:
                 try:
                     with open('debug_colmap.txt', 'w', encoding='utf-8') as dbf:
@@ -2415,7 +2398,7 @@ def generate_word_docs():
                 except Exception:
                     pass
 
-            # Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â: Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢ + Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â
+            # שם מלא: שם פרטי + שם משפחה אם קיימים
             first = get_val('first_name')
             last  = get_val('last_name')
             if first or last:
@@ -2438,7 +2421,7 @@ def generate_word_docs():
             })
             
         if not examinees:
-            flash("Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢ Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¥ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂÃƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…â€œ", "warning")
+            flash("לא נמצאו נתונים בקובץ האקסל", "warning")
             return redirect(url_for('exam_attendance'))
             
         # Load template
@@ -2449,7 +2432,7 @@ def generate_word_docs():
             with open(template_path, 'rb') as f:
                 word_bytes = f.read()
         
-        all_docs = []  # Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…â€œ (Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â_Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¥, bytes) Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸
+        all_docs = []  # רשימה של (שם_קובץ, bytes) לכל נבחן
         
         for i, e in enumerate(examinees):
             # Load template first so we can use it for InlineImage
@@ -2458,11 +2441,11 @@ def generate_word_docs():
             # Format: exam_name|id_number|name|username|password|row|seat
             # exam_name: from column or from Excel title row
             exam_title = e['exam_name'] if e['exam_name'] else (exam_title_from_header or 'EXAMINEE')
-            # Clean trailing "- Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª" or "Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª"
-            exam_title_clean = re.sub(r'[-ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“]\s*Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª\s*$', '', exam_title).strip()
-            exam_title_clean = exam_title_clean.replace('|', ' ').strip()  # Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¢ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‹Å“ Ãƒâ€”Ã¢â‚¬Â-QR
+            # Clean trailing "- נוכחות" or "נוכחות"
+            exam_title_clean = re.sub(r'[-–]\s*נוכחות\s*$', '', exam_title).strip()
+            exam_title_clean = exam_title_clean.replace('|', ' ').strip()  # מונע שבירת פורמט ה-QR
             qr_data = f"{exam_title_clean}|{e['id_number']}|{e['name']}|{e['username']}|{e['password']}|{e['row']}|{e['seat']}"
-            # QR Ãƒâ€”Ã…Â¾-API Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã…â€œ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â§ Ãƒâ€”Ã¢â‚¬Ëœ-QR Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢ (Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â Step 2 Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¡)
+            # QR מ-API מבוטל — משתמשים רק ב-QR מקומי (ראה Step 2 בהמשך)
             qr_inline = ""
             
             # Context
@@ -2492,11 +2475,11 @@ def generate_word_docs():
             # ---- Step 0.5: Replace static old title and location to match the imported exam ----
             def replace_static_text(p, new_title, new_loc):
                 txt = p.text
-                title_keywords = ["Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª", "Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª", "Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª", "Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…Â¡", "Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â", "Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â", "Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…â€œ", "Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…â€œ", "Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…â€œ"]
-                loc_keywords = ["Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸ REIT1", "Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬â€ Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Â", "Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â", "Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œ 6", "Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸", "Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â", "Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â"]
+                title_keywords = ["משרד הבריאות", "מינהל האחיות", "מומחיות", "טיפול תומך", "רישוי חשמלאים", "חשמלאים", "כיתות חשמל", "כיתת חשמל", "חשמל"]
+                loc_keywords = ["בניין REIT1", "פתח תקווה", "מליאה", "אפעל 6", "בניין", "קומה", "כיתה"]
                 
-                is_title = any(kw in txt for kw in title_keywords) and "Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¡ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª" not in txt
-                is_loc = any(kw in txt for kw in loc_keywords) and not is_title and "Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¡ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª" not in txt
+                is_title = any(kw in txt for kw in title_keywords) and "טופס התחברות" not in txt
+                is_loc = any(kw in txt for kw in loc_keywords) and not is_title and "טופס התחברות" not in txt
                 
                 if is_title:
                     if p.runs:
@@ -2524,7 +2507,7 @@ def generate_word_docs():
                         title_p = None
                         loc_p = None
                         for p in non_empty_ps:
-                            if "Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¡ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª" not in p.text:
+                            if "טופס התחברות" not in p.text:
                                 if not title_p:
                                     title_p = p
                                 elif not loc_p:
@@ -2592,16 +2575,16 @@ def generate_word_docs():
 
             # ---- Step 1: Fill data tables by label matching ----
             label_to_value = {
-                'Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸': e['name'],
-                'Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª': e['id_number'],
-                'Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©': e['username'],
-                'Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â': e['password'],
-                'Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã‚ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª': e['notes'],
+                'שם נבחן': e['name'],
+                'תעודת זהות': e['id_number'],
+                'קוד משתמש': e['username'],
+                'סיסמה': e['password'],
+                'התאמות': e['notes'],
             }
             for t_idx, t in enumerate(doc.tables):
-                # Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬â„¢ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…â€œÃƒâ€”Ã‚Âª "Ãƒâ€”Ã…â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸/Ãƒâ€”Ã‚Âª" ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Ëœ Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“
+                # דלג על טבלת "למילוי על ידי הנבחן/ת" — נשארת ריקה לכתב יד
                 table_text = ' '.join(cell.text for row in t.rows for cell in row.cells)
-                if 'Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â' in table_text or 'Ãƒâ€”Ã…â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢' in table_text:
+                if 'חתימה' in table_text or 'למילוי' in table_text:
                     continue
                 for row_idx, r in enumerate(t.rows):
                     if len(r.cells) >= 2:
@@ -2618,11 +2601,11 @@ def generate_word_docs():
                                 break
 
             # ---- Step 2: Find seat paragraph in BODY and add QR ----
-            seat_display = e.get('seat', '') or str(i + 1)  # fallback: Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢
+            seat_display = e.get('seat', '') or str(i + 1)  # fallback: מספר סידורי
             target_p = None
             for p in doc.paragraphs:
                 txt = p.text.strip()
-                if txt == seat_display or txt == '1':   # '1' Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â-placeholder Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Âª
+                if txt == seat_display or txt == '1':   # '1' הוא ה-placeholder בתבנית
                     target_p = p
                     break
 
@@ -2655,7 +2638,7 @@ def generate_word_docs():
                 run_seat.font.name = 'Tahoma'
 
 
-            # DEBUG: Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…Â¡ Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â
+            # DEBUG: שמור כל מסמך נפרד לבדיקה
             import os as _os
             _debug_dir = r'C:\Users\uri\OneDrive\Desktop\test\debug_docs'
             _os.makedirs(_debug_dir, exist_ok=True)
@@ -2667,10 +2650,10 @@ def generate_word_docs():
                 _f.write(_dbuf.read())
             print(f"[DEBUG] Saved person {i+1}: {e['name']} | qr_data={qr_data[:60]}")
 
-            # Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â§ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â
+            # שמור כל דוק ברשימה
             all_docs.append(doc)
 
-        # Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â‚¬â„¢ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â docxcompose ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª
+        # מזג עם docxcompose — מטפל נכון בקשרי תמונות
         from docxcompose.composer import Composer
         from docx.enum.text import WD_BREAK
 
@@ -2678,7 +2661,7 @@ def generate_word_docs():
         composer = Composer(master_doc)
 
         for doc in all_docs[1:]:
-            # Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â£ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â£ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…Â¡ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â£
+            # הוסף מעבר עמוד בסוף המסמך הנוכחי לפני הצירוף
             last_para = master_doc.paragraphs[-1] if master_doc.paragraphs else master_doc.add_paragraph()
             last_para.add_run().add_break(WD_BREAK.PAGE)
             composer.append(doc)
@@ -2690,7 +2673,7 @@ def generate_word_docs():
         return send_file(
             final_buf,
             as_attachment=True,
-            download_name='Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢_Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â.docx',
+            download_name='טפסי_נבחנים.docx',
             mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         )
 
@@ -2698,13 +2681,13 @@ def generate_word_docs():
     except Exception as e:
         import traceback
         traceback.print_exc()
-        flash(f"Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â: {e}", "danger")
+        flash(f"שגיאה ביצירת המסמכים: {e}", "danger")
         return redirect(url_for('exam_attendance'))
 
 @app.route('/exam-attendance/print')
 @login_required
 def exam_attendance_print():
-    """Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â£ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â QR"""
+    """דף הדפסת טפסים עם QR"""
     exam_filter = request.args.get('exam', '')
     conn = get_db_connection()
     if not conn: return "DB Error", 500
@@ -2716,7 +2699,7 @@ def exam_attendance_print():
             cur.execute("SELECT * FROM examinees ORDER BY exam_name, full_name")
         examinees = [dict(e) for e in cur.fetchall()]
         cur.close()
-        # Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª QR Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸
+        # יצירת QR לכל נבחן
         for e in examinees:
             qr_data = f"EXAMINEE|{e['id_number']}|{e['full_name']}|{e.get('username','')}|{e.get('password','')}|{e.get('classroom','')}|{e.get('exam_name','')}|{e.get('laptop_number','')}"  
             qr_img = qrcode.make(qr_data)
@@ -2736,7 +2719,7 @@ def test_scanner():
 @app.route('/simple-scanner', methods=['GET'])
 @login_required
 def simple_scanner():
-    """Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â§ Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‹Å“ - Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â§ Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â§ Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â"""
+    """עמוד סורק פשוט - סורק רק נבחנים"""
     return render_template('simple_scanner.html')
 
 @app.route('/api/simple-scan', methods=['POST'])
@@ -2745,7 +2728,7 @@ def api_simple_scan():
     data = request.json
     qr_text = data.get('qr', '').strip()
     if not qr_text.startswith('EXAMINEE|'):
-        return {"error": "QR Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸"}, 400
+        return {"error": "QR לא תקין"}, 400
 
     parts = qr_text.split('|')
     id_number = parts[1] if len(parts) > 1 else ''
@@ -2757,7 +2740,7 @@ def api_simple_scan():
         cur = get_safe_cursor(conn)
         cur.execute("SELECT * FROM examinees WHERE id_number = %s", (id_number,))
         if not cur.fetchone():
-            return {"error": f"Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Âª.Ãƒâ€”Ã¢â‚¬â€œ. {id_number} Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Âª"}, 404
+            return {"error": f"נבחן עם ת.ז. {id_number} לא במערכת"}, 404
 
         cur.execute("""
             UPDATE examinees SET is_present = 1, scan_time = %s, scanner_technician = %s WHERE id_number = %s
@@ -2769,13 +2752,13 @@ def api_simple_scan():
     finally:
         release_db_connection(conn)
 
-# ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ BEACON: GET endpoint Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‹Å“Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ (Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â£ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª SSL Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+# ── BEACON: GET endpoint לסריקות מהטלפון (עוקף בעיות SSL בכרום) ──────
 @app.route('/api/exam-scan-beacon', methods=['GET'])
 @login_required
 def api_exam_scan_beacon():
     """
-    Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã…Â¡ GET params Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨ pixel Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â£.
-    Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬â€ GET Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â£ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª SSL Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œ.
+    מקבל נתוני סריקה דרך GET params ומחזיר pixel שקוף.
+    הדפדפן תמיד שולח GET לתמונות — עוקף בעיות SSL בכרום מובייל.
     """
     qr_text    = (request.args.get('qr', '') or '').strip()
     computer   = (request.args.get('computer', '') or '').strip()
@@ -2795,29 +2778,31 @@ def api_exam_scan_beacon():
         def _save():
             try:
                 import gspread
+                from google.oauth2.service_account import Credentials
                 scopes   = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+                sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
                 sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
-                creds    = get_google_creds(scopes)
+                creds    = Credentials.from_service_account_file(sa_file, scopes=scopes)
                 client   = gspread.authorize(creds)
                 ws       = client.open_by_key(sheet_id).sheet1
                 row = [exam_name, id_number, full_name, computer, pc_status,
-                       'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦' if is_present == 1 else 'ÃƒÂ¢Ã‚ÂÃ…â€™', scan_time_str, technician, col, seat]
+                       '✅' if is_present == 1 else '❌', scan_time_str, technician, col, seat]
                 ws.append_row(row, value_input_option='USER_ENTERED')
                 print(f"[BEACON] Saved: {full_name} | {computer}")
             except Exception as ex:
                 print(f"[BEACON] Save error: {ex}")
         threading.Thread(target=_save, daemon=True).start()
     else:
-        print(f"[BEACON] ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â Invalid QR: {qr_text[:40]}")
+        print(f"[BEACON] ⚠️ Invalid QR: {qr_text[:40]}")
 
-    # Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã‚Â¨ pixel Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â£ 1x1
+    # החזר pixel שקוף 1x1
     pixel = base64.b64decode('R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==')
     return send_file(io.BytesIO(pixel), mimetype='image/gif', max_age=0)
 
 @app.route('/api/check-computer-used', methods=['POST'])
 @login_required
 def api_check_computer_used():
-    """Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¡ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢"""
+    """בדיקה אם מחשב כבר שויך לנבחן אחר בגיליון הנוכחי"""
     global attendance_cache
     data = request.json or {}
     computer = (data.get('computer', '') or '').strip()
@@ -2826,8 +2811,8 @@ def api_check_computer_used():
     if not computer or not exam_name:
         return jsonify({"in_use": False})
 
-    # Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â© Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…Â¾Ãƒâ€”Ã‹Å“Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ (Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨ Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸)
-    # Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã‚Â© Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¡
+    # חיפוש מהיר במטמון (אם כבר טעון)
+    # אם לא טעון — ניגש לגוגל שיטס
     try:
         import gspread
         from google.oauth2.service_account import Credentials
@@ -2849,7 +2834,8 @@ def api_check_computer_used():
             sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
 
         scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-        creds = get_google_creds(scopes)
+        sa_file = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+        creds = Credentials.from_service_account_file(sa_file, scopes=scopes)
         client = gspread.authorize(creds)
         try:
             ws = client.open_by_key(sheet_id).worksheet(exam_name)
@@ -2857,10 +2843,10 @@ def api_check_computer_used():
             ws = client.open_by_key(sheet_id).sheet1
         all_rows = ws.get_all_values()
         for r in all_rows[1:]:
-            # Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â K (Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¡ 10) = Ãƒâ€”Ã…Â¾.Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ, Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â L (Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¡ 11) = Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª
+            # עמודה K (אינדקס 10) = מ.מחשב, עמודה L (אינדקס 11) = נוכחות
             if len(r) > 10 and str(r[10]).strip() == str(computer).strip():
                 if len(r) > 11 and r[11].strip():
-                    existing_name = r[0] if r[0] else 'Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸'
+                    existing_name = r[0] if r[0] else 'נבחן'
                     return jsonify({"in_use": True, "name": existing_name})
         return jsonify({"in_use": False})
     except Exception as ex:
@@ -2871,7 +2857,7 @@ def api_check_computer_used():
 @app.route('/api/exam-scan-double', methods=['POST'])
 @login_required
 def api_exam_scan_double():
-    """Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â: Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸ + Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ + Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…â€œ JSON Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢ form data"""
+    """סריקה כפולה: נבחן + מחשב + סטטוסים — מקבל JSON או form data"""
     global attendance_cache
 
     if request.is_json:
@@ -2887,13 +2873,13 @@ def api_exam_scan_double():
 
     parts = qr_text.split('|')
     if len(parts) < 3:
-        return {"error": "QR Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸"}, 400
+        return {"error": "QR לא מזוהה כנבחן"}, 400
 
-    # Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â-QR - Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã¢â‚¬Ëœ-DB
+    # קריאת נתונים ישירות מה-QR - לא תלוי ב-DB
     id_number = parts[1] if len(parts) > 1 else ''
     full_name = parts[2] if len(parts) > 2 else ''
     
-    # Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¨, Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã…Â¡ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â-QR (parts[0])
+    # שם המבחן — מהפרמטר, ובמידת הצורך מה-QR (parts[0])
     exam_name = (data.get('exam_name', '') or '').strip()
     if not exam_name:
         exam_name = parts[0] if (len(parts) > 0 and parts[0] != 'EXAMINEE') else ''
@@ -2901,7 +2887,7 @@ def api_exam_scan_double():
     scan_time_str = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
     technician = session.get('username', '')
 
-    # ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢: Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¥ Ãƒâ€”Ã¢â‚¬Â-Google Sheet Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã…â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â‚¬Â ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+    # ── דינמי: איתור קובץ ה-Google Sheet הייעודי למבחן זה ──
     sheet_id = None
     if exam_name:
         conn_db = get_db_connection()
@@ -2918,24 +2904,26 @@ def api_exam_scan_double():
             finally:
                 release_db_connection(conn_db)
 
-    # Fallback Ãƒâ€”Ã…â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬â€ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã…â€œ
+    # Fallback למפתח ברירת המחדל
     if not sheet_id:
         sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
 
-    # Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬â€ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã…â€œÃƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œ
+    # שמירת מפתח הגיליון והבחינה בסשן לטובת ביטול
     session['last_exam_sheet_id'] = sheet_id
     session['last_exam_name'] = exam_name
     session['last_id_number'] = id_number
 
-    # Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‹Å“Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Âª
+    # טעינת המטמון במידה ולא נטען עדיין עבור הבחינה הנוכחית
     if exam_name not in attendance_cache:
         print(f"[CACHE] Loading attendance cache for exam: {exam_name}", flush=True)
         try:
             import gspread
+            from google.oauth2.service_account import Credentials
             scopes = ['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/drive']
-            creds = get_google_creds(scopes)
+            sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+            creds    = Credentials.from_service_account_file(sa_file, scopes=scopes)
             client   = gspread.authorize(creds)
-            # Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â© Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª (Ãƒâ€”Ã‚Â©Ãƒâ€” ) Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€” , Ãƒâ€” Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…Â¡ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬â€
+            # חיפוש לפי כותרת (שם) קודם, אחרכך על פי מפתח
             ws = None
             if exam_name:
                 try:
@@ -2950,29 +2938,31 @@ def api_exam_scan_double():
                     ws = client.open_by_key(sheet_id).sheet1
             all_rows = ws.get_all_values()
 
-            # Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€” Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…â€œ:
-            # [0]Ãƒâ€”Ã‚Â©Ãƒâ€”  Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢ | [1]Ãƒâ€”Ã‚Â©Ãƒâ€”  Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â | [2]Ãƒâ€”Ã‚Âª.Ãƒâ€”Ã¢â‚¬â€œ | [3]Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€” Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª | [4]Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â | [5]Ãƒâ€”Ã‚Â©Ãƒâ€”  Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â© | [6]Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â | [7]Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â' Ãƒâ€” Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”  | [8]Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ | [9]Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¡Ãƒâ€”  | [10]Ãƒâ€”Ã…Â¾.Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ | [11]Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª | [12]Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â | [13]Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â Ãƒâ€” Ãƒâ€”Ã¢â€žÂ¢
+            # מבנה עמודות לפי האקסל:
+            # [0]שם פרטי | [1]שם משפחה | [2]ת.ז | [3]התאמות | [4]סיסמה | [5]שם משתמש | [6]גרסה | [7]סה' אולם | [8]טור | [9]כסא | [10]מ.מחשב | [11]נוכחות | [12]שעת סריקה | [13]טכנאי
             attendance_cache[exam_name] = {}
             for r in all_rows[1:]:
-                # Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â L (Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¡ 11) = Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª
+                # בדיקה בעמודה L (אינדקס 11) = נוכחות
                 if len(r) > 11 and r[11].strip() and len(r) > 2:
-                    attendance_cache[exam_name][str(r[2]).strip()] = r[12] if (len(r) > 12 and r[12].strip()) else 'Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€'
+                    attendance_cache[exam_name][str(r[2]).strip()] = r[12] if (len(r) > 12 and r[12].strip()) else 'נוכח'
             print(f"[CACHE] Loaded {len(attendance_cache[exam_name])} active scans for {exam_name}", flush=True)
         except Exception as ex:
             print(f"[CACHE ERROR] Failed to build cache for {exam_name}: {ex}", flush=True)
             attendance_cache[exam_name] = {}
 
-    # Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã…â€œÃƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â
+    # שמירה תמיד — ללא בדיקת כפולים
     attendance_cache.setdefault(exam_name, {})[str(id_number).strip()] = scan_time_str
 
     def save_to_exam_sheet_in_thread(target_sheet_id, target_exam_name, target_id_number, target_full_name, target_computer, target_col, target_seat, target_pc_status, target_scan_time, target_technician):
         import sys, traceback, gspread
+        from google.oauth2.service_account import Credentials
         print(f"[THREAD] Starting Google Sheets update for {target_full_name} ({target_id_number})...", flush=True)
         try:
             scopes = ['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/drive']
-            creds    = get_google_creds(scopes)
+            sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+            creds    = Credentials.from_service_account_file(sa_file, scopes=scopes)
             client   = gspread.authorize(creds)
-            # Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â© Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª (Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â) Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â, Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…Â¡ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬â€
+            # חיפוש לפי כותרת (שם) קודם, אחרכך על פי מפתח
             ws = None
             if target_exam_name:
                 try:
@@ -2986,22 +2976,22 @@ def api_exam_scan_double():
                 except Exception:
                     ws = client.open_by_key(target_sheet_id).sheet1
 
-            # Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â£ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â = Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â
+            # תמיד מוסיף שורה חדשה — כל סריקה = שורה חדשה
             new_row = [
-                target_full_name,    # [0] Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢ (Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â)
-                "",                  # [1] Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â
-                target_id_number,    # [2] Ãƒâ€”Ã‚Âª.Ãƒâ€”Ã¢â‚¬â€œ
-                "",                  # [3] Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã‚ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª
-                "",                  # [4] Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â
-                "",                  # [5] Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©
-                target_exam_name,    # [6] Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â/Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â
-                "",                  # [7] Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â' Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â
-                target_col,          # [8] Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨
-                target_seat,         # [9] Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â
-                target_computer,     # [10] Ãƒâ€”Ã…Â¾.Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ ÃƒÂ¢Ã¢â‚¬Â Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â§
-                "1",                 # [11] Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª ÃƒÂ¢Ã¢â‚¬Â Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â§
-                target_scan_time,    # [12] Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â
-                target_technician    # [13] Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢
+                target_full_name,    # [0] שם פרטי (שם מלא)
+                "",                  # [1] שם משפחה
+                target_id_number,    # [2] ת.ז
+                "",                  # [3] התאמות
+                "",                  # [4] סיסמה
+                "",                  # [5] שם משתמש
+                target_exam_name,    # [6] גרסה/בחינה
+                "",                  # [7] סה' אולם
+                target_col,          # [8] טור
+                target_seat,         # [9] כסא
+                target_computer,     # [10] מ.מחשב ← נסרק
+                "1",                 # [11] נוכחות ← נסרק
+                target_scan_time,    # [12] שעת סריקה
+                target_technician    # [13] טכנאי
             ]
             ws.append_row(new_row, value_input_option='USER_ENTERED')
             print(f"[THREAD OK] Appended new row for {target_full_name}", flush=True)
@@ -3025,21 +3015,22 @@ def api_exam_scan_double():
 @app.route('/api/undo-last-scan', methods=['POST'])
 @login_required
 def undo_last_scan():
-    """Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¡ Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¡"""
+    """ביטול סריקה אחרונה וניקוי סטטוס נוכחות בגוגל שיטס"""
     global attendance_cache
     try:
         import gspread, os
-        scopes = ['https://www.googleapis.com/auth/spreadsheets',
+        from google.oauth2.service_account import Credentials
+        scopes   = ['https://www.googleapis.com/auth/spreadsheets',
                     'https://www.googleapis.com/auth/drive']
-        creds = get_google_creds(scopes)
-
+        sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+        creds    = Credentials.from_service_account_file(sa_file, scopes=scopes)
         client   = gspread.authorize(creds)
         
         sheet_id = session.get('last_exam_sheet_id') or os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
         exam_name = session.get('last_exam_name')
         last_id_number = session.get('last_id_number')
         
-        # Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…Â¾Ãƒâ€”Ã‹Å“Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸
+        # הסרה מהמטמון
         if exam_name and last_id_number and exam_name in attendance_cache:
             if last_id_number in attendance_cache[exam_name]:
                 del attendance_cache[exam_name][last_id_number]
@@ -3062,7 +3053,7 @@ def undo_last_scan():
                 r_new = list(all_vals[row_idx - 1])
                 while len(r_new) < 13:
                     r_new.append("")
-                # Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¡ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª: Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ, Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª, Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â‚¬Ëœ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ, Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â
+                # איפוס עמודות: מחשב, נוכחות, מצב מחשב, שעת סריקה
                 r_new[6]  = ""
                 r_new[10] = ""
                 r_new[11] = ""
@@ -3071,30 +3062,30 @@ def undo_last_scan():
                 print(f"[UNDO OK] Cleared presence on row {row_idx} for ID {last_id_number}", flush=True)
                 return {"success": True}
         
-        # Fallback Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â€žÂ¢
+        # Fallback לביטול השורה האחרונה במידה ולא נמצא נתון ספציפי
         all_vals = ws.get_all_values()
         last_row = len(all_vals)
         if last_row > 1:
             ws.delete_rows(last_row)
             return {"success": True}
             
-        return {"success": False, "error": "Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œ"}
+        return {"success": False, "error": "לא נמצא נבחן לביטול"}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
 @app.route('/api/exam-scan', methods=['POST'])
 @login_required
 def api_exam_scan():
-    """Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Âª QR Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª"""
+    """סריקת QR לנוכחות"""
     data = request.json
     qr_text = data.get('qr', '').strip()
     if not qr_text:
-        return {"error": "Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…â€œ QR"}, 400
+        return {"error": "לא התקבל QR"}, 400
 
-    # Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‹Å“: Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â_Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â|Ãƒâ€”Ã‚Âª.Ãƒâ€”Ã¢â‚¬â€œ.|Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â|Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“|Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â|Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨|Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â
+    # פרמט: שם_בחינה|ת.ז.|שם|קוד|סיסמא|טור|כסא
     parts = qr_text.split('|')
     if len(parts) < 6:
-        return {"error": "QR Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸", "type": "unknown"}, 400
+        return {"error": "QR לא מזוהה כנבחן", "type": "unknown"}, 400
 
     id_number = parts[1] if len(parts) > 1 else ''
 
@@ -3105,19 +3096,19 @@ def api_exam_scan():
         cur.execute("SELECT * FROM examinees WHERE id_number = %s", (id_number,))
         examinee = cur.fetchone()
         if not examinee:
-            return {"error": f"Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Âª.Ãƒâ€”Ã¢â‚¬â€œ. {id_number} Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Âª"}, 404
+            return {"error": f"נבחן עם ת.ז. {id_number} לא נמצא במערכת"}, 404
 
         examinee = dict(examinee)
         if examinee.get('is_present') in (True, 1):
             return {"success": True, "already": True, "examinee": examinee}
 
-        # Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€
+        # סמן כנוכח
         cur.execute("""
             UPDATE examinees SET is_present = 1, scan_time = %s, scanner_technician = %s WHERE id_number = %s
         """, (datetime.now(), session.get('username',''), id_number))
         conn.commit()
 
-        # Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Ëœ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¢
+        # סנכרון לגוגל דרייב ברקע
         exam_name = examinee.get('exam_name')
         if exam_name:
             cur.execute("SELECT * FROM examinees WHERE exam_name = %s", (exam_name,))
@@ -3129,7 +3120,7 @@ def api_exam_scan():
 
         cur.close()
 
-        # Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Google Sheets (Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â)
+        # סנכרון Google Sheets (קוד קיים)
         threading.Thread(target=sync_inventory_to_sheets, daemon=True).start()
 
         examinee['is_present'] = True
@@ -3143,7 +3134,7 @@ def api_exam_scan():
 @app.route('/exam-attendance/delete/<int:eid>', methods=['POST'])
 @login_required
 def exam_attendance_delete(eid):
-    """Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸"""
+    """מחיקת נבחן"""
     conn = get_db_connection()
     if not conn: return "DB Error", 500
     try:
@@ -3151,7 +3142,7 @@ def exam_attendance_delete(eid):
         cur.execute("DELETE FROM examinees WHERE id = %s", (eid,))
         conn.commit()
         cur.close()
-        flash("Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â§ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¦Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â", "success")
+        flash("הנבחן נמחק בהצלחה", "success")
     finally:
         release_db_connection(conn)
     return redirect(url_for('exam_attendance'))
@@ -3159,9 +3150,9 @@ def exam_attendance_delete(eid):
 @app.route('/exam-attendance/clear', methods=['POST'])
 @login_required
 def exam_attendance_clear():
-    """Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¡ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª (Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â) - Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Å“"""
+    """איפוס כל הנוכחות (לפני בחינה חדשה) - מנהל בלבד"""
     if session.get('role') != 'admin':
-        flash("Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â‚¬Â¢", "danger")
+        flash("אין הרשאה לפעולה זו", "danger")
         return redirect(url_for('exam_attendance'))
     conn = get_db_connection()
     if not conn: return "DB Error", 500
@@ -3170,7 +3161,7 @@ def exam_attendance_clear():
         cur.execute("UPDATE examinees SET is_present = 0, scan_time = NULL")
         conn.commit()
         cur.close()
-        flash("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…Â¸ Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â!", "success")
+        flash("✅ כל הנוכחות אופסה – מוכן לבחינה חדשה!", "success")
     finally:
         release_db_connection(conn)
     return redirect(url_for('exam_attendance'))
@@ -3178,7 +3169,7 @@ def exam_attendance_clear():
 @app.route('/exam-attendance/scanner')
 @login_required
 def exam_attendance_scanner():
-    """Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª"""
+    """עמוד סריקת נוכחות"""
     return render_template('exam_scanner.html')
 
 
@@ -3191,15 +3182,15 @@ def logout():
 
 @app.route('/exam-generator')
 def exam_generator():
-    """Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â£ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂÃƒâ€”Ã‚Âª Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…â€œ Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢ Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â"""
+    """דף העלאת אקסל ליצירת טפסי בחינה"""
     return render_template('exam_generator.html')
 
 @app.route('/generate-forms', methods=['POST'])
 def generate_forms():
-    """Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Â§Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…â€œ Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â£ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…Â¸ Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Â QR"""
+    """מעבד אקסל ומחזיר דף מוכן להדפסה עם QR"""
     excel_file = request.files.get('excel_file')
     if not excel_file:
-        return "Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¥", 400
+        return "לא הועלה קובץ", 400
 
     try:
         wb = openpyxl.load_workbook(excel_file)
@@ -3210,14 +3201,14 @@ def generate_forms():
         col_map = {}
         for i, h in enumerate(headers):
             h_l = h.lower()
-            if 'Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â' in h and 'Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã…Â¸' in h: col_map['name'] = i
-            elif 'Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â' in h and col_map.get('name') is None: col_map['name'] = i
-            elif 'Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª' in h or 'Ãƒâ€”Ã‚Âª.Ãƒâ€”Ã¢â‚¬â€œ' in h or 'id' in h_l: col_map['id_number'] = i
-            elif 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚ÂªÃƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â©' in h or 'Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“' in h or 'user' in h_l: col_map['username'] = i
-            elif 'Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã…Â¾' in h or 'pass' in h_l: col_map['password'] = i
-            elif 'Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã‚ÂÃƒâ€”Ã…Â¾' in h or 'notes' in h_l: col_map['notes'] = i
-            elif 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ' in h or 'computer' in h_l or 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨' in h: col_map['computer'] = i
-            elif 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â' in h or 'Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬Â' in h or 'location' in h_l: col_map['location'] = i
+            if 'שם' in h and 'נבחן' in h: col_map['name'] = i
+            elif 'שם' in h and col_map.get('name') is None: col_map['name'] = i
+            elif 'זהות' in h or 'ת.ז' in h or 'id' in h_l: col_map['id_number'] = i
+            elif 'משתמש' in h or 'קוד' in h or 'user' in h_l: col_map['username'] = i
+            elif 'סיסמ' in h or 'pass' in h_l: col_map['password'] = i
+            elif 'התאמ' in h or 'notes' in h_l: col_map['notes'] = i
+            elif 'מחשב' in h or 'computer' in h_l or 'מספר' in h: col_map['computer'] = i
+            elif 'מיקום' in h or 'כיתה' in h or 'location' in h_l: col_map['location'] = i
 
         students = []
         for row in ws.iter_rows(min_row=2, values_only=True):
@@ -3245,14 +3236,14 @@ def generate_forms():
 
     except Exception as e:
         import traceback; traceback.print_exc()
-        return f"Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â: {e}", 500
+        return f"שגיאה: {e}", 500
 
-# ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ FAULT REPORT: Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¡ Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+# ── FAULT REPORT: טופס תקלות מחשב ────────────────────────────────
 @app.route('/fault-report', methods=['GET'])
 @login_required
 def fault_report_page():
-    """Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Å“ Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¡ Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â€ Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â"""
-    # Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â£ Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Âª auto-complete
+    """עמוד טופס דיווח תקלה"""
+    # שלוף רשימת מחשבים לרשימת auto-complete
     conn = get_db_connection()
     barcodes = []
     if conn:
@@ -3270,7 +3261,7 @@ def fault_report_page():
 @app.route('/api/submit-fault', methods=['POST'])
 @login_required
 def api_submit_fault():
-    """Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã…â€œÃƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â€ Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¡ + Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â"""
+    """קבלת דיווח תקלה — שומר לשיטס + להיסטוריה"""
     data = request.json or {}
     barcode     = (data.get('barcode', '') or '').strip()
     fault_type  = (data.get('fault_type', '') or '').strip()
@@ -3280,42 +3271,45 @@ def api_submit_fault():
     report_time = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
 
     if not barcode:
-        return jsonify({"success": False, "error": "Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ"}), 400
+        return jsonify({"success": False, "error": "חובה להזין מספר מחשב"}), 400
     if not description:
-        return jsonify({"success": False, "error": "Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…â€œÃƒâ€”Ã‚ÂªÃƒâ€”Ã‚ÂÃƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚ÂÃƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â"}), 400
+        return jsonify({"success": False, "error": "חובה לתאר את התקלה"}), 400
 
-    # ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ 'Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª' Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¡ ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+    # ── שמירה לגיליון 'תקלות' בשיטס ─────────────────────────────
     def save_fault_to_sheets():
         import traceback
-        print(f"[FAULT] ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¶ÃƒÂ¯Ã‚Â¸Ã‚Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â: Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ {barcode} | {fault_type}", flush=True)
+        print(f"[FAULT] ▶️ שומר תקלה: מחשב {barcode} | {fault_type}", flush=True)
         try:
             import gspread
+            from google.oauth2.service_account import Credentials
+            scopes   = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+            sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
             sheet_id = os.getenv('GOOGLE_SHEETS_ID')
             if not sheet_id:
-                print("[FAULT] ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â GOOGLE_SHEETS_ID Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â¨", flush=True)
+                print("[FAULT] ⚠️ GOOGLE_SHEETS_ID לא מוגדר", flush=True)
                 return
-            creds  = get_google_creds(scopes)
+            creds  = Credentials.from_service_account_file(sa_file, scopes=scopes)
             client = gspread.authorize(creds)
             sh     = client.open_by_key(sheet_id)
-            # Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â‚¬â€/Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ 'Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª'
+            # פתח/צור גיליון 'תקלות'
             try:
-                ws = sh.worksheet('Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª')
+                ws = sh.worksheet('תקלות')
             except gspread.WorksheetNotFound:
-                ws = sh.add_worksheet(title='Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª', rows='500', cols='8')
-                ws.append_row(['Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚ÂÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¡', 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ', 'Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â„¢ Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â', 'Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨', 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â', 'Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â€žÂ¢', 'Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¡ Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œ'],
+                ws = sh.add_worksheet(title='תקלות', rows='500', cols='8')
+                ws.append_row(['תאריך', 'מחשב', 'סוג תקלה', 'תיאור', 'מיקום', 'טכנאי', 'סטטוס טיפול'],
                               value_input_option='USER_ENTERED')
                 ws.format('A1:G1', {'textFormat': {'bold': True},
                                     'backgroundColor': {'red': 1.0, 'green': 0.85, 'blue': 0.4}})
-            ws.append_row([report_time, barcode, fault_type, description, location, technician, 'Ãƒâ€”Ã…Â¾Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚ÂªÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã…â€œÃƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¤Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…â€œ'],
+            ws.append_row([report_time, barcode, fault_type, description, location, technician, 'ממתין לטיפול'],
                           value_input_option='USER_ENTERED')
-            print(f"[FAULT] ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª: {barcode}", flush=True)
+            print(f"[FAULT] ✅ נשמר לגיליון תקלות: {barcode}", flush=True)
         except Exception as ex:
-            print(f"[FAULT] ÃƒÂ¢Ã‚ÂÃ…â€™ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¡: {ex}", flush=True)
+            print(f"[FAULT] ❌ שגיאה בשמירה לשיטס: {ex}", flush=True)
             traceback.print_exc()
 
     threading.Thread(target=save_fault_to_sheets, daemon=False).start()
 
-    # ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ËœDB ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+    # ── שמירה להיסטוריה בDB ───────────────────────────────────────
     conn = get_db_connection()
     if conn:
         try:
@@ -3324,12 +3318,12 @@ def api_submit_fault():
             comp = cur.fetchone()
             if comp:
                 comp_id = comp['id']
-                note_text = f"[Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â] {fault_type}: {description}"
+                note_text = f"[תקלה] {fault_type}: {description}"
                 cur.execute("""
                     INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
-                    VALUES (%s, %s, 'Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â€ Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â', %s, %s)
+                    VALUES (%s, %s, 'דיווח תקלה', %s, %s)
                 """, (comp_id, technician,
-                       f"Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â: {location}",
+                       f"מיקום: {location}",
                        note_text))
                 conn.commit()
             cur.close()
@@ -3338,23 +3332,23 @@ def api_submit_fault():
         finally:
             release_db_connection(conn)
 
-    return jsonify({"success": True, "message": f"Ãƒâ€”Ã‚ÂªÃƒâ€”Ã‚Â§Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¦Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â¢Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬Ëœ {barcode}"})
+    return jsonify({"success": True, "message": f"תקלה דווחה בהצלחה עבור מחשב {barcode}"})
 
 @app.route('/api/sheets-sync-status')
 @login_required
 def api_sheets_sync_status():
-    """Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã…Â¾Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã¢â‚¬ÂÃƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â„¢Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã…â€œÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¸ Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¡"""
+    """מחזיר זמן הסנכרון האחרון מגיליון שיטס"""
     global _last_sheets_import
     if _last_sheets_import:
         diff = (datetime.now() - _last_sheets_import).seconds
         if diff < 60:
-            ago = f"Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢ {diff} Ãƒâ€”Ã‚Â©Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª"
+            ago = f"לפני {diff} שניות"
         else:
-            ago = f"Ãƒâ€”Ã…â€œÃƒâ€”Ã‚Â¤Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â€žÂ¢ {diff // 60} Ãƒâ€”Ã¢â‚¬Å“Ãƒâ€”Ã‚Â§Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Âª"
+            ago = f"לפני {diff // 60} דקות"
         return jsonify({"last_sync": _last_sheets_import.strftime('%H:%M:%S'), "ago": ago})
-    return jsonify({"last_sync": None, "ago": "Ãƒâ€”Ã‹Å“Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã‚Â Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã‚Â¨Ãƒâ€”Ã…Â¸"})
+    return jsonify({"last_sync": None, "ago": "טרם סונכרן"})
 
-# ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ CAGE INFO PAGE (FOR MOBILE/PHONE QR SCAN) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+# ── CAGE INFO PAGE (FOR MOBILE/PHONE QR SCAN) ─────────────────────────
 @app.route('/cage-info/<cage_id>')
 @login_required
 def cage_info_page(cage_id):
@@ -3381,9 +3375,9 @@ def cage_info_page(cage_id):
         if not cage:
             cage = {
                 'cage_id': cage_id,
-                'name': f'Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Ëœ {cage_id}',
+                'name': f'כלוב {cage_id}',
                 'location': '',
-                'notes': 'Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Ëœ Ãƒâ€”Ã¢â‚¬â€œÃƒâ€”Ã¢â‚¬Â Ãƒâ€”Ã‚Â Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‚Â¦Ãƒâ€”Ã‚Â¨ Ãƒâ€”Ã‚ÂÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã…Â¾Ãƒâ€”Ã‹Å“Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã‚Â¢Ãƒâ€”Ã‚Âª Ãƒâ€”Ã‚Â¡Ãƒâ€”Ã‚Â¨Ãƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â§Ãƒâ€”Ã‚Âª Ãƒâ€”Ã…Â¾Ãƒâ€”Ã¢â‚¬â€Ãƒâ€”Ã‚Â©Ãƒâ€”Ã¢â‚¬ËœÃƒâ€”Ã¢â€žÂ¢Ãƒâ€”Ã‚Â.'
+                'notes': 'כלוב זה נוצר אוטומטית בעת סריקת מחשבים.'
             }
             
         return render_template('cage_info.html', cage=cage, computers=computers, total=len(computers))
@@ -3420,7 +3414,7 @@ def print_cage_page(cage_id):
         if not cage:
             cage = {
                 'cage_id': cage_id,
-                'name': f'Ãƒâ€”Ã¢â‚¬ÂºÃƒâ€”Ã…â€œÃƒâ€”Ã¢â‚¬Â¢Ãƒâ€”Ã¢â‚¬Ëœ {cage_id}',
+                'name': f'כלוב {cage_id}',
                 'location': '',
                 'notes': ''
             }
@@ -3458,6 +3452,3 @@ if __name__ == '__main__':
         ssl_ctx = 'adhoc'
         print("[WARN] Custom cert not found, using adhoc SSL")
     app.run(host='0.0.0.0', debug=True, port=5000, ssl_context=ssl_ctx)
-
-
-
