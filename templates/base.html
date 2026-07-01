@@ -832,73 +832,7 @@
         {% block content %}{% endblock %}
     </main>
 
-    <div class="ai-chat-bubble" onclick="toggleAI()">✨</div>
-    <div class="ai-window" id="aiWindow">
-        <div class="ai-header">
-            <h3><span>🤖</span> עוזר AI - URI System</h3>
-            <span class="ai-close" onclick="toggleAI()">✕</span>
-        </div>
-        <div class="ai-messages" id="aiMessages">
-            <div class="ai-msg bot">שלום! אני עוזר ה-AI שלך. שאל אותי כל דבר על המלאי, הכלובים או הסטטיסטיקות במערכת.</div>
-        </div>
-        <div class="ai-input-area">
-            <input type="text" id="aiInput" placeholder="שאל אותי משהו..." onkeypress="handleAIKey(event)">
-            <button class="ai-send" onclick="sendAIMessage()">שלח</button>
-        </div>
-    </div>
-
     <script>
-        function toggleAI() {
-            const win = document.getElementById('aiWindow');
-            win.classList.toggle('show');
-            if(win.classList.contains('show')) {
-                document.getElementById('aiInput').focus();
-            }
-        }
-
-        function handleAIKey(e) {
-            if (e.key === 'Enter') sendAIMessage();
-        }
-
-        async function sendAIMessage() {
-            const input = document.getElementById('aiInput');
-            const msg = input.value.trim();
-            if (!msg) return;
-
-            const container = document.getElementById('aiMessages');
-            
-            // User bubble
-            const userDiv = document.createElement('div');
-            userDiv.className = 'ai-msg user';
-            userDiv.textContent = msg;
-            container.appendChild(userDiv);
-            input.value = '';
-            container.scrollTop = container.scrollHeight;
-
-            // Loading state
-            const botDiv = document.createElement('div');
-            botDiv.className = 'ai-msg bot';
-            botDiv.textContent = '...חושב';
-            container.appendChild(botDiv);
-            container.scrollTop = container.scrollHeight;
-
-            try {
-                const resp = await fetch('/api/ai-chat', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({message: msg})
-                });
-                const data = await resp.json();
-                if (data.response) {
-                    botDiv.textContent = data.response;
-                } else {
-                    botDiv.textContent = "שגיאה: " + (data.error || "משהו השתבש");
-                }
-            } catch (err) {
-                botDiv.textContent = "שגיאה בחיבור לשרת.";
-            }
-            container.scrollTop = container.scrollHeight;
-        }
 
         // Smooth scrolling for horizontal nav if needed via mouse wheel
         const navLinks = document.querySelector('.nav-links');
