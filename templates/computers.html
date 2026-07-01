@@ -419,7 +419,7 @@
                         {{ c.last_technician or '—' }}
                     </td>
                     <td class="hide-mobile" style="color:var(--muted); font-size:0.75rem;">
-                        {{ c.last_seen.strftime('%d/%m/%Y %H:%M') if c.last_seen else '—' }}
+                        {{ c.last_seen | israel_time if c.last_seen else '—' }}
                     </td>
                     <td style="white-space:nowrap; text-align: left;">
                         <a href="{{ url_for('edit_computer', cid=c.id) }}"

@@ -353,6 +353,18 @@ def format_history_filter(val_str):
 def summarize_history_filter(entry):
     return summarize_history(entry)
 
+@app.template_filter('israel_time')
+def israel_time_filter(dt):
+    """ממיר datetime מ-UTC לשעון ישראל (UTC+3)"""
+    if not dt:
+        return '—'
+    from datetime import timedelta, timezone
+    if hasattr(dt, 'tzinfo') and dt.tzinfo is not None:
+        il = dt.astimezone(timezone(timedelta(hours=3)))
+    else:
+        il = dt + timedelta(hours=3)
+    return il.strftime('%H:%M %d/%m/%Y')
+
 
 def get_auto_spec(barcode):
     """מחזיר מפרט אוטומטי לפי מספר מחשב"""

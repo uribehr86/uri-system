@@ -75,7 +75,7 @@
             <tbody>
                 {% for entry in history %}
                 <tr>
-                    <td style="color:var(--muted); font-size:0.75rem; white-space:nowrap;">{{ entry.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td style="color:var(--muted); font-size:0.75rem; white-space:nowrap;">{{ entry.timestamp | israel_time }}</td>
                     <td style="font-weight:700;">{{ entry.technician }}</td>
                     <td><code style="color:var(--accent2); font-weight: 700;">{{ entry.barcode }}</code></td>
                     <td>
