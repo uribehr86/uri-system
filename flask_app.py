@@ -1064,16 +1064,20 @@ def process_scan():
             cur.execute("SELECT * FROM computers WHERE id = %s", (computer['id'],))
             new_computer = dict(cur.fetchone())
             
-            # Fetch last technician and time
-            cur.execute("SELECT technician, timestamp FROM inventory_history WHERE computer_id = %s ORDER BY timestamp DESC LIMIT 1", (new_computer['id'],))
+            # Fetch previous technician and time (skip current scan = LIMIT 1 OFFSET 1)
+            cur.execute("SELECT technician, timestamp FROM inventory_history WHERE computer_id = %s ORDER BY timestamp DESC LIMIT 1 OFFSET 1", (new_computer['id'],))
             hist = cur.fetchone()
-            new_computer['last_technician'] = hist['technician'] if hist and hist['technician'] else "לא ידוע"
+            new_computer['last_technician'] = hist['technician'] if hist and hist['technician'] else ""
             
             ts = hist['timestamp'] if hist else None
             if ts and not isinstance(ts, str):
                 new_computer['last_scan_time'] = ts.strftime("%d/%m/%Y %H:%M")
             else:
-                new_computer['last_scan_time'] = str(ts or '')
+                new_computer['last_scan_time'] = str(ts) if ts else ''
+            
+            # Serialize scan_time for JSON
+            if new_computer.get('scan_time') and not isinstance(new_computer['scan_time'], str):
+                new_computer['scan_time'] = new_computer['scan_time'].strftime("%d/%m/%Y %H:%M")
             
             conn.commit()
             cur.close()

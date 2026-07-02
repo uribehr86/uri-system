@@ -103,6 +103,7 @@
   .sheet-overlay { display: none; position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.75); backdrop-filter: blur(3px); }
   .sheet-overlay.show { display: flex; align-items: flex-end; }
   .sheet { background: #111827; border-radius: 24px 24px 0 0; width: 100%; padding: 20px 18px 30px; border-top: 3px solid #2563eb; max-height: 85vh; overflow-y: auto; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+  .sheet.duplicate-mode { border-top-color: #f97316; }
   .sheet-overlay.show .sheet { transform: translateY(0); }
   .sheet-handle { width: 40px; height: 4px; background: #334155; border-radius: 4px; margin: 0 auto 18px; }
   .sheet h3 { text-align: center; font-size: 1.3rem; font-weight: 900; margin-bottom: 16px; }
@@ -144,6 +145,19 @@
   .ss-joined-info { color: #4ade80; font-size: 0.8rem; font-weight: 700; }
   @keyframes ss-pulse { 0%,100%{opacity:0.7} 50%{opacity:1} }
   .ss-live-dot { display: inline-block; width: 7px; height: 7px; background:#4ade80; border-radius: 50%; margin-left: 4px; animation: ss-pulse 1.5s infinite; }
+  /* Duplicate warning modal */
+  #dup-modal { display:none; position:fixed; inset:0; z-index:9000; background:rgba(0,0,0,0.85); backdrop-filter:blur(4px); align-items:center; justify-content:center; padding:20px; }
+  #dup-modal.show { display:flex; }
+  .dup-card { background: linear-gradient(145deg, #1c0a00, #2d1200); border: 2px solid #f97316; border-radius: 22px; padding: 28px 24px; width: 100%; max-width: 420px; box-shadow: 0 0 60px rgba(249,115,22,0.35), 0 0 0 1px rgba(249,115,22,0.15); animation: dupSlideIn 0.3s cubic-bezier(0.4,0,0.2,1); }
+  @keyframes dupSlideIn { from { transform: scale(0.88); opacity:0; } to { transform: scale(1); opacity:1; } }
+  .dup-icon { font-size: 3rem; text-align: center; margin-bottom: 12px; }
+  .dup-title { font-size: 1.25rem; font-weight: 900; color: #f97316; text-align: center; margin-bottom: 6px; }
+  .dup-subtitle { font-size: 0.9rem; color: #fdba74; text-align: center; margin-bottom: 16px; }
+  .dup-info { background: rgba(249,115,22,0.1); border: 1px solid rgba(249,115,22,0.3); border-radius: 12px; padding: 12px 16px; margin-bottom: 20px; font-size: 0.88rem; color: #fed7aa; line-height: 1.6; }
+  .dup-btns { display: grid; gap: 10px; }
+  .dup-btn-open { background: linear-gradient(135deg, #ea580c, #c2410c); color: #fff; border: none; padding: 14px; border-radius: 13px; font-weight: 800; font-size: 1rem; cursor: pointer; transition: filter 0.2s; }
+  .dup-btn-open:hover { filter: brightness(1.1); }
+  .dup-btn-cancel { background: rgba(255,255,255,0.06); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); padding: 12px; border-radius: 13px; font-weight: 700; font-size: 0.95rem; cursor: pointer; }
 </style>
 
 <div class="scan-page">
@@ -215,7 +229,14 @@
           נסרקו במושב זה: <span id="area-count">0</span>
         </div>
       </div>
-      <div class="waiting-hint"><div class="pulse-dot"></div> סרוק מחשב לפתיחת טופס</div>
+
+      <!-- Auto-save status bar -->
+      <div id="autosave-bar" style="display:none; margin-bottom:8px; padding:8px 12px; background:rgba(74,222,128,0.12); border:1px solid rgba(74,222,128,0.35); border-radius:10px; display:none; align-items:center; justify-content:space-between; gap:8px;">
+        <div style="font-size:0.82rem; color:#4ade80; font-weight:700;">🔒 שמירה אוטומטית פעילה — <span id="autosave-info" style="font-weight:400;"></span></div>
+        <button onclick="disableAutoSave()" style="border:none; background:rgba(239,68,68,0.2); color:#f87171; border-radius:8px; padding:4px 10px; font-size:0.78rem; font-weight:700; cursor:pointer;">🔓 בטל</button>
+      </div>
+
+      <div class="waiting-hint" id="area-waiting-hint"><div class="pulse-dot"></div> סרוק מחשב לפתיחת טופס</div>
       
       <div id="area-controls" style="margin-top: 10px;">
         <button class="btn-pack btn-pause" id="btn-pause-area" onclick="togglePause()" style="width: 100%; border:none; padding:12px; border-radius:12px; font-weight:700; cursor:pointer;">⏸️ השהה סריקה</button>
@@ -326,6 +347,20 @@
     <div style="display:grid; gap:10px;">
       <button onclick="resumeSession()" style="padding:16px; border-radius:14px; border:none; background:linear-gradient(135deg,#2563eb,#1d4ed8); color:#fff; font-weight:800; font-size:1.05rem; cursor:pointer;">▶️ המשך מאיפה שעצרתי</button>
       <button onclick="restartSession()" style="padding:14px; border-radius:14px; border:1px solid rgba(255,255,255,0.1); background:transparent; color:#94a3b8; font-weight:700; cursor:pointer;">🔄 התחל משימה חדשה (שמור הגדרות)</button>
+    </div>
+  </div>
+</div>
+
+<!-- Duplicate warning modal -->
+<div id="dup-modal">
+  <div class="dup-card" dir="rtl">
+    <div class="dup-icon">⚠️</div>
+    <div class="dup-title">כפילות אותרת!</div>
+    <div class="dup-subtitle">מחשב זה כבר נסרק בעבר</div>
+    <div class="dup-info" id="dup-info"></div>
+    <div class="dup-btns">
+      <button class="dup-btn-open" onclick="dupConfirm()">✏️ פתח לעריכה בכל זאת</button>
+      <button class="dup-btn-cancel" onclick="dupCancel()">❌ בטל — אין צורך לשנות</button>
     </div>
   </div>
 </div>
@@ -718,6 +753,74 @@
     }
   }
 
+  // ── AUTO-SAVE MODE ────────────────────────────────────────────────────
+  let autoSaveMode = false;
+
+  function enableAutoSave() {
+    autoSaveMode = true;
+    const bar = document.getElementById('autosave-bar');
+    if (bar) bar.style.display = 'flex';
+    // Update hint text
+    const hint = document.getElementById('area-waiting-hint');
+    if (hint) hint.innerHTML = '<div class="pulse-dot"></div> סרוק מחשב לשמירה אוטומטית';
+    // Update info label
+    updateAutoSaveInfo();
+  }
+
+  function disableAutoSave() {
+    autoSaveMode = false;
+    const bar = document.getElementById('autosave-bar');
+    if (bar) bar.style.display = 'none';
+    const hint = document.getElementById('area-waiting-hint');
+    if (hint) hint.innerHTML = '<div class="pulse-dot"></div> סרוק מחשב לפתיחת טופס';
+  }
+
+  function updateAutoSaveInfo() {
+    const info = document.getElementById('autosave-info');
+    if (!info) return;
+    let parts = [];
+    if (lastAreaSettings.location) parts.push('📍 ' + lastAreaSettings.location);
+    if (lastAreaSettings.cage) parts.push('📦 ' + lastAreaSettings.cage);
+    if (lastAreaSettings.status) parts.push(lastAreaSettings.status);
+    info.textContent = parts.join(' | ') || 'הגדרות נעולות';
+  }
+
+  function autoSaveComputer(computer) {
+    const data = {
+      id: computer.id,
+      location: lastAreaSettings.location || computer.location || '',
+      cage_number: lastAreaSettings.cage || computer.cage_number || '',
+      cage_name: lastAreaSettings.cage || computer.cage_number || '',
+      status: lastAreaSettings.status || computer.status || 'תקין',
+      case_number: computer.case_number || '',
+      exam_appeal: lastAreaSettings.exam || computer.exam_appeal || '',
+      specs: lastAreaSettings.specs || computer.specs || '',
+      project: lastAreaSettings.project || computer.project || '',
+      ministry: lastAreaSettings.ministry || computer.ministry || '',
+      notes: computer.notes || ''
+    };
+    _pushSettingsToSession(data);
+    fetch('/api/update-computer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        areaCount++;
+        document.getElementById('area-count').textContent = areaCount;
+        saveSession();
+        showToast('✓ נשמר אוטומטית: ' + computer.barcode);
+        setTimeout(() => { scanner.resume(); resetFailTimer(); }, 300);
+      } else {
+        showToast('שגיאה בשמירה', true);
+        scanner.resume(); resetFailTimer();
+      }
+    })
+    .catch(() => { showToast('שגיאת חיבור', true); scanner.resume(); resetFailTimer(); });
+  }
+
   // ── AREA SCAN (Option 1) ─────────────────────────────────────────────
   function onAreaScan(barcode) {
     if (isSheetOpen) return;
@@ -731,7 +834,14 @@
     .then(data => {
       if (data.error) throw new Error(data.error);
       onScanSuccess_visual();
-      openSheet(data.computer, !data.exists);
+      // If auto-save mode is active, save directly (skip sheet)
+      // Exception: show sheet if computer already has a cage (duplicate warning)
+      const hasCageDuplicate = data.exists && data.computer && data.computer.cage_number;
+      if (autoSaveMode && !hasCageDuplicate) {
+        autoSaveComputer(data.computer);
+      } else {
+        openSheet(data.computer, !data.exists);
+      }
     })
     .catch(err => {
       setScanBoxState('fail');
@@ -1291,21 +1401,54 @@
   }
   // ────────────────────────────────────────────────────────────────────────
 
+  let _dupPendingComputer = null;
+  let _dupPendingIsNew = false;
+
+  function showDupModal(computer) {
+    _dupPendingComputer = computer;
+    const info = document.getElementById('dup-info');
+    let lines = [];
+    lines.push(`📦 נמצא בכלוב: <strong style="color:#f97316">${computer.cage_number || 'לא ידוע'}</strong>`);
+    if (computer.location) lines.push(`📍 מיקום: ${computer.location}`);
+    if (computer.last_technician) {
+      let t = `👤 נסרק ע"י: ${computer.last_technician}`;
+      if (computer.last_scan_time) t += ` ב-${computer.last_scan_time}`;
+      lines.push(t);
+    }
+    info.innerHTML = lines.join('<br>');
+    document.getElementById('dup-modal').classList.add('show');
+  }
+
+  function dupConfirm() {
+    document.getElementById('dup-modal').classList.remove('show');
+    if (_dupPendingComputer) openSheetDirect(_dupPendingComputer, false);
+    _dupPendingComputer = null;
+  }
+
+  function dupCancel() {
+    document.getElementById('dup-modal').classList.remove('show');
+    isSheetOpen = false;
+    lastScanTime = Date.now();
+    _dupPendingComputer = null;
+    setTimeout(() => { scanner.resume(); resetFailTimer(); }, 300);
+  }
+
   function openSheet(computer, isNew) {
     isSheetOpen = true;
     if (failTimer) clearTimeout(failTimer);
     hideManualInput();
     
     if (!isNew && computer.cage_number) {
-        let warnMsg = `⚠️ כפילות: מחשב זה נסרק בעבר וכבר משויך לכלוב: ${computer.cage_number}\nהאם אתה בטוח שברצונך לפתוח אותו לעריכה מחדש?`;
-        
-        if (!confirm(warnMsg)) {
-            isSheetOpen = false;
-            lastScanTime = Date.now(); 
-            setTimeout(() => { scanner.resume(); resetFailTimer(); }, 300);
-            return;
-        }
+      // Show styled duplicate warning instead of confirm()
+      showDupModal(computer);
+      return;
     }
+
+    openSheetDirect(computer, isNew);
+  }
+
+  function openSheetDirect(computer, isNew) {
+    isSheetOpen = true;
 
     let titleHtml = (isNew ? '<span class="badge-new">חדש</span>' : '') +
       'מחשב: <span id="sheet-barcode">' + computer.barcode + '</span>';
@@ -1319,7 +1462,15 @@
     document.getElementById('sheet-title').innerHTML = titleHtml;
     
     document.getElementById('sheet-id').value = computer.id;
-    // Use last saved settings or computer's current settings
+    // Populate sheet fields
+    const sheet = document.querySelector('.sheet');
+    if (sheet) {
+      if (!isNew && computer.cage_number) {
+        sheet.classList.add('duplicate-mode');
+      } else {
+        sheet.classList.remove('duplicate-mode');
+      }
+    }
     document.getElementById('sh-location').value = lastAreaSettings.location || computer.location || '';
     document.getElementById('sh-cage').value = lastAreaSettings.cage || computer.cage_number || '';
     document.getElementById('sh-status').value = lastAreaSettings.status || computer.status || 'תקין';
@@ -1473,6 +1624,13 @@
 
         // שמירת session
         saveSession();
+
+        // After first successful save, enable auto-save mode automatically
+        if (!autoSaveMode) {
+          enableAutoSave();
+        } else {
+          updateAutoSaveInfo();
+        }
 
         showToast('✓ נשמר! המשך לסרוק...');
         setTimeout(() => { scanner.resume(); resetFailTimer(); }, 300);
