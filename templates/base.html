@@ -791,10 +791,12 @@
                 class="{{ 'active' if request.endpoint in ['computers','dashboard','add_computer','edit_computer'] }}">📊 מלאי</a>
             <a href="{{ url_for('scanner') }}"
                 class="{{ 'active' if request.endpoint == 'scanner' }}">📱 סורק מחשבים</a>
+            {% if session.get('user') == 'admin_uri' and IS_LOCAL_MODE %}
             <a href="{{ url_for('exam_attendance_scanner') }}"
                 class="{{ 'active' if request.endpoint == 'exam_attendance_scanner' }}">🎓 סורק נוכחות</a>
             <a href="{{ url_for('exam_attendance') }}"
                 class="{{ 'active' if 'exam_attendance' in request.endpoint and request.endpoint != 'exam_attendance_scanner' }}">📝 נוכחות נבחנים</a>
+            {% endif %}
             <a href="{{ url_for('history_page') }}"
                 class="{{ 'active' if request.endpoint == 'history_page' }}">🕒 היסטוריה</a>
             <a href="{{ url_for('export_computers') }}">📤 ייצוא</a>
