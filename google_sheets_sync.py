@@ -1,10 +1,10 @@
-import gspread
+﻿import gspread
 from google.oauth2.service_account import Credentials
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import json
 from utils import format_history, summarize_history
 
@@ -12,6 +12,19 @@ from utils import format_history, summarize_history
 load_dotenv()
 
 import sqlite3
+
+IL_TZ = timezone(timedelta(hours=3))
+
+def to_il_time(dt):
+    """ממיר datetime מ-UTC לשעון ישראל ומחזיר string"""
+    if not dt or isinstance(dt, str):
+        return str(dt or '')
+    try:
+        if dt.tzinfo is not None:
+            return dt.astimezone(IL_TZ).strftime("%d/%m/%Y %H:%M")
+        return (dt + timedelta(hours=3)).strftime("%d/%m/%Y %H:%M")
+    except Exception:
+        return str(dt)
 
 def get_db_connection():
     """חיבור למסד הנתונים PostgreSQL עם Fallback ל-SQLite מקומי"""
@@ -137,7 +150,7 @@ def sync_inventory_to_sheets():
                 r['barcode'], r['case_number'] or '', r['cage_number'] or '', r['status'] or '', 
                 r['location'] or '', r['specs'] or '', r['project'] or '', 
                 r['exam_appeal'] or '', r['notes'] or '', 
-                r['scan_time'].strftime("%d/%m/%Y %H:%M") if r['scan_time'] and not isinstance(r['scan_time'], str) else str(r['scan_time'] or '')
+                to_il_time(r['scan_time'])
             ])
             
         # חישוב סטטיסטיקות
@@ -199,7 +212,7 @@ def sync_inventory_to_sheets():
         faulty_data = []
         for r in faulty_rows:
             ts = r['scan_time']
-            ts_str = ts.strftime("%d/%m/%Y %H:%M") if ts and not isinstance(ts, str) else str(ts or '')
+            ts_str = to_il_time(ts)
             faulty_data.append([
                 r['barcode'],
                 r['case_number'] or '',
@@ -231,7 +244,7 @@ def sync_inventory_to_sheets():
             for r in p_rows:
                 p_data.append([r['barcode'], r['case_number'] or '', r['cage_number'] or '', r['status'] or '', 
                                r['location'] or '', r['specs'] or '', r['notes'] or '',
-                               r['scan_time'].strftime("%d/%m/%Y %H:%M") if r['scan_time'] and not isinstance(r['scan_time'], str) else str(r['scan_time'] or '')])
+                               to_il_time(r['scan_time'])])
             
             # Create/Update worksheet for this project
             update_worksheet(sh, f"פרויקט-{project_name}", p_header, p_data)
@@ -251,7 +264,7 @@ def sync_inventory_to_sheets():
         exam_data = []
         for r in exam_rows:
             exam_data.append([r['barcode'], r['case_number'] or '', r['exam_appeal'] or '', r['status'] or '', 
-                              r['location'] or '', r['scan_time'].strftime("%d/%m/%Y %H:%M") if r['scan_time'] and not isinstance(r['scan_time'], str) else str(r['scan_time'] or '')])
+                              r['location'] or '', to_il_time(r['scan_time'])])
         update_worksheet(sh, "מבחן-ערעור", exam_header, exam_data)
 
         # --- טאב 3: היסטוריית שינויים ---
@@ -275,7 +288,7 @@ def sync_inventory_to_sheets():
             
             ts = r['timestamp']
             if ts and not isinstance(ts, str):
-                ts_str = ts.strftime("%d/%m/%Y %H:%M")
+                ts_str = to_il_time(ts)
             else:
                 ts_str = str(ts or '')
 
@@ -301,7 +314,7 @@ def sync_inventory_to_sheets():
                 attended_str = "✅ כן" if attended in (True, 1, 'true', 't') else "❌ לא"
                 attend_time = r['scan_time']
                 if attend_time and not isinstance(attend_time, str):
-                    attend_time_str = attend_time.strftime("%d/%m/%Y %H:%M")
+                    attend_time_str = to_il_time(attend_time)
                 else:
                     attend_time_str = str(attend_time or '')
                 exam_data.append([r['full_name'], r['id_number'], r['username'] or '', r['laptop_number'] or '',
@@ -454,3 +467,4 @@ def import_from_sheets():
 if __name__ == "__main__":
     success, msg = sync_inventory_to_sheets()
     print(msg)
+
