@@ -68,16 +68,20 @@ def sync_inventory_to_sheets():
     if not spreadsheet_id:
         return False, "GOOGLE_SHEETS_ID לא מוגדר ב-.env"
 
-    if not os.path.exists(service_account_file):
-        return False, f"קובץ ההרשאות ({service_account_file}) לא נמצא בתיקיית הפרויקט."
-
     try:
         # 1. הגדרת גישה ל-API של גוגל
         scopes = [
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive"
         ]
-        creds = Credentials.from_service_account_file(service_account_file, scopes=scopes)
+        # תמיכה ב-GOOGLE_SERVICE_ACCOUNT_JSON (Render) וגם בקובץ מקומי
+        sa_json_str = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
+        if sa_json_str:
+            creds = Credentials.from_service_account_info(json.loads(sa_json_str), scopes=scopes)
+        elif os.path.exists(service_account_file):
+            creds = Credentials.from_service_account_file(service_account_file, scopes=scopes)
+        else:
+            return False, f"קובץ ההרשאות ({service_account_file}) לא נמצא ו-GOOGLE_SERVICE_ACCOUNT_JSON לא מוגדר."
         client = gspread.authorize(creds)
         sh = client.open_by_key(spreadsheet_id)
 
@@ -328,15 +332,19 @@ def import_from_sheets():
 
     if not spreadsheet_id:
         return False, "GOOGLE_SHEETS_ID לא מוגדר ב-.env", {}
-    if not os.path.exists(service_account_file):
-        return False, f"קובץ ההרשאות ({service_account_file}) לא נמצא.", {}
 
     try:
         scopes = [
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive"
         ]
-        creds = Credentials.from_service_account_file(service_account_file, scopes=scopes)
+        sa_json_str = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
+        if sa_json_str:
+            creds = Credentials.from_service_account_info(json.loads(sa_json_str), scopes=scopes)
+        elif os.path.exists(service_account_file):
+            creds = Credentials.from_service_account_file(service_account_file, scopes=scopes)
+        else:
+            return False, f"קובץ ההרשאות ({service_account_file}) לא נמצא.", {}
         client = gspread.authorize(creds)
         sh = client.open_by_key(spreadsheet_id)
 
