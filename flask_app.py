@@ -1041,6 +1041,15 @@ def process_scan():
         }, 400
     # ──────────────────────────────────────────────────────────────────
 
+    # ── ולידציה: ברקוד חייב להיות מספרי בלבד ובטווח 1-9999 ──────────
+    if not barcode.isdigit() or not (1 <= int(barcode) <= 9999):
+        print(f"[BLOCKED] Invalid barcode rejected: '{barcode}'")
+        return {
+            "error": "❌ הברקוד דפוק",
+            "blocked": True
+        }, 400
+    # ──────────────────────────────────────────────────────────────────
+
     conn = get_db_connection()
     if not conn: return {"error": "DB connection failed"}, 500
     try:
