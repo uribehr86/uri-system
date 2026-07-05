@@ -795,32 +795,32 @@ def add_computer():
                         specs=%s, project=%s, notes=%s, last_technician=%s, scan_time=NOW()
                     WHERE id=%s
                 """, (data.get('case_number',''), data.get('cage_number',''),
-                       data.get('status','×ª×§×™×Ÿ'), data.get('location',''),
+                       data.get('status','תקין'), data.get('location',''),
                        specs_val, project, data.get('notes',''),
                        session.get('username'), existing['id']))
                 cur.execute("""
                     INSERT INTO inventory_history (computer_id, technician, change_type, new_value)
                     VALUES (%s, %s, 'Updated via Add Form', %s)
                 """, (existing['id'], session.get('username'),
-                       f"×›×œ×•×‘ ×©×•× ×” ×œ: {data.get('cage_number','')}" ))
+                       f"כלוב שונה ל: {data.get('cage_number','')}" ))
                 conn.commit()
                 cur.close()
-                flash(f"×ž×—×©×‘ {barcode} ×¢×•×“×›×Ÿ ×‘×”×¦×œ×—×”!", "success")
+                flash(f"מחשב {barcode} עודכן בהצלחה!", "success")
                 return redirect(url_for('computers'))
 
             cur.execute("""
                 INSERT INTO computers (barcode, case_number, cage_number, status, location, specs, project, notes, scan_time, last_technician)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s)
             """, (barcode, data.get('case_number',''), data.get('cage_number',''),
-                  data.get('status','×ª×§×™×Ÿ'), data.get('location',''),
+                  data.get('status','תקין'), data.get('location',''),
                   specs_val, project, data.get('notes',''), session.get('username')))
             conn.commit()
             cur.close()
-            flash("×ž×—×©×‘ × ×•×¡×£ ×‘×”×¦×œ×—×”!", "success")
+            flash("מחשב נוסף בהצלחה!", "success")
             return redirect(url_for('computers'))
         except Exception as e:
             conn.rollback()
-            flash(f"×©×’×™××” ×‘×”×•×¡×¤×ª ×ž×—×©×‘: {e}", "danger")
+            flash(f"שגיאה בהוספת מחשב: {e}", "danger")
         finally:
             release_db_connection(conn)
 
@@ -844,7 +844,7 @@ def edit_computer(cid):
                 UPDATE computers 
                 SET case_number=%s, cage_number=%s, status=%s, location=%s, exam_appeal=%s, specs=%s, project=%s, notes=%s, last_technician=%s
                 WHERE id=%s
-            """, (data.get('case_number',''), data.get('cage_number',''), data.get('status','×ª×§×™×Ÿ'), data.get('location',''), data.get('exam_appeal',''), data.get('specs',''), project, data.get('notes',''), session.get('username'), cid))
+            """, (data.get('case_number',''), data.get('cage_number',''), data.get('status','תקין'), data.get('location',''), data.get('exam_appeal',''), data.get('specs',''), project, data.get('notes',''), session.get('username'), cid))
             
             cur.execute("""
                 INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
@@ -858,7 +858,7 @@ def edit_computer(cid):
             
             conn.commit()
             cur.close()
-            flash("×¤×¨×˜×™ ×”×ž×—×©×‘ ×¢×•×“×›× ×•!", "success")
+            flash("פרטי המחשב עודכנו!", "success")
             return redirect(url_for('computers'))
             
         cur.execute("SELECT * FROM computers WHERE id = %s", (cid,))
@@ -978,7 +978,7 @@ def create_shared_session():
     settings = {
         'location': data.get('location', ''),
         'cage': data.get('cage', ''),
-        'status': data.get('status', '×ª×§×™×Ÿ'),
+        'status': data.get('status', 'תקין'),
         'exam': data.get('exam', ''),
         'specs': data.get('specs', ''),
         'project': data.get('project', ''),
@@ -1523,7 +1523,7 @@ def api_fast_scan():
     location   = data.get('location', '')
     cage_number = data.get('cage_number', '')
     cage_name  = data.get('cage_name', cage_number)
-    status     = data.get('status', '×ª×§×™×Ÿ')
+    status     = data.get('status', 'תקין')
     specs      = data.get('specs', '') or get_auto_spec(barcode)
     project    = data.get('project', '')
     ministry   = data.get('ministry', '')
