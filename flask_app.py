@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', write_through=True)
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', write_through=True)
@@ -341,7 +341,7 @@ def utility_processor():
             return {'manufacturer': 'Lenovo', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': 'ðŸ–¥ï¸'}
         return None
 
-    return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, get_computer_spec=get_computer_spec)
+    return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, get_computer_spec=get_computer_spec, APP_VERSION="v2.7 · 05/07/2026")
 
 
 
