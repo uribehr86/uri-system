@@ -1074,10 +1074,17 @@ def process_scan():
             cur.execute("""
                 UPDATE computers 
                 SET scan_time = NOW(), last_technician = %s
-                    {}
+                    {spec_part}
+                    {case_part}
                 WHERE id = %s
-            """.format(", specs = %s" if auto_spec else ""),
-                (session.get('username'),) + ((auto_spec, computer['id']) if auto_spec else (computer['id'],)))
+            """.format(
+                spec_part=", specs = %s" if auto_spec else "",
+                case_part=", case_number = %s" if not (computer.get('case_number') or '').strip() else ""
+            ),
+                (session.get('username'),)
+                + ((auto_spec,) if auto_spec else ())
+                + ((barcode,) if not (computer.get('case_number') or '').strip() else ())
+                + (computer['id'],))
             
             # Fetch the updated record (SQLite doesn't support RETURNING)
             cur.execute("SELECT * FROM computers WHERE id = %s", (computer['id'],))
@@ -1109,9 +1116,9 @@ def process_scan():
             # Create completely new record
             auto_spec = get_auto_spec(barcode)
             cur.execute("""
-                INSERT INTO computers (barcode, status, scan_time, specs, notes, last_technician) 
-                VALUES (%s, '×ª×§×™×Ÿ', NOW(), %s, %s, %s) 
-            """, (barcode, auto_spec or None, None, session.get('username')))
+                INSERT INTO computers (barcode, case_number, status, scan_time, specs, notes, last_technician) 
+                VALUES (%s, %s, 'תקין', NOW(), %s, %s, %s) 
+            """, (barcode, barcode, auto_spec or None, None, session.get('username')))
             
             last_id = cur.lastrowid if hasattr(cur, 'lastrowid') else None
             if last_id:
