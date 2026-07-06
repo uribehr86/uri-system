@@ -93,6 +93,17 @@ app.permanent_session_lifetime = timedelta(days=365)
 app.config['SESSION_COOKIE_SECURE']   = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['JSON_AS_ASCII']           = False  # Hebrew in JSON stays as Hebrew
+
+@app.after_request
+def set_utf8_charset(response):
+    """Force UTF-8 charset on all HTML responses for all platforms."""
+    if 'text/html' in response.content_type:
+        if 'charset' not in response.content_type:
+            response.content_type = 'text/html; charset=utf-8'
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+    return response
 
 @app.before_request
 def refresh_session():
