@@ -799,7 +799,7 @@
       specs: lastAreaSettings.specs || computer.specs || '',
       project: lastAreaSettings.project || computer.project || '',
       ministry: lastAreaSettings.ministry || computer.ministry || '',
-      notes: computer.notes || ''
+      notes: lastAreaSettings.notes || computer.notes || ''
     };
     _pushSettingsToSession(data);
     fetch('/api/update-computer', {
@@ -1263,7 +1263,8 @@
       exam: '',
       specs: '',
       project: '',
-      ministry: ''
+      ministry: '',
+      notes: ''
   };
 
   // ── SHARED SESSION ──────────────────────────────────────────────────────
@@ -1382,6 +1383,7 @@
     if (settings.specs)    lastAreaSettings.specs    = settings.specs;
     if (settings.project)  lastAreaSettings.project  = settings.project;
     if (settings.ministry) lastAreaSettings.ministry = settings.ministry;
+    if (settings.notes)    lastAreaSettings.notes    = settings.notes;
   }
 
   // כשמשה שומר מחשב — מעדכן את הסשן שלו (אם פעיל)
@@ -1605,6 +1607,7 @@
     lastAreaSettings.specs = data.specs;
     lastAreaSettings.project = data.project;
     lastAreaSettings.ministry = data.ministry;
+    lastAreaSettings.notes = data.notes;
 
     // אם יש סשן פעיל — מעדכן את כל המצטרפים אוטומטית
     _pushSettingsToSession(data);
