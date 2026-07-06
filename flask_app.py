@@ -1171,11 +1171,17 @@ def api_update_computer():
         # Update
         updates = []
         params = []
-        for key in ['case_number', 'cage_number', 'status', 'location', 'exam_appeal', 'specs', 'project', 'notes']:
+        for key in ['case_number', 'cage_number', 'status', 'location', 'exam_appeal', 'specs', 'project']:
             if key in data:
                 val = data[key]
                 updates.append(f"{key} = %s")
                 params.append(val)
+
+        # Only update notes if a non-empty value was explicitly sent
+        if data.get('notes', '').strip():
+            updates.append("notes = %s")
+            params.append(data['notes'].strip())
+
         
         # Always update last_technician on scan update
         updates.append("last_technician = %s")
