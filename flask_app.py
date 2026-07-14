@@ -3,7 +3,7 @@ import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', write_through=True)
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', write_through=True)
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify, abort
 from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
 import sqlite3
@@ -908,7 +908,6 @@ def scanner():
     return render_template('scanner.html')
 
 @app.route('/exam')
-@local_only
 @login_required
 def exam_page():
     conn = get_db_connection()
