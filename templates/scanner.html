@@ -15,6 +15,9 @@
   .camera-wrap { position: relative; width: 100%; flex: 1; background: #000; overflow: hidden; max-height: 52vh; }
   #reader { width: 100%; height: 100%; }
   #reader video { width: 100%; height: 100%; object-fit: cover; }
+  /* הסתר טקסט "Scanner paused" של הספרייה */
+  #reader__status_span, #reader > div > span { display: none !important; }
+
 
   /* Scan overlay box */
   .scan-overlay { position: absolute; inset: 0; pointer-events: none; display: flex; align-items: center; justify-content: center; }
@@ -643,6 +646,7 @@
     }
   }
 
+
   async function toggleBatterySave() {
     batterySaveMode = !batterySaveMode;
     const btn = document.getElementById('battery-btn');
@@ -758,6 +762,7 @@
 
   // ── AUTO-SAVE MODE ────────────────────────────────────────────────────
   let autoSaveMode = false;
+  let isSettingsMode = false;
 
   function enableAutoSave() {
     autoSaveMode = true;
@@ -837,14 +842,18 @@
     .then(data => {
       if (data.error) throw new Error(data.error);
       onScanSuccess_visual();
-      // If auto-save mode is active, save directly (skip sheet)
-      // Exception: show sheet if computer already has a cage (duplicate warning)
-      const hasCageDuplicate = data.exists && data.computer && data.computer.cage_number;
-      if (autoSaveMode && !hasCageDuplicate) {
+      // פתח טופס רק אם הכלוב של המחשב שונה מהכלוב הנוכחי בהגדרות
+      const hasCageDuplicate = lastAreaSettings.cage &&
+          data.exists && data.computer && data.computer.cage_number &&
+          data.computer.cage_number !== lastAreaSettings.cage;
+      // שמור אוטומטי רק אם יש כלוב מוגדר + אין קונפליקט
+      if (autoSaveMode && lastAreaSettings.cage && !hasCageDuplicate) {
         autoSaveComputer(data.computer);
       } else {
         openSheet(data.computer, !data.exists);
       }
+
+
     })
     .catch(err => {
       setScanBoxState('fail');
@@ -997,17 +1006,46 @@
   }
 
   function finishAreaScan() {
-      if (confirm('לסיים סריקת שטח? המונה יאופס (כל המחשבים שנסרקו כבר נשמרו).')) {
-          areaCount = 0;
-          document.getElementById('area-count').textContent = areaCount;
-          disableAutoSave();
-          
-          showToast('הסריקה הסתיימה בהצלחה.');
-          if (isPaused) togglePause();
-          resetFailTimer();
-          hideManualInput();
-      }
+      areaCount = 0;
+      document.getElementById('area-count').textContent = areaCount;
+      if (isPaused) togglePause();
+
+      // ריסט הגדרות לסריקה הבאה (כלוב, הערות וכו')
+      lastAreaSettings = { location: lastAreaSettings.location, cage: '', status: 'תקין', exam: '', specs: '', project: '', ministry: '', notes: '' };
+      updateAutoSaveInfo();
+
+      // ריסט מחסום הברקוד + חידוש הסורק
+      lastScannedBarcode = '';
+      lastScanTime = 0;
+      isSheetOpen = false;
+      try { scanner.resume(); } catch(e) {}
+      resetFailTimer();
+      hideManualInput();
+
+      showToast('✅ סריקה הסתיימה!\nמוכן לסריקה הבאה');
   }
+
+
+
+
+  function openSettingsSheet() {
+      isSettingsMode = true;
+      isSheetOpen = true;
+      document.getElementById('sheet-title').innerHTML = '⚙️ הגדרות לסריקה הבאה';
+      document.getElementById('sheet-id').value = '';
+      document.getElementById('sh-location').value = lastAreaSettings.location || '';
+      document.getElementById('sh-cage').value = lastAreaSettings.cage || '';
+      document.getElementById('sh-status').value = lastAreaSettings.status || 'תקין';
+      document.getElementById('sh-exam').value = lastAreaSettings.exam || '';
+      document.getElementById('sh-specs').value = lastAreaSettings.specs || '';
+      document.getElementById('sh-project').value = lastAreaSettings.project || '';
+      document.getElementById('sh-ministry').value = lastAreaSettings.ministry || '';
+      document.getElementById('sh-notes').value = lastAreaSettings.notes || '';
+      const saveBtn = document.querySelector('.btn-save');
+      if (saveBtn) saveBtn.innerHTML = '✅ אשר הגדרות והמשך';
+      document.getElementById('sheet-overlay').classList.add('show');
+  }
+
 
   function finishCagePacking() {
       if (confirm('לסיים סריקת כלוב זה? כל המחשבים שנסרקו כבר נשמרו במערכת בהצלחה.')) {
@@ -1622,6 +1660,19 @@
     lastAreaSettings.project = data.project;
     lastAreaSettings.ministry = data.ministry;
     lastAreaSettings.notes = data.notes;
+
+    // מצב הגדרות בלבד — לא שולחים לשרת
+    if (isSettingsMode) {
+      isSettingsMode = false;
+      const saveBtn = document.querySelector('.btn-save');
+      if (saveBtn) saveBtn.innerHTML = '💾 שמור וסרוק הבא';
+      document.getElementById('sheet-overlay').classList.remove('show');
+      isSheetOpen = false;
+      enableAutoSave();
+      showToast('✅ הגדרות נשמרו! מוכן לסריקה');
+      if (scanner) setTimeout(() => { try { scanner.resume(); } catch(e){} resetFailTimer(); }, 300);
+      return;
+    }
 
     // אם יש סשן פעיל — מעדכן את כל המצטרפים אוטומטית
     _pushSettingsToSession(data);

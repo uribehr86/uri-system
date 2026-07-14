@@ -746,9 +746,22 @@
             const res = await fetch('/api/sheets-sync-status');
             const d = await res.json();
             const el = document.getElementById('auto-sync-ago');
-            if (el) el.textContent = d.last_sync ? d.ago : 'ממתין';
+            if (!el) return;
+            if (d.last_sync) {
+                const diff = d.diff_seconds;
+                if (diff !== undefined && diff !== null && !isNaN(diff)) {
+                    el.textContent = diff < 60 ? `לפני ${diff} שניות` : `לפני ${Math.floor(diff/60)} דקות`;
+                } else if (d.ago) {
+                    el.textContent = d.ago;
+                } else {
+                    el.textContent = d.last_sync;
+                }
+            } else {
+                el.textContent = 'טרם סונכרן';
+            }
         } catch(e) { /* silent */ }
     }
+
     loadAutoSyncStatus();
     setInterval(loadAutoSyncStatus, 60000); // רענן כל דקה
 

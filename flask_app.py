@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', write_through=True)
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', write_through=True)
@@ -1560,7 +1560,7 @@ def api_fast_scan():
     specs      = data.get('specs', '') or get_auto_spec(barcode)
     project    = data.get('project', '')
     ministry   = data.get('ministry', '')
-    technician = session.get('username', '×œ× ×™×“×•×¢')
+    technician = session.get('username', 'unknown')
 
     conn = get_db_connection()
     if not conn: return {"success": False, "error": "DB connection failed"}, 500
@@ -1994,7 +1994,7 @@ def api_pack_cage_photo():
             "details": []
         }
         
-        technician = session.get('username', '×œ× ×™×“×•×¢')
+        technician = session.get('username', 'unknown')
         
         # Process each extracted number
         for barcode in extracted_numbers:
