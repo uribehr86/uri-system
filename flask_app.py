@@ -1253,7 +1253,24 @@ def api_ai_chat():
             contents=[system_prompt, user_msg]
         )
         
-        return {"response": response.text}
+        # Try Claude Sonnet first, fallback to Gemini
+        anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+        if anthropic_key:
+            import anthropic
+            client = anthropic.Anthropic(api_key=anthropic_key)
+            msg = client.messages.create(
+                model='claude-sonnet-4-5',
+                max_tokens=1024,
+                system=system_prompt,
+                messages=[{'role': 'user', 'content': user_msg}]
+            )
+            return {'response': msg.content[0].text}
+        else:
+            response = genai_client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=[system_prompt, user_msg]
+            )
+            return {'response': response.text}
         
     except Exception as e:
         print(f"AI Error: {e}")
