@@ -240,9 +240,10 @@
 
       <div class="waiting-hint" id="area-waiting-hint"><div class="pulse-dot"></div> סרוק מחשב לפתיחת טופס</div>
       
-      <div id="area-controls" style="margin-top: 10px;">
-        <button class="btn-pack btn-pause" id="btn-pause-area" onclick="togglePause()" style="width: 100%; border:none; padding:12px; border-radius:12px; font-weight:700; cursor:pointer;">⏸️ השהה סריקה</button>
-        <button class="btn-pack btn-resume" id="btn-resume-area" onclick="togglePause()" style="width: 100%; border:none; padding:12px; border-radius:12px; font-weight:700; cursor:pointer; display:none;">▶️ המשך סריקה</button>
+      <div id="area-controls" style="margin-top: 10px; display: flex; gap: 8px;">
+        <button class="btn-pack btn-pause" id="btn-pause-area" onclick="togglePause()" style="flex:1; border:none; padding:15px 10px; border-radius:8px; font-weight:700; cursor:pointer;">⏸️ השהה</button>
+        <button class="btn-pack btn-resume" id="btn-resume-area" onclick="togglePause()" style="flex:1; border:none; padding:15px 10px; border-radius:8px; font-weight:700; cursor:pointer; display:none;">▶️ המשך</button>
+        <button class="btn-pack btn-stop" onclick="finishAreaScan()" style="flex:1.5; padding: 15px 10px; border-radius:8px; font-weight:700; cursor:pointer; border:none; font-size:0.95rem;">⏹️ סיום סריקה</button>
       </div>
 
       <div id="manual-wrap-area" class="manual-input-wrap" style="display:none;">
@@ -992,6 +993,19 @@
           });
           showToast('▶️ סריקה ממשיכה');
           resetFailTimer();
+      }
+  }
+
+  function finishAreaScan() {
+      if (confirm('לסיים סריקת שטח? המונה יאופס (כל המחשבים שנסרקו כבר נשמרו).')) {
+          areaCount = 0;
+          document.getElementById('area-count').textContent = areaCount;
+          disableAutoSave();
+          
+          showToast('הסריקה הסתיימה בהצלחה.');
+          if (isPaused) togglePause();
+          resetFailTimer();
+          hideManualInput();
       }
   }
 

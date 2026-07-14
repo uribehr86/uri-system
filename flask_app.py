@@ -914,7 +914,7 @@ def exam_page():
     if not conn: return redirect(url_for('dashboard'))
     try:
         cur = get_safe_cursor(conn)
-        cur.execute("SELECT * FROM computers WHERE exam_appeal IS NOT NULL AND TRIM(exam_appeal) != ''")
+        cur.execute("SELECT * FROM computers WHERE exam_appeal IS NOT NULL AND TRIM(exam_appeal) != '' AND LOWER(TRIM(exam_appeal)) != 'none'")
         computers = cur.fetchall()
         cur.close()
         return render_template('exam.html', computers=computers)
