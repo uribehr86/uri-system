@@ -129,6 +129,22 @@ def refresh_session():
         print(f'[BEFORE_REQUEST ERROR] {_ex}', flush=True)
         session.clear()
 
+# Initialize Google AI (Gemini)
+try:
+    genai_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+except Exception as e:
+    print(f"[WARNING] Google AI init failed: {e}")
+    genai_client = None
+
+# Initialize Connection Pool variables (will be created lazily on first DB access)
+db_pool = None
+db_pool_initialized = False
+IS_LOCAL_MODE = False
+
+@app.teardown_appcontext
+def close_db(error):
+    pass
+
 def get_db_connection():
     global db_pool, db_pool_initialized, IS_LOCAL_MODE
     
