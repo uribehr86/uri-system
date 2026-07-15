@@ -136,18 +136,8 @@ def get_db_connection():
         db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
         if db_url:
             if 'connect_timeout' not in db_url:
-                db_url += ('&' if '?' in db_url else '?') + 'connect_timeout=3'
+                db_url += ('&' if '?' in db_url else '?') + 'connect_timeout=15'
             try:
-                # Fast check: extract host and try resolving to prevent DNS blocking
-                import urllib.parse
-                parsed = urllib.parse.urlparse(db_url)
-                host = parsed.hostname
-                if host:
-                    import socket
-                    # Set a short timeout for socket calls
-                    socket.setdefaulttimeout(3)
-                    socket.gethostbyname(host)
-                
                 db_pool = psycopg2.pool.SimpleConnectionPool(1, 15, db_url)
                 print("[OK] Database connection pool created successfully (lazy)", flush=True)
                 IS_LOCAL_MODE = False
@@ -156,9 +146,11 @@ def get_db_connection():
                 db_pool = None
                 IS_LOCAL_MODE = True
         else:
+            print("[WARNING] No DATABASE_URL or RENDER_DB_URL set! Using local SQLite.", flush=True)
             db_pool = None
             IS_LOCAL_MODE = True
         db_pool_initialized = True
+
 
     if IS_LOCAL_MODE or not db_pool:
         # Fallback to SQLite
