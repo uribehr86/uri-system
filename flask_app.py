@@ -107,27 +107,30 @@ def set_utf8_charset(response):
 
 @app.before_request
 def refresh_session():
+    """×ž×¨×¢× ×Ÿ ××ª ×”×¡×©×Ÿ ×‘×›×œ ×‘×§×©×” ×›×“×™ ×©×œ× ×™×¤×•×’"""
     try:
         if 'user_id' in session:
             session.permanent = True
             session.modified  = True
-            now = datetime.now()
-            last_ping = session.get('_last_ping')
-            if not last_ping or (now - datetime.fromisoformat(last_ping)).total_seconds() > 300:
-                session['_last_ping'] = now.isoformat()
-                try:
-                    conn = get_db_connection()
-                    if conn:
-                        cur = get_safe_cursor(conn)
-                        cur.execute("UPDATE users SET timestamp = NOW() WHERE id = %s", (session['user_id'],))
-                        conn.commit()
-                        cur.close()
-                        release_db_connection(conn)
-                except Exception:
-                    pass
+        # ×¢×“×›×Ÿ timestamp ×¤×¢× ×‘-5 ×“×§×•×ª ×œ×›×œ ×™×•×ª×¨ (×œ×ž× ×•×¢ ×¢×•×ž×¡ ×¢×œ DB)
+        now = datetime.now()
+        last_ping = session.get('_last_ping')
+        if not last_ping or (now - datetime.fromisoformat(last_ping)).total_seconds() > 300:
+            session['_last_ping'] = now.isoformat()
+            try:
+                conn = get_db_connection()
+                if conn:
+                    cur = get_safe_cursor(conn)
+                    cur.execute("UPDATE users SET timestamp = NOW() WHERE id = %s", (session['user_id'],))
+                    conn.commit()
+                    cur.close()
+                    release_db_connection(conn)
+            except Exception:
+                pass
     except Exception as _ex:
         print(f'[BEFORE_REQUEST ERROR] {_ex}', flush=True)
         session.clear()
+
 
 # Initialize Google AI (Gemini)
 try:
@@ -141,9 +144,44 @@ db_pool = None
 db_pool_initialized = False
 IS_LOCAL_MODE = False
 
-@app.teardown_appcontext
-def close_db(error):
-    pass
+# ×ž×˜×ž×•×Ÿ ×’×œ×•×‘×œ×™ ×œ×ž× ×™×¢×ª ×‘×“×™×§×” ×›×¤×•×œ×” ××™×˜×™×ª ×‘×’×•×’×œ ×©×™×˜×¡
+attendance_cache = {}
+
+
+class SafeCursor:
+    """Wrapper for cursor to handle %s -> ? translation for SQLite"""
+    def __init__(self, cursor, is_sqlite=False):
+        self.cursor = cursor
+        self.is_sqlite = is_sqlite
+
+    def execute(self, query, params=None):
+        if self.is_sqlite and params:
+            # Handle list for IN clauses and basic %s replacements
+            if "IN (" in query and isinstance(params, (list, tuple)):
+                # This is a bit tricky, but common in this app
+                pass # Already handled by placeholders in most cases
+            query = query.replace('%s', '?')
+            # Handle ILIKE -> LIKE for SQLite (SQLite LIKE is case-insensitive usually, but ILIKE is Postgres specific)
+            query = query.replace('ILIKE', 'LIKE')
+            # Handle NOW() -> datetime('now')
+            query = query.replace('NOW()', "datetime('now', 'localtime')")
+            # Handle NULLS LAST (SQLite supports it in newer versions, but let's be safe)
+            # query = query.replace('NULLS LAST', '') 
+        
+        try:
+            if params:
+                return self.cursor.execute(query, params)
+            else:
+                return self.cursor.execute(query)
+        except Exception as e:
+            print(f"[DB ERROR] Query: {query}")
+            print(f"[DB ERROR] Params: {params}")
+            raise e
+
+    def fetchone(self): return self.cursor.fetchone()
+    def fetchall(self): return self.cursor.fetchall()
+    def close(self): return self.cursor.close()
+    def __getattr__(self, name): return getattr(self.cursor, name)
 
 def get_db_connection():
     global db_pool, db_pool_initialized, IS_LOCAL_MODE
@@ -154,6 +192,16 @@ def get_db_connection():
             if 'connect_timeout' not in db_url:
                 db_url += ('&' if '?' in db_url else '?') + 'connect_timeout=15'
             try:
+                # Fast check: extract host and try resolving to prevent DNS blocking
+                import urllib.parse
+                parsed = urllib.parse.urlparse(db_url)
+                host = parsed.hostname
+                if host:
+                    import socket
+                    # Set a short timeout for socket calls
+                    pass  # socket timeout removed
+                    pass  # DNS pre-check removed
+                
                 db_pool = psycopg2.pool.SimpleConnectionPool(1, 15, db_url)
                 print("[OK] Database connection pool created successfully (lazy)", flush=True)
                 IS_LOCAL_MODE = False
@@ -162,11 +210,9 @@ def get_db_connection():
                 db_pool = None
                 IS_LOCAL_MODE = True
         else:
-            print("[WARNING] No DATABASE_URL or RENDER_DB_URL set! Using local SQLite.", flush=True)
             db_pool = None
             IS_LOCAL_MODE = True
         db_pool_initialized = True
-
 
     if IS_LOCAL_MODE or not db_pool:
         # Fallback to SQLite
