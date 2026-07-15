@@ -285,6 +285,57 @@ def run_startup_migrations():
     is_sqlite = isinstance(conn, sqlite3.Connection)
     try:
         cur = get_safe_cursor(conn)
+        
+        # אתחול טבלאות SQLite במידה והן לא קיימות (למניעת קריסות בריצת fallback נקייה בשרת)
+        if is_sqlite:
+            try:
+                cur.execute("""CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    password TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    timestamp TIMESTAMP
+                )""")
+                cur.execute("""CREATE TABLE IF NOT EXISTS computers (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    barcode TEXT,
+                    case_number TEXT,
+                    cage_number TEXT,
+                    cage_name TEXT,
+                    status TEXT,
+                    location TEXT,
+                    exam_appeal TEXT,
+                    specs TEXT,
+                    project TEXT,
+                    ministry TEXT,
+                    notes TEXT,
+                    scan_time TEXT,
+                    last_technician TEXT,
+                    sheets_delete_request INTEGER DEFAULT 0
+                )""")
+                cur.execute("""CREATE TABLE IF NOT EXISTS inventory_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    computer_id INTEGER,
+                    technician TEXT,
+                    change_type TEXT,
+                    old_value TEXT,
+                    new_value TEXT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                )""")
+                conn.commit()
+                
+                # הכנסת משתמשי ברירת מחדל אם הטבלה ריקה
+                cur.execute("SELECT COUNT(*) as cnt FROM users")
+                if cur.fetchone()['cnt'] == 0:
+                    from werkzeug.security import generate_password_hash
+                    cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", ("admin_uri", generate_password_hash("uri*"), "admin"))
+                    cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", ("uri", generate_password_hash("1234"), "admin"))
+                    conn.commit()
+                    print("[OK] SQLite Initialized: added default users", flush=True)
+            except Exception as e_init:
+                print(f"[ERROR] SQLite initialization failed: {e_init}", flush=True)
+                conn.rollback()
+
         # הוסף עמודת sheets_delete_request אם לא קיימת
         try:
             if is_sqlite:
