@@ -3618,6 +3618,41 @@ def db_debug():
         res['error'] = str(e)
     return jsonify(res)
 
+@app.route('/sqlite-debug')
+def sqlite_debug():
+    import sqlite3
+    res = {}
+    try:
+        conn = sqlite3.connect('system_data.db')
+        conn.row_factory = dict_factory
+        cur = conn.cursor()
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        res['tables'] = [r['name'] for r in cur.fetchall()]
+        
+        # Check users count if table exists
+        if 'users' in res['tables']:
+            cur.execute("SELECT COUNT(*) as cnt FROM users")
+            res['users_count'] = cur.fetchone()['cnt']
+            
+        # Check computers count if table exists
+        if 'computers' in res['tables']:
+            cur.execute("SELECT COUNT(*) as cnt FROM computers")
+            res['computers_count'] = cur.fetchone()['cnt']
+            
+        conn.close()
+    except Exception as e:
+        res['error'] = str(e)
+    return jsonify(res)
+
+@app.route('/run-migrations')
+def trigger_migrations():
+    try:
+        run_startup_migrations()
+        return "Migrations triggered successfully! Check /sqlite-debug"
+    except Exception as e:
+        import traceback
+        return f"Migration error: {traceback.format_exc()}"
+
 # --- End of Routes ---
 
 if __name__ == '__main__':
