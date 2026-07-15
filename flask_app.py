@@ -183,6 +183,12 @@ class SafeCursor:
     def close(self): return self.cursor.close()
     def __getattr__(self, name): return getattr(self.cursor, name)
 
+def dict_factory(cursor, row):
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
+
 def get_db_connection():
     global db_pool, db_pool_initialized, IS_LOCAL_MODE
     
@@ -218,7 +224,7 @@ def get_db_connection():
         # Fallback to SQLite
         try:
             conn = sqlite3.connect('system_data.db', check_same_thread=False)
-            conn.row_factory = sqlite3.Row
+            conn.row_factory = dict_factory
             return conn
         except Exception as e:
             print(f"[CRITICAL] SQLite connection failed: {e}", flush=True)
@@ -239,23 +245,30 @@ def get_db_connection():
         print(f"[FALLBACK] Cloud DB checkout failed: {e}. Switching to Local SQLite.", flush=True)
         try:
             conn = sqlite3.connect('system_data.db', check_same_thread=False)
-            conn.row_factory = sqlite3.Row
+            conn.row_factory = dict_factory
             return conn
         except Exception as e2:
             print(f"[CRITICAL] All DB connections failed: {e2}")
             return None
 
 def get_safe_cursor(conn):
-    if IS_LOCAL_MODE:
+    if isinstance(conn, sqlite3.Connection):
         return SafeCursor(conn.cursor(), is_sqlite=True)
     else:
         return conn.cursor(cursor_factory=RealDictCursor)
 
 def release_db_connection(conn):
-    if IS_LOCAL_MODE:
+    if isinstance(conn, sqlite3.Connection):
         if conn: conn.close()
     elif db_pool and conn:
-        db_pool.putconn(conn)
+        try:
+            db_pool.putconn(conn)
+        except Exception as e:
+            print(f"[ERROR] Failed to return connection to pool: {e}", flush=True)
+            try:
+                conn.close()
+            except:
+                pass
 
 
 @app.teardown_appcontext
@@ -265,15 +278,16 @@ def close_db(error):
     pass
 
 def run_startup_migrations():
-    """×”×•×¡×¤×ª ×¢×ž×•×“×•×ª ×—×“×©×•×ª ×œ×ž×¡×“ ×× ×¢×“×™×™×Ÿ ×œ× ×§×™×™×ž×•×ª"""
+    """הוספת עמודות חדשות למסד אם עדיין לא קיימות"""
     conn = get_db_connection()
     if not conn:
         return
+    is_sqlite = isinstance(conn, sqlite3.Connection)
     try:
         cur = get_safe_cursor(conn)
-        # ×”×•×¡×£ ×¢×ž×•×“×ª sheets_delete_request ×× ×œ× ×§×™×™×ž×ª
+        # הוסף עמודת sheets_delete_request אם לא קיימת
         try:
-            if IS_LOCAL_MODE:
+            if is_sqlite:
                 cur.execute("ALTER TABLE computers ADD COLUMN sheets_delete_request INTEGER DEFAULT 0")
             else:
                 cur.execute("ALTER TABLE computers ADD COLUMN IF NOT EXISTS sheets_delete_request BOOLEAN DEFAULT FALSE")
@@ -281,9 +295,19 @@ def run_startup_migrations():
             print("[OK] Migration: added sheets_delete_request column")
         except Exception:
             conn.rollback()
-        # ×¦×•×¨ ×˜×‘×œ×ª ×¤×¨×•×™×§×˜×™× ×× ×œ× ×§×™×™×ž×ª
+        # הוסף עמודת timestamp לטבלת users אם לא קיימת
         try:
-            if IS_LOCAL_MODE:
+            if is_sqlite:
+                cur.execute("ALTER TABLE users ADD COLUMN timestamp TIMESTAMP")
+            else:
+                cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS timestamp TIMESTAMP")
+            conn.commit()
+            print("[OK] Migration: added timestamp column to users table")
+        except Exception:
+            conn.rollback()
+        # צור טבלת פרויקטים אם לא קיימת
+        try:
+            if is_sqlite:
                 cur.execute("""CREATE TABLE IF NOT EXISTS projects (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
@@ -2726,17 +2750,21 @@ def generate_word_docs():
                 run_seat.font.name = 'Tahoma'
 
 
-            # DEBUG: ×©×ž×•×¨ ×›×œ ×ž×¡×ž×š × ×¤×¨×“ ×œ×‘×“×™×§×”
-            import os as _os
-            _debug_dir = r'C:\Users\uri\OneDrive\Desktop\test\debug_docs'
-            _os.makedirs(_debug_dir, exist_ok=True)
-            _safe = e['name'].replace(' ','_')[:20]
-            _dbuf = io.BytesIO()
-            doc.save(_dbuf)
-            _dbuf.seek(0)
-            with open(f'{_debug_dir}\\{i+1:02d}_{_safe}.docx','wb') as _f:
-                _f.write(_dbuf.read())
-            print(f"[DEBUG] Saved person {i+1}: {e['name']} | qr_data={qr_data[:60]}")
+            # DEBUG: שמור כל מסמך נפרד לבדיקה (רק בהרצה מקומית, כדי למנוע קריסה ב-Render)
+            if IS_LOCAL_MODE:
+                try:
+                    import os as _os
+                    _debug_dir = r'C:\Users\uri\OneDrive\Desktop\test\debug_docs'
+                    _os.makedirs(_debug_dir, exist_ok=True)
+                    _safe = e['name'].replace(' ','_')[:20]
+                    _dbuf = io.BytesIO()
+                    doc.save(_dbuf)
+                    _dbuf.seek(0)
+                    with open(f'{_debug_dir}\\{i+1:02d}_{_safe}.docx','wb') as _f:
+                        _f.write(_dbuf.read())
+                    print(f"[DEBUG] Saved person {i+1}: {e['name']} | qr_data={qr_data[:60]}")
+                except Exception as _ex:
+                    print(f"[DEBUG ERROR] Failed to save debug doc: {_ex}", flush=True)
 
             # ×©×ž×•×¨ ×›×œ ×“×•×§ ×‘×¨×©×™×ž×”
             all_docs.append(doc)

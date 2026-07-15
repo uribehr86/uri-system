@@ -4,7 +4,7 @@ app.config['TESTING'] = True
 client = app.test_client()
 
 # Default user
-client.post('/login', data={'username': 'admin_uri', 'password': '111'}, follow_redirects=True)
+client.post('/login', data={'username': 'admin_uri', 'password': 'uri*'}, follow_redirects=True)
 
 routes_to_test = [
     '/portal',
