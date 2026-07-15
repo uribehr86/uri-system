@@ -194,6 +194,9 @@ def get_db_connection():
     
     if not db_pool_initialized:
         db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
+        if not db_url:
+            # ברירת מחדל להתחברות למסד הנתונים בענן בשרת Render
+            db_url = "postgresql://uri_system_db_user:VfsC66ho76RaIYZFYgIFZytreG3JaUtc@dpg-d6nhhuv5gffc73bkekmg-a.oregon-postgres.render.com/uri_system_db?sslmode=require"
         if db_url:
             if 'connect_timeout' not in db_url:
                 db_url += ('&' if '?' in db_url else '?') + 'connect_timeout=15'
