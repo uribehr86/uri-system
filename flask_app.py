@@ -471,7 +471,7 @@ def login():
                     session.update({
                         'user': username,
                         'user_id': 1,
-                        'username': "××•×¨×™ ×ž× ×”×œ ×ž×¢×¨×›×ª",
+                        'username': username,
                         'role': 'admin'
                     })
                     session.permanent = True
