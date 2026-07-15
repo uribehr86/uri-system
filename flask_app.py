@@ -3549,6 +3549,24 @@ def print_cage_page(cage_id):
     finally:
         release_db_connection(conn)
 
+@app.route('/db-debug')
+def db_debug():
+    import os, psycopg2
+    db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
+    res = {
+        'RENDER_DB_URL_exists': bool(os.getenv('RENDER_DB_URL')),
+        'DATABASE_URL_exists': bool(os.getenv('DATABASE_URL')),
+        'db_url_masked': db_url.split('@')[-1] if db_url else None,
+    }
+    try:
+        conn = psycopg2.connect(db_url, connect_timeout=5)
+        res['connection'] = 'SUCCESS'
+        conn.close()
+    except Exception as e:
+        res['connection'] = 'FAILED'
+        res['error'] = str(e)
+    return jsonify(res)
+
 # --- End of Routes ---
 
 if __name__ == '__main__':
