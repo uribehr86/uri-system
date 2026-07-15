@@ -475,6 +475,8 @@ def get_auto_spec(barcode):
         return 'Dell | i7-8550U @ 1.80GHz | 16GB RAM'
     elif 4001 <= num <= 4300:
         return 'Lenovo | i5-7200U @ 2.50GHz | 8GB RAM'
+    elif 6001 <= num <= 6400:
+        return '11th Gen Intel(R) Core(TM) i7-1195G7 @ 2.90GHz'
     return ''
 
 
