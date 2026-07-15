@@ -761,7 +761,13 @@ def computers():
                                total_matching=total_matching,
                                sort=sort,
                                direction=direction,
-                               cage_search=cage_search)
+                               cage_search=cage_search,
+                               project_search='')
+    except Exception as _e:
+        import traceback as _tb
+        _err = _tb.format_exc()
+        print(f'[COMPUTERS ERROR] {_err}', flush=True)
+        return f'<pre style="direction:ltr">COMPUTERS ERROR:\n{_err}</pre>', 500
     finally:
         release_db_connection(conn)
 
