@@ -82,6 +82,42 @@ _poller_thread = threading.Thread(target=_auto_import_loop, daemon=True, name="S
 _poller_thread.start()
 print("[AUTO-SYNC] ðŸ”„ Auto-poller ×”×•×¤×¢×œ â€” ×™×¡× ×›×¨×Ÿ ×©×™×˜×¡â†’××ª×¨ ×›×œ 3 ×“×§×•×ª", flush=True)
 
+
+# ── DB STORAGE MONITOR: checks DB size every hour ──────────────────────────
+DB_SIZE_LIMIT_GB = 10.0  # plan limit in GB
+
+def _db_storage_monitor_loop():
+    import time
+    time.sleep(60)  # wait 1 min for Flask to stabilize
+    while True:
+        try:
+            _db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
+            if _db_url:
+                import psycopg2 as _pg2
+                _mc = _pg2.connect(_db_url)
+                _cur2 = _mc.cursor()
+                _cur2.execute('SELECT pg_database_size(current_database())')
+                _sz = _cur2.fetchone()[0]
+                _cur2.close()
+                _mc.close()
+                _gb = _sz / (1024 ** 3)
+                _mb = _sz / (1024 ** 2)
+                _pct = (_gb / DB_SIZE_LIMIT_GB) * 100
+                if _pct >= 95:
+                    print(f'[DB-MONITOR] CRITICAL: DB at {_pct:.1f}% ({_mb:.0f} MB / {DB_SIZE_LIMIT_GB:.0f} GB) - ACT NOW!', flush=True)
+                elif _pct >= 85:
+                    print(f'[DB-MONITOR] WARNING: DB at {_pct:.1f}% ({_mb:.0f} MB / {DB_SIZE_LIMIT_GB:.0f} GB) - start cleaning.', flush=True)
+                elif _pct >= 70:
+                    print(f'[DB-MONITOR] NOTICE: DB at {_pct:.1f}% ({_mb:.0f} MB / {DB_SIZE_LIMIT_GB:.0f} GB).', flush=True)
+                else:
+                    print(f'[DB-MONITOR] OK: {_mb:.1f} MB used ({_pct:.1f}% of {DB_SIZE_LIMIT_GB:.0f} GB)', flush=True)
+        except Exception as _mon_ex:
+            print(f'[DB-MONITOR] Error checking DB size: {_mon_ex}', flush=True)
+        time.sleep(3600)  # check every hour
+
+_db_monitor_thread = threading.Thread(target=_db_storage_monitor_loop, daemon=True, name='DBStorageMonitor')
+_db_monitor_thread.start()
+print('[DB-MONITOR] DB Storage Monitor started - checks DB size every hour', flush=True)
 # ×˜×¢×™× ×ª ×”×’×“×¨×•×ª
 load_dotenv()
 
@@ -730,9 +766,42 @@ def api_change_admin_credentials():
         release_db_connection(conn)
 
 
+
+@app.route('/api/inventory-stats')
+@login_required
+def api_inventory_stats():
+    conn = get_db_connection()
+    if not conn:
+        return {"error": "db"}, 500
+    try:
+        cur = get_safe_cursor(conn)
+        cur.execute("""
+            SELECT
+                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 1    AND 600  THEN 1
+                           WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 1001 AND 1600 THEN 1 END) AS dell2018,
+                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 6001 AND 6400 THEN 1 END) AS hp2023,
+                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 2001 AND 2200 THEN 1 END) AS hp2018,
+                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 3001 AND 3200 THEN 1 END) AS dell_barut,
+                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 4001 AND 4400 THEN 1 END) AS lenovo
+            FROM computers WHERE barcode ~ '^[0-9]+$'
+        """)
+        r = cur.fetchone()
+        cur.close()
+        return {"items": [
+            {"name": "Dell 2018",  "spec": "i5/i7",     "count": r["dell2018"],  "capacity": 1200, "range": "1-600, 1001-1600", "color": "#4A90D9", "pct": round(r["dell2018"]  / 1200 * 100)},
+            {"name": "HP 2023",    "spec": "i7-1195G7", "count": r["hp2023"],    "capacity": 400,  "range": "6001-6400",        "color": "#34C759", "pct": round(r["hp2023"]    / 400  * 100)},
+            {"name": "HP 2018",    "spec": "i5-7200U",  "count": r["hp2018"],    "capacity": 200,  "range": "2001-2200",        "color": "#FF9500", "pct": round(r["hp2018"]    / 200  * 100)},
+            {"name": "Dell Bagrut", "spec": "i7-8550U",  "count": r["dell_barut"],"capacity": 200,  "range": "3001-3200",        "color": "#AF52DE", "pct": round(r["dell_barut"]/ 200  * 100)},
+            {"name": "Lenovo",     "spec": "i5-7200U",  "count": r["lenovo"],    "capacity": 400,  "range": "4001-4400",        "color": "#FF2D55", "pct": round(r["lenovo"]    / 400  * 100)},
+        ]}
+    except Exception as e:
+        return {"error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
 @app.route('/install-cert')
 def install_cert():
-    """×ž××¤×©×¨ ×œ××™×™×¤×•×Ÿ ×œ×”×•×¨×™×“ ×•×œ×”×ª×§×™×Ÿ ××ª ××™×©×•×¨ ×”-SSL"""
+    """מאפשר לאייפון להוריד ולהתקין את אישור ה-SSL"""
     cert_path = os.path.join(os.path.dirname(__file__), 'server.crt')
     if not os.path.exists(cert_path):
         return "Certificate not found", 404
@@ -743,7 +812,7 @@ def install_cert():
 
 @app.route('/dashboard')
 @app.route('/manage-computers')
-@app.route('/computers') # ×ª×ž×™×›×” ×‘×©× ×™ ×”×©×ž×•×ª
+@app.route('/computers') # תמיכה בשני השמות
 @login_required
 def computers():
     search = request.args.get('q', '').strip()
@@ -763,7 +832,6 @@ def computers():
         'cage_number': 'cage_number',
         'status': 'status',
         'location': 'location',
-        'scan_time': 'scan_time',
         'scan_time': 'scan_time',
         'exam_appeal': 'exam_appeal',
         'specs': 'specs',
@@ -801,6 +869,8 @@ def computers():
             search_val = f"%{search}%"
             norm_val = f"%{norm_search}%"
             params.extend([search_val, norm_val, search_val, search_val, search_val, search_val])
+        else:
+            norm_search = ''
             
         # Dedicated cage search
         if cage_search:
@@ -821,15 +891,22 @@ def computers():
         query = "SELECT id, barcode, case_number, cage_name, cage_number, location, status, exam_appeal, specs, project, notes, last_technician, scan_time as last_seen FROM computers"
         query += base_where
         
-        # Order by logic
-        if sort_col == 'scan_time':
-            query += f" ORDER BY {sort_col} {sort_dir} NULLS LAST"
+        # Order by logic — exact barcode match always comes first, then normal sort
+        if search:
+            exact_priority = " (CASE WHEN barcode = %s OR barcode = %s THEN 0 ELSE 1 END),"
+            order_params = [search, norm_search]
         else:
-            query += f" ORDER BY {sort_col} {sort_dir}"
+            exact_priority = ""
+            order_params = []
+
+        if sort_col == 'scan_time':
+            query += f" ORDER BY{exact_priority} {sort_col} {sort_dir} NULLS LAST"
+        else:
+            query += f" ORDER BY{exact_priority} {sort_col} {sort_dir}"
             
         query += " LIMIT %s OFFSET %s"
         
-        cur.execute(query, params + [per_page, offset])
+        cur.execute(query, params + order_params + [per_page, offset])
         computers = cur.fetchall()
         cur.close()
         
@@ -846,7 +923,8 @@ def computers():
                                sort=sort,
                                direction=direction,
                                cage_search=cage_search,
-                               project_search='')
+                               project_search='',
+                               inventory=[])
     except Exception as _e:
         import traceback as _tb
         _err = _tb.format_exc()
