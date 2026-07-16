@@ -316,6 +316,39 @@
     </div>
 </div>
 
+
+<div id="inv-widget" style="margin-bottom:20px;">
+    <div style="font-size:0.85rem;color:var(--muted);margin-bottom:10px;font-weight:600;">📦 מלאי לפי דגם</div>
+    <div id="inv-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;">
+        <div style="color:var(--muted);font-size:0.8rem;padding:10px;">טוען...</div>
+    </div>
+</div>
+<script>
+(function(){
+    fetch('/api/inventory-stats')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.items) return;
+            const grid = document.getElementById('inv-grid');
+            grid.innerHTML = data.items.map(item => `
+                <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <div>
+                            <div style="font-weight:700;font-size:0.9rem;">${item.name}</div>
+                            <div style="font-size:0.72rem;color:var(--muted);">${item.spec}</div>
+                        </div>
+                        <div style="font-size:1.3rem;font-weight:800;color:${item.color};">${item.count}<span style="font-size:0.7rem;color:var(--muted);font-weight:400;">/${item.capacity}</span></div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.08);border-radius:100px;height:6px;overflow:hidden;">
+                        <div style="width:${item.pct}%;height:100%;background:${item.color};border-radius:100px;transition:width 0.8s ease;"></div>
+                    </div>
+                    <div style="font-size:0.68rem;color:var(--muted);margin-top:4px;text-align:left;">${item.pct}%</div>
+                </div>`).join('');
+        })
+        .catch(() => { document.getElementById('inv-widget').style.display='none'; });
+})();
+</script>
+
 {% if session.get('role') == 'admin' %}
 <div class="sheets-admin-panel" id="sheets-admin-panel">
     <span class="label">🔗 גוגל שיטס:</span>
@@ -338,8 +371,6 @@
         <input type="text" name="cage_q" class="form-control" placeholder="📦 חיפוש לפי כלוב..."
             style="padding: 10px 14px; max-width:160px;" value="{{ cage_search }}" />
 
-        <input type="text" name="project_q" class="form-control" placeholder="📂 חיפוש פרויקט..."
-            style="padding: 10px 14px; max-width:160px;" value="{{ project_search or '' }}" />
 
 
         <select name="status" class="form-control" style="padding: 10px 14px; max-width:140px;">
