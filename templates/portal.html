@@ -164,6 +164,97 @@
         {% endif %}
 
     </div>
+
+    {% if inventory %}
+    <div class="inventory-section" dir="rtl">
+        <h2 class="inventory-title">📦 מלאי לפי דגם</h2>
+        <div class="inventory-grid">
+            {% for item in inventory %}
+            <div class="inv-card">
+                <div class="inv-header">
+                    <div>
+                        <div class="inv-name">{{ item.name }}</div>
+                        <div class="inv-spec">{{ item.spec }}</div>
+                        <div class="inv-range">טווח: {{ item.range }}</div>
+                    </div>
+                    <div class="inv-count" style="color: {{ item.color }}">{{ item.count }}<span>/{{ item.capacity }}</span></div>
+                </div>
+                <div class="inv-bar-bg">
+                    <div class="inv-bar-fill" style="width: {{ item.pct }}%; background: {{ item.color }}"></div>
+                </div>
+                <div class="inv-pct">{{ item.pct }}% סרוקים</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
 </div>
+
+<style>
+.inventory-section {
+    width: 100%;
+    max-width: 800px;
+    margin-top: 10px;
+}
+.inventory-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 16px;
+    text-align: right;
+}
+.inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+}
+.inv-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.inv-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+.inv-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+}
+.inv-name { font-weight: 700; font-size: 1rem; color: var(--text); }
+.inv-spec { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+.inv-range { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+.inv-count {
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1;
+}
+.inv-count span { font-size: 0.8rem; color: var(--muted); font-weight: 400; }
+.inv-bar-bg {
+    background: rgba(255,255,255,0.08);
+    border-radius: 100px;
+    height: 8px;
+    overflow: hidden;
+}
+.inv-bar-fill {
+    height: 100%;
+    border-radius: 100px;
+    transition: width 1s ease;
+}
+.inv-pct {
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-align: left;
+    margin-top: 4px;
+}
+@media (max-width: 600px) {
+    .inventory-grid { grid-template-columns: 1fr; }
+}
+</style>
 
 {% endblock %}

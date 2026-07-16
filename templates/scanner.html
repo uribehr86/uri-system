@@ -1034,7 +1034,8 @@
       document.getElementById('sh-status').value = lastAreaSettings.status || 'תקין';
       document.getElementById('sh-exam').value = lastAreaSettings.exam || '';
       document.getElementById('sh-specs').value = lastAreaSettings.specs || '';
-      document.getElementById('sh-project').value = lastAreaSettings.project || '';
+      const projectEl = document.getElementById('sh-project');
+      if (projectEl) projectEl.value = lastAreaSettings.project || '';
       document.getElementById('sh-ministry').value = lastAreaSettings.ministry || '';
       document.getElementById('sh-notes').value = lastAreaSettings.notes || '';
       const saveBtn = document.querySelector('.btn-save');
@@ -1529,7 +1530,8 @@
     document.getElementById('sh-case').value = computer.case_number || '';
     document.getElementById('sh-exam').value = lastAreaSettings.exam || computer.exam_appeal || '';
     document.getElementById('sh-specs').value = lastAreaSettings.specs || computer.specs || '';
-    document.getElementById('sh-project').value = lastAreaSettings.project || computer.project || '';
+    const projectEl2 = document.getElementById('sh-project');
+    if (projectEl2) projectEl2.value = lastAreaSettings.project || computer.project || '';
     document.getElementById('sh-ministry').value = lastAreaSettings.ministry || computer.ministry || '';
     document.getElementById('sh-notes').value = lastAreaSettings.notes || computer.notes || '';
     
@@ -1642,7 +1644,7 @@
       case_number: document.getElementById('sh-case').value,
       exam_appeal: document.getElementById('sh-exam').value,
       specs: document.getElementById('sh-specs').value,
-      project: document.getElementById('sh-project').value,
+      project: document.getElementById('sh-project') ? document.getElementById('sh-project').value : (lastAreaSettings.project || ''),
       ministry: document.getElementById('sh-ministry').value,
       notes: document.getElementById('sh-notes').value
     };
