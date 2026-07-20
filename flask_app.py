@@ -863,12 +863,17 @@ def computers():
         
         # Free search across multiple fields
         if search:
-            # Normalize search term if it's purely digits (barcode-like)
             norm_search = re.sub(r'^0+(?=\d)', '', search)
-            base_where += " AND (barcode ILIKE %s OR barcode ILIKE %s OR case_number ILIKE %s OR location ILIKE %s OR notes ILIKE %s OR exam_appeal ILIKE %s)"
-            search_val = f"%{search}%"
-            norm_val = f"%{norm_search}%"
-            params.extend([search_val, norm_val, search_val, search_val, search_val, search_val])
+            if search.isdigit():
+                # Exact barcode match for numeric input (1 = only barcode 1, not 10/11/100)
+                base_where += " AND (barcode = %s OR barcode = %s OR case_number ILIKE %s OR location ILIKE %s OR notes ILIKE %s OR exam_appeal ILIKE %s)"
+                params.extend([search, norm_search, f"%{search}%", f"%{search}%", f"%{search}%", f"%{search}%"])
+            else:
+                # Partial match for text searches
+                base_where += " AND (barcode ILIKE %s OR barcode ILIKE %s OR case_number ILIKE %s OR location ILIKE %s OR notes ILIKE %s OR exam_appeal ILIKE %s)"
+                search_val = f"%{search}%"
+                norm_val = f"%{norm_search}%"
+                params.extend([search_val, norm_val, search_val, search_val, search_val, search_val])
         else:
             norm_search = ''
             
