@@ -597,7 +597,7 @@ def login():
                     session.permanent = True
                     print(f"[OK] User {username} logged in (hardcoded fallback)")
                     next_page = request.args.get('next')
-                    if next_page:
+                    if next_page and next_page.startswith('/') and not next_page.startswith('//'):
                         return redirect(next_page)
                     return redirect(url_for('portal'))
 
@@ -648,7 +648,7 @@ def login():
                         session.permanent = True
                         print(f"[OK] User {username} logged in via DB")
                         next_page = request.args.get('next')
-                        if next_page:
+                        if next_page and next_page.startswith('/') and not next_page.startswith('//'):
                             return redirect(next_page)
                         return redirect(url_for('portal'))
                     else:
@@ -3443,11 +3443,13 @@ def logout():
 # --- Standalone Exam Form Generator ---
 
 @app.route('/exam-generator')
+@login_required
 def exam_generator():
     """דף העלאת אקסל ליצירת טפסי בחינה"""
     return render_template('exam_generator.html')
 
 @app.route('/generate-forms', methods=['POST'])
+@login_required
 def generate_forms():
     """מעבד אקסל ומחזיר דף מוכן להדפסה עם QR"""
     excel_file = request.files.get('excel_file')

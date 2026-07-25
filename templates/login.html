@@ -174,26 +174,26 @@
     const usernameInput = document.getElementById('username');
     const rememberMeCheckbox = document.getElementById('rememberMe');
 
-    // Load saved credentials on page load
+    // Load saved username only (never store passwords in localStorage)
     window.addEventListener('load', () => {
+        // Clear any previously stored password for security
+        localStorage.removeItem('uri_saved_pass');
         const savedUser = localStorage.getItem('uri_saved_user');
-        const savedPass = localStorage.getItem('uri_saved_pass');
-        if (savedUser && savedPass) {
+        if (savedUser) {
             usernameInput.value = savedUser;
-            passwordInput.value = savedPass;
             rememberMeCheckbox.checked = true;
         }
     });
 
-    // Save credentials when submit button is clicked
+    // Save only username when submit button is clicked (NEVER password)
     function saveCredentials() {
         if (rememberMeCheckbox.checked) {
             localStorage.setItem('uri_saved_user', usernameInput.value);
-            localStorage.setItem('uri_saved_pass', passwordInput.value);
         } else {
             localStorage.removeItem('uri_saved_user');
-            localStorage.removeItem('uri_saved_pass');
         }
+        // Always ensure password is never stored
+        localStorage.removeItem('uri_saved_pass');
     }
 </script>
 </body>
