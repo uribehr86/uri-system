@@ -561,8 +561,6 @@ def login():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
         
-        print(f"DEBUG: Login attempt - username: '{username}', password: '{password}'")
-        
         # בדוק admin_uri מהמסד תחילה (אם קיים שם) â€” אחרת fallback לקשיח
         admin_matched = False
         if username.lower() in ("uri", "admin_uri") or True:  # always try DB first for any user
