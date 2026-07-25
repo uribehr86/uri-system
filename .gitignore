@@ -22,3 +22,22 @@ service_account.json
 # IDE settings
 .vscode/
 .idea/
+
+# Local folders that should never be committed
+uri system scan/
+uri_system_scan/
+scratch/
+
+# SSL certificates
+server.key
+server.crt
+*.pem
+
+# Debug & temp files
+debug_*.txt
+debug_*.xlsx
+flask_test_output.txt
+flask_test_error.txt
+flask_out.txt
+flask_err.txt
+flask_pid.txt
