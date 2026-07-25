@@ -2814,7 +2814,12 @@ def generate_word_docs():
             qr_gen.make(fit=True)
             qr_img = qr_gen.make_image(fill_color="black", back_color="white")
             qr_buf_local = io.BytesIO()
-            qr_img.save(qr_buf_local, format='PNG')
+            # PyPNGImage.save() doesn't accept format= kwarg (it's always PNG)
+            # For Pillow-backed images it does, so handle both cases
+            try:
+                qr_img.save(qr_buf_local, format='PNG')
+            except TypeError:
+                qr_img.save(qr_buf_local)
             qr_buf_local.seek(0)
 
             from docx.shared import Inches, Pt, Cm
