@@ -70,6 +70,7 @@ def _auto_import_loop():
                 updated = stats.get('updated', 0)
                 if updated > 0:
                     print(f"[AUTO-SYNC] âœ… {_last_sheets_import.strftime('%H:%M:%S')} â€” עודכנו {updated} רשומות מגיליון שיטס", flush=True)
+                    trigger_debounced_sync()
                 else:
                     print(f"[AUTO-SYNC] â³ {_last_sheets_import.strftime('%H:%M:%S')} â€” אין שינויים בשיטס", flush=True)
             else:
