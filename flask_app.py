@@ -20,6 +20,7 @@ import io
 import base64
 import qrcode
 import re
+import uuid
 import traceback
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -178,7 +179,8 @@ except Exception as e:
 # Initialize Connection Pool variables (will be created lazily on first DB access)
 db_pool = None
 db_pool_initialized = False
-IS_LOCAL_MODE = False
+# אם RENDER=true → ענן. אחרת → מקומי (גם אם ה-DB ענני)
+IS_LOCAL_MODE = not bool(os.getenv('RENDER'))
 
 # מטמון גלובלי למניעת בדיקה כפולה איטית בגוגל שיטס
 attendance_cache = {}
@@ -249,14 +251,14 @@ def get_db_connection():
                 
                 db_pool = psycopg2.pool.SimpleConnectionPool(1, 15, db_url)
                 print("[OK] Database connection pool created successfully (lazy)", flush=True)
-                IS_LOCAL_MODE = False
+                # IS_LOCAL_MODE נקבע לפי RENDER env var — לא משנים כאן
             except Exception as e:
                 print(f"[FALLBACK] Cloud DB init failed: {e}. Switching to Local SQLite.", flush=True)
                 db_pool = None
-                IS_LOCAL_MODE = True
+                # IS_LOCAL_MODE נקבע לפי RENDER env var — לא משנים כאן
         else:
             db_pool = None
-            IS_LOCAL_MODE = True
+            # IS_LOCAL_MODE נקבע לפי RENDER env var — לא משנים כאן
         db_pool_initialized = True
 
     if IS_LOCAL_MODE or not db_pool:
@@ -325,17 +327,19 @@ def run_startup_migrations():
     try:
         cur = get_safe_cursor(conn)
         
-        # אתחול טבלאות SQLite במידה והן לא קיימות (למניעת קריסות בריצת fallback נקייה בשרת)
-        if is_sqlite:
-            try:
-                cur.execute("""CREATE TABLE IF NOT EXISTS users (
+        # ALWAYS initialize SQLite fallback DB to prevent crashes on Render if Postgres goes down
+        try:
+            with sqlite3.connect('system_data.db', check_same_thread=False) as sl_conn:
+                sl_conn.row_factory = dict_factory
+                sl_cur = sl_conn.cursor()
+                sl_cur.execute("""CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT UNIQUE NOT NULL,
                     password TEXT NOT NULL,
                     role TEXT NOT NULL,
                     timestamp TIMESTAMP
                 )""")
-                cur.execute("""CREATE TABLE IF NOT EXISTS computers (
+                sl_cur.execute("""CREATE TABLE IF NOT EXISTS computers (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     barcode TEXT,
                     case_number TEXT,
@@ -352,7 +356,7 @@ def run_startup_migrations():
                     last_technician TEXT,
                     sheets_delete_request INTEGER DEFAULT 0
                 )""")
-                cur.execute("""CREATE TABLE IF NOT EXISTS inventory_history (
+                sl_cur.execute("""CREATE TABLE IF NOT EXISTS inventory_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     computer_id INTEGER,
                     technician TEXT,
@@ -361,21 +365,48 @@ def run_startup_migrations():
                     new_value TEXT,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                 )""")
-                conn.commit()
+                sl_cur.execute("""CREATE TABLE IF NOT EXISTS projects (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    keywords TEXT NOT NULL,
+                    sheets_id TEXT DEFAULT '',
+                    drive_url TEXT DEFAULT '',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )""")
+                sl_cur.execute("""CREATE TABLE IF NOT EXISTS examinees (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    exam_name TEXT DEFAULT '',
+                    id_number TEXT DEFAULT '',
+                    full_name TEXT DEFAULT '',
+                    username TEXT DEFAULT '',
+                    password TEXT DEFAULT '',
+                    row TEXT DEFAULT '',
+                    seat TEXT DEFAULT '',
+                    hall TEXT DEFAULT '',
+                    adaptations TEXT DEFAULT '',
+                    computer TEXT DEFAULT '',
+                    is_present INTEGER DEFAULT 0,
+                    scan_time TEXT DEFAULT '',
+                    technician TEXT DEFAULT '',
+                    pc_status TEXT DEFAULT '',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )""")
                 
-                # הכנסת משתמשי ברירת מחדל אם הטבלה ריקה
-                cur.execute("SELECT COUNT(*) as cnt FROM users")
-                if cur.fetchone()['cnt'] == 0:
-                    from werkzeug.security import generate_password_hash
-                    cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", ("admin_uri", generate_password_hash("uri*"), "admin"))
-                    cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", ("uri", generate_password_hash("1234"), "admin"))
-                    conn.commit()
-                    print("[OK] SQLite Initialized: added default users", flush=True)
-            except Exception as e_init:
-                print(f"[ERROR] SQLite initialization failed: {e_init}", flush=True)
-                conn.rollback()
+                try: sl_cur.execute("ALTER TABLE computers ADD COLUMN sheets_delete_request INTEGER DEFAULT 0")
+                except: pass
+                try: sl_cur.execute("ALTER TABLE users ADD COLUMN timestamp TIMESTAMP")
+                except: pass
 
-        # הוסף עמודת sheets_delete_request אם לא קיימת
+                sl_cur.execute("SELECT COUNT(*) as cnt FROM users")
+                if sl_cur.fetchone()['cnt'] == 0:
+                    from werkzeug.security import generate_password_hash
+                    sl_cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", ("admin_uri", generate_password_hash("uri*"), "admin"))
+                    sl_cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", ("uri", generate_password_hash("1234"), "admin"))
+                sl_conn.commit()
+        except Exception as e_sl:
+            print(f"[ERROR] SQLite fallback initialization failed: {e_sl}", flush=True)
+
+        # Now do the migrations for the ACTIVE database connection
         try:
             if is_sqlite:
                 cur.execute("ALTER TABLE computers ADD COLUMN sheets_delete_request INTEGER DEFAULT 0")
@@ -397,16 +428,7 @@ def run_startup_migrations():
             conn.rollback()
         # צור טבלת פרויקטים אם לא קיימת
         try:
-            if is_sqlite:
-                cur.execute("""CREATE TABLE IF NOT EXISTS projects (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    keywords TEXT NOT NULL,
-                    sheets_id TEXT DEFAULT '',
-                    drive_url TEXT DEFAULT '',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )""")
-            else:
+            if not is_sqlite:
                 cur.execute("""CREATE TABLE IF NOT EXISTS projects (
                     id SERIAL PRIMARY KEY,
                     name TEXT NOT NULL,
@@ -415,11 +437,38 @@ def run_startup_migrations():
                     drive_url TEXT DEFAULT '',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )""")
-            conn.commit()
-            print("[OK] Migration: projects table ready")
+                conn.commit()
+                print("[OK] Migration: projects table ready")
         except Exception as e:
             conn.rollback()
             print(f"[WARNING] projects table: {e}")
+
+        # צור טבלת נבחנים אם לא קיימת
+        try:
+            if not is_sqlite:
+                cur.execute("""CREATE TABLE IF NOT EXISTS examinees (
+                    id SERIAL PRIMARY KEY,
+                    exam_name TEXT DEFAULT '',
+                    id_number TEXT DEFAULT '',
+                    full_name TEXT DEFAULT '',
+                    username TEXT DEFAULT '',
+                    password TEXT DEFAULT '',
+                    row TEXT DEFAULT '',
+                    seat TEXT DEFAULT '',
+                    hall TEXT DEFAULT '',
+                    adaptations TEXT DEFAULT '',
+                    computer TEXT DEFAULT '',
+                    is_present INTEGER DEFAULT 0,
+                    scan_time TEXT DEFAULT '',
+                    technician TEXT DEFAULT '',
+                    pc_status TEXT DEFAULT '',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )""")
+                conn.commit()
+                print("[OK] Migration: examinees table ready")
+        except Exception as e:
+            conn.rollback()
+            print(f"[WARNING] examinees table: {e}")
         cur.close()
     finally:
         release_db_connection(conn)
@@ -470,7 +519,7 @@ def utility_processor():
             return {'manufacturer': 'Lenovo', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': 'ðŸ–¥ï¸'}
         return None
 
-    return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, get_computer_spec=get_computer_spec, APP_VERSION="v2.7 · 05/07/2026")
+    return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, get_computer_spec=get_computer_spec, APP_VERSION="v2.7.1 · 26/07/2026")
 
 
 
@@ -486,8 +535,19 @@ def summarize_history_filter(entry):
 def israel_time_filter(dt):
     """ממיר datetime מ-UTC לשעון ישראל (UTC+3)"""
     if not dt:
-        return 'â€”'
-    from datetime import timedelta, timezone
+        return '—'
+    
+    from datetime import timedelta, timezone, datetime
+    if isinstance(dt, str):
+        try:
+            # Handle possible ISO format or SQL format
+            dt = datetime.fromisoformat(dt.replace('Z', '+00:00'))
+        except ValueError:
+            try:
+                dt = datetime.strptime(dt.split('.')[0], '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                return dt  # Return as-is if unparseable
+
     if hasattr(dt, 'tzinfo') and dt.tzinfo is not None:
         il = dt.astimezone(timezone(timedelta(hours=3)))
     else:
@@ -1710,6 +1770,309 @@ def api_get_cage(cage_id):
     finally:
         release_db_connection(conn)
 
+@app.route('/cage_manage/<cage_id>')
+@login_required
+def cage_manage(cage_id):
+    normalized = normalize_cage_id(cage_id)
+    if normalized != cage_id:
+        return redirect(url_for('cage_manage', cage_id=normalized))
+    """UI דף ניהול כלוב"""
+    conn = get_db_connection()
+    if not conn:
+        flash("שגיאת חיבור למסד הנתונים", "danger")
+        return redirect(url_for('computers'))
+        
+    try:
+        cur = get_safe_cursor(conn)
+        cur.execute("""
+            SELECT barcode, status, specs
+            FROM computers
+            WHERE cage_number = %s OR cage_name = %s
+            ORDER BY scan_time DESC NULLS LAST
+        """, (cage_id, cage_id))
+        computers_in_cage = cur.fetchall()
+        
+        total = len(computers_in_cage)
+        stats = {'Dell': 0, 'Lenovo': 0, 'HP': 0}
+        
+        enriched_computers = []
+        for c in computers_in_cage:
+            # נסה להסיק יצרן מהברקוד או מהמפרט
+            bc = str(c.get('barcode', ''))
+            specs = c.get('specs', '') or ''
+            mfg = 'אחר'
+            
+            if 'Dell' in specs or 'i7' in specs:
+                mfg = 'Dell'
+                stats['Dell'] += 1
+            elif 'HP' in specs or (bc.isdigit() and (1001 <= int(bc) <= 1600 or 2001 <= int(bc) <= 2400)):
+                mfg = 'HP'
+                stats['HP'] += 1
+            elif 'Lenovo' in specs or (bc.isdigit() and 4001 <= int(bc) <= 4300):
+                mfg = 'Lenovo'
+                stats['Lenovo'] += 1
+            elif bc.isdigit() and 1 <= int(bc) <= 600:
+                mfg = 'Dell'
+                stats['Dell'] += 1
+            else:
+                # Default logic if needed
+                if bc.isdigit() and 3001 <= int(bc) <= 3200:
+                    mfg = 'Dell'
+                    stats['Dell'] += 1
+            
+            enriched_computers.append({
+                'barcode': bc,
+                'status': c.get('status', ''),
+                'mfg': mfg
+            })
+            
+        cur.close()
+        return render_template('cage_manage.html', cage_id=cage_id, computers=enriched_computers, total=total, stats=stats)
+    except Exception as e:
+        print(f"Error in cage_manage: {e}")
+        flash("שגיאה בטעינת נתוני כלוב", "danger")
+        return redirect(url_for('computers'))
+    finally:
+        release_db_connection(conn)
+
+@app.route('/api/cage/<cage_id>/add', methods=['POST'])
+@login_required
+def api_cage_add(cage_id):
+    cage_id = normalize_cage_id(cage_id)
+    barcode = request.form.get('barcode', '').strip()
+    confirm_move = request.form.get('confirm_move', '')
+    from_edit = request.form.get('from_edit', '')
+    session_count = request.form.get('session_count', '0')
+    
+    try:
+        session_count = int(session_count)
+    except:
+        session_count = 0
+        
+    def redirect_back(**kwargs):
+        if from_edit == '1':
+            return redirect(url_for('cage_edit', cage_id=cage_id, session_count=session_count, **kwargs))
+        return redirect(url_for('cage_manage', cage_id=cage_id, **kwargs))
+
+    if not barcode:
+        flash("נא להזין ברקוד", "warning")
+        return redirect_back()
+        
+    conn = get_db_connection()
+    if not conn:
+        flash("שגיאת חיבור למסד הנתונים", "danger")
+        return redirect_back()
+        
+    try:
+        cur = get_safe_cursor(conn)
+        # Check if computer exists
+        cur.execute("SELECT id, cage_number FROM computers WHERE barcode = %s", (barcode,))
+        existing = cur.fetchone()
+        
+        if existing:
+            old_cage = existing['cage_number']
+            if old_cage and str(old_cage) != str(cage_id) and confirm_move != 'yes':
+                # Needs confirmation
+                return redirect_back(confirm_barcode=barcode, old_cage=old_cage)
+                
+            # Update its cage
+            cur.execute("UPDATE computers SET cage_number = %s, cage_name = %s, status = 'בכלוב', scan_time = NOW() WHERE barcode = %s", 
+                        (cage_id, cage_id, barcode))
+            if confirm_move != 'yes':
+                session_count += 1
+            flash(f"המחשב {barcode} שויך לכלוב {cage_id} בהצלחה.", "success")
+            last_added_bc = barcode
+        else:
+            # Create new computer and assign to cage
+            cur.execute("""
+                INSERT INTO computers (barcode, cage_number, cage_name, status, scan_time, last_technician)
+                VALUES (%s, %s, %s, 'בכלוב', NOW(), %s)
+            """, (barcode, cage_id, cage_id, session.get('username', '')))
+            if confirm_move != 'yes':
+                session_count += 1
+            flash(f"המחשב {barcode} נוצר במערכת ושויך לכלוב {cage_id}.", "success")
+            last_added_bc = barcode
+            
+        conn.commit()
+        trigger_debounced_sync()
+        cur.close()
+    except Exception as e:
+        print(f"Error in api_cage_add: {e}")
+        flash("שגיאה בהוספת המחשב", "danger")
+        last_added_bc = ""
+
+    finally:
+        release_db_connection(conn)
+        
+    return redirect_back(last_added=last_added_bc)
+
+@app.route('/api/cage/<cage_id>/batch_add', methods=['POST'])
+@login_required
+def api_cage_batch_add(cage_id):
+    cage_id = normalize_cage_id(cage_id)
+    data = request.get_json()
+    if not data or 'barcodes' not in data:
+        return jsonify({"success": False, "error": "Invalid payload"}), 400
+        
+    barcodes = data['barcodes']
+    if not isinstance(barcodes, list):
+        return jsonify({"success": False, "error": "Barcodes must be a list"}), 400
+        
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"success": False, "error": "DB connection failed"}), 500
+        
+    results = {"success": True, "updated": 0, "new": 0, "transferred": 0, "details": []}
+    technician = session.get('username', 'unknown')
+    
+    try:
+        cur = get_safe_cursor(conn)
+        
+        for barcode in barcodes:
+            barcode = str(barcode).strip()
+            if not barcode: continue
+            
+            cur.execute("SELECT * FROM computers WHERE barcode = %s", (barcode,))
+            existing = cur.fetchone()
+            
+            if existing:
+                old_val = dict(existing)
+                prev_cage = old_val.get('cage_number', '')
+                is_transfer = (prev_cage and str(prev_cage) != str(cage_id))
+                
+                cur.execute("UPDATE computers SET cage_number = %s, cage_name = %s, status = 'בכלוב', scan_time = NOW(), last_technician = %s WHERE barcode = %s", 
+                            (cage_id, cage_id, technician, barcode))
+                            
+                cur.execute("""
+                    INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
+                    VALUES (%s, %s, 'Batch Pack', %s, %s)
+                """, (
+                    old_val['id'],
+                    technician,
+                    json.dumps(old_val, default=str),
+                    json.dumps({"cage_number": cage_id, "cage_name": cage_id}, default=str)
+                ))
+                
+                if is_transfer:
+                    results["transferred"] += 1
+                    results["details"].append({"barcode": barcode, "status": "transferred"})
+                else:
+                    results["updated"] += 1
+                    results["details"].append({"barcode": barcode, "status": "updated"})
+                    
+            else:
+                cur.execute("""
+                    INSERT INTO computers (barcode, cage_number, cage_name, status, scan_time, last_technician)
+                    VALUES (%s, %s, %s, 'בכלוב', NOW(), %s) RETURNING id
+                """, (barcode, cage_id, cage_id, technician))
+                new_id = cur.fetchone()['id']
+                
+                cur.execute("""
+                    INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
+                    VALUES (%s, %s, 'Batch Pack (New)', %s, %s)
+                """, (
+                    new_id,
+                    technician,
+                    None,
+                    json.dumps({"cage_number": cage_id, "cage_name": cage_id, "status": "בכלוב"}, default=str)
+                ))
+                
+                results["new"] += 1
+                results["details"].append({"barcode": barcode, "status": "new"})
+                
+        conn.commit()
+        trigger_debounced_sync()
+        cur.close()
+    except Exception as e:
+        print(f"Error in api_cage_batch_add: {e}")
+        if conn: conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        release_db_connection(conn)
+        
+    return jsonify(results)
+
+def normalize_cage_id(cid):
+    if not cid: return cid
+    cid = cid.strip()
+    if cid.isdigit():
+        return str(int(cid))
+    return cid
+
+@app.route('/cage_entry', methods=['GET', 'POST'])
+@login_required
+def cage_entry():
+    if request.method == 'POST':
+        cage_id = request.form.get('cage_id', '').strip()
+        cage_id = normalize_cage_id(cage_id)
+        if cage_id:
+            return redirect(url_for('cage_manage', cage_id=cage_id))
+        else:
+            flash("נא להזין מספר כלוב", "warning")
+    return render_template('cage_entry.html')
+
+@app.route('/cage_manage/<cage_id>/edit')
+@login_required
+def cage_edit(cage_id):
+    normalized = normalize_cage_id(cage_id)
+    if normalized != cage_id:
+        session_count = request.args.get('session_count', '0')
+        return redirect(url_for('cage_edit', cage_id=normalized, session_count=session_count))
+    session_count = request.args.get('session_count', '0')
+    try:
+        session_count = int(session_count)
+    except:
+        session_count = 0
+    return render_template('cage_edit.html', cage_id=cage_id, session_count=session_count)
+
+@app.route('/api/cage/<cage_id>/verify', methods=['POST'])
+@login_required
+def api_cage_verify(cage_id):
+    # This just marks the cage as verified by user, then returns them to portal
+    flash(f"כלוב {cage_id} אומת בהצלחה! תודה.", "success")
+    return redirect(url_for('portal'))
+
+@app.route('/api/cage/<cage_id>/mark_returned', methods=['POST'])
+@login_required
+def api_cage_mark_returned(cage_id):
+    # get all barcodes in the form, and the returned ones
+    returned_barcodes = request.form.getlist('returned_barcodes')
+    all_barcodes = request.form.getlist('all_barcodes')
+    
+    if not all_barcodes:
+        return redirect(url_for('cage_manage', cage_id=cage_id))
+        
+    conn = get_db_connection()
+    if not conn:
+        flash("שגיאת חיבור למסד הנתונים", "danger")
+        return redirect(url_for('cage_manage', cage_id=cage_id))
+        
+    try:
+        cur = get_safe_cursor(conn)
+        updated_count = 0
+        
+        for bc in all_barcodes:
+            if bc in returned_barcodes:
+                status = 'חזר'
+            else:
+                status = 'חסר'  # Or we can just leave it as it was if we don't want to mark missing
+                
+            cur.execute("UPDATE computers SET status = %s WHERE barcode = %s", (status, bc))
+            updated_count += 1
+            
+        conn.commit()
+        trigger_debounced_sync()
+        cur.close()
+        flash(f"עודכן סטטוס עבור {updated_count} מחשבים.", "success")
+    except Exception as e:
+        print(f"Error in api_cage_mark_returned: {e}")
+        flash("שגיאה בעדכון הסטטוס", "danger")
+    finally:
+        release_db_connection(conn)
+        
+    return redirect(url_for('cage_manage', cage_id=cage_id))
+
+
 # â”€â”€ API: סריקה מהירה (ללא חלון) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.route('/api/fast-scan', methods=['POST'])
 @login_required
@@ -2308,7 +2671,6 @@ def export_computers():
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @app.route('/exam-attendance')
-@local_only
 @login_required
 def exam_attendance():
     """דשבורד נוכחות נבחנים"""
@@ -2345,11 +2707,10 @@ def exam_attendance_add():
         if not conn: return "DB Error", 500
         try:
             cur = get_safe_cursor(conn)
-            import uuid
             token = uuid.uuid4().hex
             cur.execute("""
-                INSERT INTO examinees (full_name, id_number, username, password, classroom, exam_name, laptop_number, token)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO examinees (full_name, id_number, username, password, classroom, exam_name, laptop_number, token, row, seat, notes)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 data.get('name','').strip(),
                 data.get('id_number','').strip(),
@@ -2358,11 +2719,14 @@ def exam_attendance_add():
                 data.get('location','').strip(),
                 data.get('exam_name','').strip(),
                 data.get('computer','').strip(),
-                token
+                token,
+                data.get('row','').strip(),
+                data.get('seat','').strip(),
+                data.get('notes','').strip(),
             ))
             conn.commit()
             cur.close()
-            flash(f"נבחן {data.get('name','')} נוסף בהצלחה! âœ…", "success")
+            flash(f"נבחן {data.get('name','')} נוסף בהצלחה! ✅", "success")
             return redirect(url_for('exam_attendance'))
         except Exception as e:
             flash(f"שגיאה: {e}", "danger")
@@ -2503,10 +2867,14 @@ def exam_attendance_import():
         # â”€â”€ כתוב נתונים לגיליון â€” לפי מבנה האקסל â”€â”€
         header_row = [
             'שם פרטי', 'שם משפחה', 'ת.ז', 'התאמות', 'סיסמה',
-            'שם משתמש', 'גרסה', "סה' אולם", 'טור', 'כסא',
+            'שם משתמש', 'גרסה', 'אולם/כיתה', 'טור', 'כסא',
             'מ.מחשב', 'נוכחות', 'שעת סריקה', 'טכנאי'
         ]
-        rows_to_write = [header_row]
+        
+        title_text = exam_title_row1 or exam_sheet_name
+        title_row = [title_text] + [''] * (len(header_row) - 1)
+        
+        rows_to_write = [title_row, header_row]
         for rec in all_rows:
             rows_to_write.append([
                 rec['name'],         # שם פרטי (שם מלא)
@@ -2516,7 +2884,7 @@ def exam_attendance_import():
                 rec['password'],     # סיסמה
                 rec['username'],     # שם משתמש
                 rec.get('exam_name', exam_sheet_name),  # גרסה
-                '',                  # סה' אולם
+                rec.get('location', ''),                # אולם/כיתה
                 rec['row_number'],   # טור
                 rec['seat_number'],  # כסא
                 '',                  # מ.מחשב â† ימולא בסריקה
@@ -2527,9 +2895,19 @@ def exam_attendance_import():
         ws_tab.clear()
         ws_tab.update('A1', rows_to_write, value_input_option='USER_ENTERED')
 
-        # עיצוב כותרות
         last_col = chr(ord('A') + len(header_row) - 1)
+        
+        # עיצוב ומיזוג שורה 1 (כותרת ראשית)
+        ws_tab.merge_cells(f'A1:{last_col}1')
         ws_tab.format(f'A1:{last_col}1', {
+            'textFormat': {'bold': True, 'fontSize': 14},
+            'backgroundColor': {'red': 0.9, 'green': 0.9, 'blue': 0.9},
+            'horizontalAlignment': 'CENTER',
+            'verticalAlignment': 'MIDDLE'
+        })
+
+        # עיצוב שורה 2 (כותרות העמודות)
+        ws_tab.format(f'A2:{last_col}2', {
             'textFormat': {'bold': True},
             'backgroundColor': {'red': 0.8, 'green': 0.9, 'blue': 1.0},
             'horizontalAlignment': 'CENTER'
@@ -2628,6 +3006,8 @@ def generate_word_docs():
             elif 'התאמות' in h or 'notes' in h_lower:                   col_map['notes']      = i
             elif 'טור' in h or 'עמודה' in h:                            col_map['row']        = i
             elif 'כסא' in h or 'כיסא' in h or 'seat' in h_lower or 'מושב' in h:       col_map['seat']       = i
+            elif 'תקין' in h or 'valid' in h_lower:                      col_map['is_valid']   = i
+            elif 'נוכחות' in h or 'attendance' in h_lower:               col_map['attendance'] = i
 
         examinees = []
         for row in ws.iter_rows(min_row=header_row_idx + 1, values_only=True):
@@ -2666,7 +3046,9 @@ def generate_word_docs():
                 'seat': get_val('seat'),
                 'exam_name': get_val('exam_name'),
                 'computer': get_val('computer'),
-                'notes': get_val('notes')
+                'notes': get_val('notes'),
+                'is_valid': get_val('is_valid'),
+                'attendance': get_val('attendance'),
             })
             
         if not examinees:
@@ -2722,7 +3104,7 @@ def generate_word_docs():
             doc = Document(rendered_buf)
 
             # ---- Step 0.5: Replace static old title and location to match the imported exam ----
-            def replace_static_text(p, new_title, new_loc):
+            def replace_static_text(p, new_title, new_loc, row_val):
                 txt = p.text
                 title_keywords = ["משרד הבריאות", "מינהל האחיות", "מומחיות", "טיפול תומך", "רישוי חשמלאים", "חשמלאים", "כיתות חשמל", "כיתת חשמל", "חשמל"]
                 loc_keywords = ["בניין REIT1", "פתח תקווה", "מליאה", "אפעל 6", "בניין", "קומה", "כיתה"]
@@ -2730,6 +3112,14 @@ def generate_word_docs():
                 is_title = any(kw in txt for kw in title_keywords) and "טופס התחברות" not in txt
                 is_loc = any(kw in txt for kw in loc_keywords) and not is_title and "טופס התחברות" not in txt
                 
+                if '[1]' in txt and row_val:
+                    if p.runs:
+                        for r_item in p.runs:
+                            if '[1]' in r_item.text:
+                                r_item.text = r_item.text.replace('[1]', row_val)
+                    else:
+                        p.text = p.text.replace('[1]', row_val)
+
                 if is_title:
                     if p.runs:
                         p.runs[0].text = new_title
@@ -2779,37 +3169,36 @@ def generate_word_docs():
                         
                         # Also apply keyword replacement for paragraphs and tables inside header
                         for p in hf.paragraphs:
-                            replace_static_text(p, exam_title_clean, e['location'])
+                            replace_static_text(p, exam_title_clean, e['location'], str(e.get('row', '')))
                         for table in hf.tables:
                             for row in table.rows:
                                 for cell in row.cells:
                                     for p in cell.paragraphs:
-                                        replace_static_text(p, exam_title_clean, e['location'])
+                                        replace_static_text(p, exam_title_clean, e['location'], str(e.get('row', '')))
 
                 # 2. Process footers with keywords replacement only (no heuristic to prevent corruption)
                 for hf_name in ['footer', 'first_page_footer', 'even_page_footer']:
                     hf = getattr(section, hf_name, None)
                     if hf:
                         for p in hf.paragraphs:
-                            replace_static_text(p, exam_title_clean, e['location'])
+                            replace_static_text(p, exam_title_clean, e['location'], str(e.get('row', '')))
                         for table in hf.tables:
                             for row in table.rows:
                                 for cell in row.cells:
                                     for p in cell.paragraphs:
-                                        replace_static_text(p, exam_title_clean, e['location'])
+                                        replace_static_text(p, exam_title_clean, e['location'], str(e.get('row', '')))
 
             # Process main body paragraphs and tables
             for p in doc.paragraphs:
-                replace_static_text(p, exam_title_clean, e['location'])
+                replace_static_text(p, exam_title_clean, e['location'], str(e.get('row', '')))
             for table in doc.tables:
                 for row in table.rows:
                     for cell in row.cells:
                         for p in cell.paragraphs:
-                            replace_static_text(p, exam_title_clean, e['location'])
+                            replace_static_text(p, exam_title_clean, e['location'], str(e.get('row', '')))
             
             # Generate QR locally
-            import qrcode as qrcode_lib
-            qr_gen = qrcode_lib.QRCode(version=1, box_size=10, border=1)
+            qr_gen = qrcode.QRCode(version=1, box_size=10, border=1)
             qr_gen.add_data(qr_data)
             qr_gen.make(fit=True)
             qr_img = qr_gen.make_image(fill_color="black", back_color="white")
@@ -2817,7 +3206,7 @@ def generate_word_docs():
             # PyPNGImage.save() doesn't accept format= kwarg (it's always PNG)
             # For Pillow-backed images it does, so handle both cases
             try:
-                qr_img.save(qr_buf_local, format='PNG')
+                qr_img.save(qr_buf_local, **{'format': 'PNG'})  # type: ignore
             except TypeError:
                 qr_img.save(qr_buf_local)
             qr_buf_local.seek(0)
@@ -2834,6 +3223,16 @@ def generate_word_docs():
                 'קוד משתמש': e['username'],
                 'סיסמה': e['password'],
                 'התאמות': e['notes'],
+                'אולם': e['location'],
+                'כיתה': e['location'],
+                'אולם/כיתה': e['location'],
+                'מחשב': e['computer'],
+                'מספר מחשב': e['computer'],
+                'טור': e['row'],
+                'כסא': e['seat'],
+                'מושב': e['seat'],
+                'תקין': e['is_valid'],
+                'נוכחות': e['attendance'],
             }
             for t_idx, t in enumerate(doc.tables):
                 # דלג על טבלת "למילוי על ידי הנבחן/ת" â€” נשארת ריקה לכתב יד
@@ -2845,13 +3244,26 @@ def generate_word_docs():
                         label_right = r.cells[1].text.strip()
                         label_left  = r.cells[0].text.strip()
                         for key, val_text in label_to_value.items():
+                            val_str = str(val_text) if val_text is not None else ''
                             if key in label_right:
-                                r.cells[0].paragraphs[0].clear()
-                                r.cells[0].paragraphs[0].add_run(val_text)
+                                para = r.cells[0].paragraphs[0]
+                                orig_run = para.runs[0] if para.runs else None
+                                para.clear()
+                                new_run = para.add_run(val_str)
+                                if orig_run:
+                                    new_run.font.name = orig_run.font.name
+                                    new_run.font.size = orig_run.font.size
+                                    new_run.font.bold = orig_run.font.bold
                                 break
                             elif key in label_left:
-                                r.cells[1].paragraphs[0].clear()
-                                r.cells[1].paragraphs[0].add_run(val_text)
+                                para = r.cells[1].paragraphs[0]
+                                orig_run = para.runs[0] if para.runs else None
+                                para.clear()
+                                new_run = para.add_run(val_str)
+                                if orig_run:
+                                    new_run.font.name = orig_run.font.name
+                                    new_run.font.size = orig_run.font.size
+                                    new_run.font.bold = orig_run.font.bold
                                 break
 
             # ---- Step 2: Find seat paragraph in BODY and add QR ----
@@ -3032,7 +3444,8 @@ def api_exam_scan_beacon():
     if len(parts) >= 3:
         id_number  = parts[1] if len(parts) > 1 else ''
         full_name  = parts[2] if len(parts) > 2 else ''
-        exam_name  = parts[0] if parts[0] != 'EXAMINEE' else ''
+        exam_name_qr = parts[6] if len(parts) > 6 else ''
+        classroom_qr = parts[5] if len(parts) > 5 else ''
         scan_time_str = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
 
         def _save():
@@ -3045,15 +3458,90 @@ def api_exam_scan_beacon():
                 creds    = Credentials.from_service_account_file(sa_file, scopes=scopes)
                 client   = gspread.authorize(creds)
                 ws       = client.open_by_key(sheet_id).sheet1
-                row = [exam_name, id_number, full_name, computer, pc_status,
-                       'âœ…' if is_present == 1 else 'âŒ', scan_time_str, technician, col, seat]
-                ws.append_row(row, value_input_option='USER_ENTERED')
-                print(f"[BEACON] Saved: {full_name} | {computer}")
+                # חיפוש שורה קיימת לפי ת.ז → עדכון, אחרת הוספה
+                all_data = ws.get_all_values()
+
+                # חיפוש שורת headers באופן דינמי (מדלג על שורת כותרת מוזגת)
+                hdr_row = 0
+                _KNOWN = ['שם', 'תעודת', 'נוכחות', 'קוד', 'מחשב', 'id', 'name']
+                for _ri, _rw in enumerate(all_data):
+                    _rt = ' '.join(str(c).strip() for c in _rw)
+                    if sum(1 for k in _KNOWN if k in _rt) >= 2:
+                        hdr_row = _ri
+                        break
+
+                def col_idx(keywords):
+                    hdrs = [str(h).strip() for h in (all_data[hdr_row] if all_data else [])]
+                    for k in keywords:
+                        for i, h in enumerate(hdrs):
+                            if k in h:
+                                return i
+                    return None
+
+                id_col       = col_idx(['ת.ז', 'תעודת', 'id'])
+                name_col     = col_idx(['שם'])
+                computer_col = col_idx(['מחשב', 'computer', 'מ.מחשב'])
+                presence_col = col_idx(['נוכחות', 'הגיע', 'attendance'])
+                time_col     = col_idx(['שעת', 'time', 'scan'])
+                tech_col     = col_idx(['טכנאי', 'technician'])
+                valid_col    = col_idx(['תקין', 'סטטוס', 'valid', 'status'])
+                class_col    = col_idx(['אולם', 'כיתה', 'classroom'])
+                exam_col     = col_idx(['בחינה', 'exam', 'גרסה'])
+                print(f"[BEACON] hdr_row={hdr_row} id={id_col} computer={computer_col} presence={presence_col}", flush=True)
+
+                target_row_idx = None
+                for i, row in enumerate(all_data[hdr_row + 1:], start=hdr_row + 1):
+                    if id_col is not None and id_col < len(row):
+                        if str(row[id_col]).strip() == str(id_number).strip():
+                            target_row_idx = i
+                            break
+                    if target_row_idx is None and name_col is not None and name_col < len(row):
+                        if str(row[name_col]).strip() == str(full_name).strip():
+                            target_row_idx = i
+                            break
+
+                if target_row_idx is not None:
+                    sheet_row = target_row_idx + 1
+                    updates = []
+                    for idx, val in [
+                        (computer_col, computer),
+                        (presence_col, '1'),
+                        (time_col,     scan_time_str),
+                        (tech_col,     technician),
+                        (valid_col,    pc_status),
+                        (class_col,    classroom_qr),
+                        (exam_col,     exam_name_qr),
+                    ]:
+                        if idx is not None:
+                            col_letter = chr(ord('A') + idx)
+                            updates.append({'range': f'{col_letter}{sheet_row}', 'values': [[val]]})
+                    if updates:
+                        ws.batch_update(updates, value_input_option='USER_ENTERED')
+                    print(f"[THREAD OK] Updated row {sheet_row} for {full_name}", flush=True)
+                else:
+                    hdrs = [str(h).strip() for h in (all_data[hdr_row] if all_data else [])]
+                    new_row = [''] * max(len(hdrs), 11)
+                    def set_col(keywords, val):
+                        idx = col_idx(keywords)
+                        if idx is not None and idx < len(new_row):
+                            new_row[idx] = val
+                    set_col(['שם', 'name'],            full_name)
+                    set_col(['ת.ז', 'תעודת', 'id'],    id_number)
+                    set_col(['בחינה', 'exam', 'גרסה'],  exam_name_qr)
+                    set_col(['טור'],                     col)
+                    set_col(['כסא', 'seat'],             seat)
+                    set_col(['מחשב', 'מ.מחשב'],          computer)
+                    set_col(['נוכחות', 'הגיע'],           '1')
+                    set_col(['שעת', 'time'],              scan_time_str)
+                    set_col(['טכנאי'],                    technician)
+                    set_col(['תקין'],                     pc_status)
+                    ws.append_row(new_row, value_input_option='USER_ENTERED')
+                    print(f"[THREAD OK] No row found – appended for {full_name}", flush=True)
             except Exception as ex:
                 print(f"[BEACON] Save error: {ex}")
         threading.Thread(target=_save, daemon=True).start()
     else:
-        print(f"[BEACON] âš ï¸ Invalid QR: {qr_text[:40]}")
+        print(f"[BEACON] âš ï¸  Invalid QR: {qr_text[:40]}")
 
     # החזר pixel שקוף 1x1
     pixel = base64.b64decode('R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==')
@@ -3137,8 +3625,15 @@ def api_exam_scan_double():
         return {"error": "QR לא מזוהה כנבחן"}, 400
 
     # קריאת נתונים ישירות מה-QR - לא תלוי ב-DB
-    id_number = parts[1] if len(parts) > 1 else ''
-    full_name = parts[2] if len(parts) > 2 else ''
+    id_number   = parts[1] if len(parts) > 1 else ''
+    full_name   = parts[2] if len(parts) > 2 else ''
+    qr_username = parts[3] if len(parts) > 3 else ''
+    qr_password = parts[4] if len(parts) > 4 else ''
+    qr_row      = parts[5] if len(parts) > 5 else ''
+    qr_seat     = parts[6] if len(parts) > 6 else ''
+    # col/seat: מה-form אם נשלח, אחרת מה-QR
+    if not col  and qr_row:  col  = qr_row
+    if not seat and qr_seat: seat = qr_seat
     
     # שם המבחן â€” מהפרמטר, ובמידת הצורך מה-QR (parts[0])
     exam_name = (data.get('exam_name', '') or '').strip()
@@ -3201,11 +3696,22 @@ def api_exam_scan_double():
 
             # מבנה עמודות לפי האקסל:
             # [0]שם פרטי | [1]שם משפחה | [2]ת.ז | [3]התאמות | [4]סיסמה | [5]שם משתמש | [6]גרסה | [7]סה' אולם | [8]טור | [9]כסא | [10]מ.מחשב | [11]נוכחות | [12]שעת סריקה | [13]טכנאי
+            cache_hdrs = [str(h).strip() for h in (all_rows[0] if all_rows else [])]
+            def _ci(kws):
+                for k in kws:
+                    for i, h in enumerate(cache_hdrs):
+                        if k in h: return i
+                return None
+            cache_id_col   = _ci(['ת.ז', 'תעודת', 'id'])
+            cache_prs_col  = _ci(['נוכחות', 'הגיע', 'attendance'])
+            cache_time_col = _ci(['שעת', 'time', 'scan'])
             attendance_cache[exam_name] = {}
             for r in all_rows[1:]:
-                # בדיקה בעמודה L (אינדקס 11) = נוכחות
-                if len(r) > 11 and r[11].strip() and len(r) > 2:
-                    attendance_cache[exam_name][str(r[2]).strip()] = r[12] if (len(r) > 12 and r[12].strip()) else 'נוכח'
+                if cache_id_col is not None and cache_prs_col is not None:
+                    if cache_prs_col < len(r) and r[cache_prs_col].strip():
+                        id_val = r[cache_id_col].strip() if cache_id_col < len(r) else ''
+                        time_val = (r[cache_time_col].strip() if cache_time_col and cache_time_col < len(r) and r[cache_time_col].strip() else 'נוכח')
+                        attendance_cache[exam_name][id_val] = time_val
             print(f"[CACHE] Loaded {len(attendance_cache[exam_name])} active scans for {exam_name}", flush=True)
         except Exception as ex:
             print(f"[CACHE ERROR] Failed to build cache for {exam_name}: {ex}", flush=True)
@@ -3214,7 +3720,7 @@ def api_exam_scan_double():
     # שמירה תמיד â€” ללא בדיקת כפולים
     attendance_cache.setdefault(exam_name, {})[str(id_number).strip()] = scan_time_str
 
-    def save_to_exam_sheet_in_thread(target_sheet_id, target_exam_name, target_id_number, target_full_name, target_computer, target_col, target_seat, target_pc_status, target_scan_time, target_technician):
+    def save_to_exam_sheet_in_thread(target_sheet_id, target_exam_name, target_id_number, target_full_name, target_computer, target_col, target_seat, target_pc_status, target_scan_time, target_technician, target_username='', target_password=''):
         import sys, traceback, gspread
         from google.oauth2.service_account import Credentials
         print(f"[THREAD] Starting Google Sheets update for {target_full_name} ({target_id_number})...", flush=True)
@@ -3254,8 +3760,92 @@ def api_exam_scan_double():
                 target_scan_time,    # [12] שעת סריקה
                 target_technician    # [13] טכנאי
             ]
-            ws.append_row(new_row, value_input_option='USER_ENTERED')
-            print(f"[THREAD OK] Appended new row for {target_full_name}", flush=True)
+            all_data = ws.get_all_values()
+            # חיפוש שורת הכותרות באופן דינמי (יתכן שיש שורת כותרת מוזגת לפני הכותרות)
+            header_row_idx = 0
+            KNOWN_HEADERS = ['שם', 'תעודת', 'נוכחות', 'קוד', 'מחשב', 'id', 'name', 'attendance']
+            for _ri, _row in enumerate(all_data):
+                row_text = ' '.join(str(c).strip() for c in _row)
+                if sum(1 for kw in KNOWN_HEADERS if kw in row_text) >= 2:
+                    header_row_idx = _ri
+                    break
+
+            def col_idx(keywords):
+                hdrs = [str(h).strip() for h in (all_data[header_row_idx] if all_data else [])]
+                for k in keywords:
+                    for i, h in enumerate(hdrs):
+                        if k in h:
+                            return i
+                return None
+
+            id_col       = col_idx(['ת.ז', 'תעודת', 'id'])
+            name_col     = col_idx(['שם'])
+            computer_col = col_idx(['מחשב', 'computer', 'מ.מחשב'])
+            presence_col = col_idx(['נוכחות', 'הגיע', 'attendance'])
+            time_col     = col_idx(['שעת', 'time', 'scan'])
+            tech_col     = col_idx(['טכנאי', 'technician'])
+            valid_col    = col_idx(['תקין', 'סטטוס', 'valid', 'status'])
+            username_col = col_idx(['קוד', 'משתמש', 'username', 'user'])
+            password_col = col_idx(['סיסמא', 'סיסמ', 'password', 'pass'])
+            print(f"[THREAD] Headers at row {header_row_idx}: id={id_col} name={name_col} computer={computer_col} presence={presence_col} user={username_col} pass={password_col}", flush=True)
+
+            target_row_idx = None
+            # חיפוש רק בשורות הנתונים (אחרי שורת הכותרות)
+            for i, row in enumerate(all_data[header_row_idx + 1:], start=header_row_idx + 1):
+                if id_col is not None and id_col < len(row):
+                    if str(row[id_col]).strip() == str(target_id_number).strip():
+                        target_row_idx = i
+                        break
+                if target_row_idx is None and name_col is not None and name_col < len(row):
+                    if str(row[name_col]).strip() == str(target_full_name).strip():
+                        target_row_idx = i
+                        break
+
+            if target_row_idx is not None:
+                sheet_row = target_row_idx + 1
+                existing_row = all_data[target_row_idx]
+                updates = []
+                for idx, val in [
+                    (computer_col, target_computer),
+                    (presence_col, str(is_present)),   # 1 אם נוכח, 0 אם לא
+                    (time_col,     target_scan_time),
+                    (tech_col,     target_technician),
+                    (valid_col,    target_pc_status),
+                ]:
+                    if idx is not None and val:
+                        col_letter = chr(ord('A') + idx)
+                        updates.append({'range': f'{col_letter}{sheet_row}', 'values': [[val]]})
+                # username/password: כתוב רק אם ה-QR מכיל ערך וגם התא ריק
+                for idx, val in [(username_col, target_username), (password_col, target_password)]:
+                    if idx is not None and val:
+                        current = existing_row[idx].strip() if idx < len(existing_row) else ''
+                        if not current:   # תא ריק בגיליון → ממלא מה-QR
+                            col_letter = chr(ord('A') + idx)
+                            updates.append({'range': f'{col_letter}{sheet_row}', 'values': [[val]]})
+                if updates:
+                    ws.batch_update(updates, value_input_option='USER_ENTERED')
+                print(f"[THREAD OK] Updated row {sheet_row} for {target_full_name} (present={is_present})", flush=True)
+            else:
+                hdrs = [str(h).strip() for h in (all_data[0] if all_data else [])]
+                new_row = [''] * max(len(hdrs), 11)
+                def set_col(keywords, val):
+                    idx = col_idx(keywords)
+                    if idx is not None and idx < len(new_row):
+                        new_row[idx] = val
+                set_col(['שם', 'name'],            target_full_name)
+                set_col(['ת.ז', 'תעודת', 'id'],    target_id_number)
+                set_col(['בחינה', 'exam', 'גרסה'],  target_exam_name)
+                set_col(['טור'],                     target_col)
+                set_col(['כסא', 'seat'],             target_seat)
+                set_col(['מחשב', 'מ.מחשב'],          target_computer)
+                set_col(['קוד', 'משתמש', 'username'], target_username)
+                set_col(['סיסמא', 'סיסמ'],             target_password)
+                set_col(['נוכחות', 'הגיע'],           str(is_present))
+                set_col(['שעת', 'time'],              target_scan_time)
+                set_col(['טכנאי'],                    target_technician)
+                set_col(['תקין'],                     target_pc_status)
+                ws.append_row(new_row, value_input_option='USER_ENTERED')
+                print(f"[THREAD OK] No row found - appended for {target_full_name}", flush=True)
 
         except Exception as ex:
             print(f"[THREAD ERROR] Save failed for {target_full_name}: {ex}", flush=True)
@@ -3264,7 +3854,7 @@ def api_exam_scan_double():
     import threading
     t = threading.Thread(
         target=save_to_exam_sheet_in_thread,
-        args=(sheet_id, exam_name, id_number, full_name, computer, col, seat, pc_status, scan_time_str, technician),
+        args=(sheet_id, exam_name, id_number, full_name, computer, col, seat, pc_status, scan_time_str, technician, qr_username, qr_password),
         daemon=False
     )
     t.start()

@@ -1,0 +1,368 @@
+{% extends 'base.html' %}
+{% block title %}עריכת כלוב {{ cage_id }}{% endblock %}
+
+{% block content %}
+<style>
+    .cage-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    .session-counter {
+        font-size: 4rem;
+        font-weight: 900;
+        text-align: center;
+        color: var(--accent);
+        margin: 20px 0;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }
+    .session-subtitle {
+        text-align: center;
+        font-size: 1.2rem;
+        color: var(--text-muted);
+        margin-bottom: 30px;
+    }
+    .scanner-form {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    .scanner-input {
+        font-size: 1.5rem;
+        padding: 15px;
+        text-align: center;
+    }
+    .btn-massive {
+        padding: 20px;
+        font-size: 1.2rem;
+        font-weight: bold;
+        border-radius: 12px;
+    }
+</style>
+
+<div class="main">
+    <div class="page-header cage-header">
+        <h1>קיפול כלוב {{ cage_id }}</h1>
+        <a href="{{ url_for('cage_manage', cage_id=cage_id) }}" class="btn btn-ghost">סיום עריכה</a>
+    </div>
+
+    <div class="card" style="max-width: 500px; margin: 0 auto; text-align: center;">
+        
+        <div class="session-counter" id="main-session-counter">{{ session_count }} / 50</div>
+        <div class="session-subtitle">מחשבים נסרקו בסשן זה</div>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="flashes" style="margin-bottom: 20px;">
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}" style="font-size: 1.1rem; padding: 15px;">{{ message }}</div>
+            {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <form id="addComputerForm" class="scanner-form" onsubmit="handleScan(event)">
+            <div style="display: flex; gap: 10px; width: 100%;">
+                <input type="text" id="barcode-input" class="form-control scanner-input" placeholder="סרוק או הקרא..." autofocus required autocomplete="off" style="flex: 1; font-size: 2.2rem; font-weight: 900; color: #00ff00; text-align: center; text-shadow: 0 0 10px rgba(0,255,0,0.5); letter-spacing: 2px;">
+                <button type="button" id="btn-dictation" class="btn btn-blue" onclick="toggleDictation()" style="font-size: 1.5rem; padding: 0 20px; transition: all 0.3s; flex-shrink: 0;" title="הקראה קולית">🎤</button>
+            </div>
+            <div id="dictation-status" style="display: none; color: #ef4444; font-weight: bold; margin-top: 10px; text-align: center; animation: pulse 1.5s infinite;">
+                🔴 מקשיב... תגיד את המספר ואז 'פסיק' בסוף
+            </div>
+            <style>
+                @keyframes pulse {
+                    0% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                    100% { opacity: 1; }
+                }
+                .dictation-active {
+                    background-color: #ef4444 !important;
+                    box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
+                }
+            </style>
+            <button type="submit" class="btn btn-blue btn-massive" style="display:none;">הוסף לרשימה</button>
+        </form>
+        
+        <div id="batch-list-container" style="margin-top: 20px; text-align: right; display:none;">
+            <h4 style="color: var(--text-muted); margin-bottom: 10px; font-size:1rem; display:flex; justify-content:space-between; align-items:center;">
+                <span>רשימת סריקות (<span id="scan-count">0</span>):</span>
+            </h4>
+            <div style="max-height: 250px; overflow-y: auto; overflow-x: hidden; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--border);">
+                <table class="table" style="margin: 0; width:100%; table-layout: fixed;">
+                    <thead style="position: sticky; top: 0; background: var(--bg);"><tr style="background: rgba(31,111,235,0.1);">
+                        <th style="width: 50px; text-align:center;">
+                            <input type="checkbox" id="check-all" checked onchange="toggleAll(this)" style="transform: scale(1.3);">
+                        </th>
+                        <th style="width: 100px;">שעה</th>
+                        <th style="text-align: right;">ברקוד</th>
+                    </tr></thead>
+                    <tbody id="batch-list-body" style="text-align:right;">
+                    </tbody>
+                </table>
+            </div>
+            
+            <button type="button" onclick="submitBatch()" id="btn-save-batch" class="btn btn-green btn-massive" style="margin-top:20px; width:100%;">
+                💾 שמור הכל לכלוב
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let scannedItems = [];
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const scannerInput = document.getElementById('barcode-input');
+        if (scannerInput) {
+            scannerInput.focus();
+            
+            // Prevent losing focus on mobile
+            document.addEventListener('click', function(e) {
+                if(e.target.tagName !== 'BUTTON' && e.target.tagName !== 'A' && e.target.tagName !== 'INPUT' && !e.target.closest('table')) {
+                    scannerInput.focus();
+                }
+            });
+        }
+        
+        // Restore from sessionStorage if exists
+        const cageId = "{{ cage_id }}";
+        const sessionKey = 'batch_session_' + cageId;
+        const saved = sessionStorage.getItem(sessionKey);
+        if (saved) {
+            try {
+                scannedItems = JSON.parse(saved);
+                renderBatchList();
+            } catch(e){}
+        }
+    });
+
+    function handleScan(e) {
+        e.preventDefault();
+        const input = document.getElementById('barcode-input');
+        const barcode = input.value.trim();
+        if(!barcode) return;
+        
+        // Add to top of list
+        let timeStr = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        scannedItems.unshift({ barcode: barcode, time: timeStr, checked: true, id: Date.now() });
+        
+        // Save to storage
+        const cageId = "{{ cage_id }}";
+        sessionStorage.setItem('batch_session_' + cageId, JSON.stringify(scannedItems));
+        
+        renderBatchList();
+        
+        input.value = '';
+        input.focus();
+    }
+    
+    function toggleItem(id) {
+        const item = scannedItems.find(x => x.id === id);
+        if(item) {
+            item.checked = !item.checked;
+            const cageId = "{{ cage_id }}";
+            sessionStorage.setItem('batch_session_' + cageId, JSON.stringify(scannedItems));
+            updateCount();
+        }
+    }
+    
+    function toggleAll(checkbox) {
+        const checked = checkbox.checked;
+        scannedItems.forEach(item => item.checked = checked);
+        const cageId = "{{ cage_id }}";
+        sessionStorage.setItem('batch_session_' + cageId, JSON.stringify(scannedItems));
+        renderBatchList();
+    }
+    
+    const initialSessionCount = {{ session_count|default(0) }};
+    
+    function updateCount() {
+        const count = scannedItems.filter(x => x.checked).length;
+        document.getElementById('scan-count').textContent = count;
+        document.getElementById('btn-save-batch').innerText = `💾 שמור ${count} מחשבים לכלוב`;
+        
+        const mainCounter = document.getElementById('main-session-counter');
+        if (mainCounter) {
+            const total = initialSessionCount + count;
+            mainCounter.innerText = `${total} / 50`;
+            if (total >= 50) {
+                mainCounter.style.color = 'var(--success)';
+            } else {
+                mainCounter.style.color = 'var(--accent)';
+            }
+        }
+    }
+
+    function renderBatchList() {
+        const container = document.getElementById('batch-list-container');
+        const tbody = document.getElementById('batch-list-body');
+        
+        if (scannedItems.length === 0) {
+            container.style.display = 'none';
+            return;
+        }
+        
+        container.style.display = 'block';
+        let html = '';
+        
+        scannedItems.forEach((item, index) => {
+            html += `<tr style="${!item.checked ? 'opacity:0.5;' : ''}">
+                <td style="text-align:center;">
+                    <input type="checkbox" onchange="toggleItem(${item.id})" ${item.checked ? 'checked' : ''} style="transform: scale(1.3);">
+                </td>
+                <td style="color: #94a3b8; font-size: 0.9rem;">${item.time}</td>
+                <td style="font-weight:900; color: #00ff00; font-size: 1.6rem; text-align: right; text-shadow: 0 0 5px rgba(0,255,0,0.3); letter-spacing: 1px;">${item.barcode}</td>
+            </tr>`;
+        });
+        
+        tbody.innerHTML = html;
+        updateCount();
+    }
+
+    async function submitBatch() {
+        const selected = scannedItems.filter(x => x.checked).map(x => x.barcode);
+        if(selected.length === 0) {
+            alert("לא נבחרו מחשבים לשמירה.");
+            return;
+        }
+        
+        const btn = document.getElementById('btn-save-batch');
+        const originalText = btn.innerText;
+        btn.innerText = "שומר... נא להמתין...";
+        btn.disabled = true;
+        
+        try {
+            const cageId = "{{ cage_id }}";
+            const response = await fetch(`/api/cage/${cageId}/batch_add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ barcodes: selected })
+            });
+            
+            const result = await response.json();
+            
+            if(result.success) {
+                sessionStorage.removeItem('batch_session_' + cageId);
+                alert(`נשמרו בהצלחה ${result.updated + result.new + result.transferred} מחשבים לכלוב!`);
+                window.location.href = `/cage_manage/${cageId}`;
+            } else {
+                alert("שגיאה בשמירה: " + result.error);
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        } catch(e) {
+            alert("שגיאת תקשורת.");
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+    }
+
+    let dictationActive = false;
+    let recognition = null;
+
+    function toggleDictation() {
+        if (dictationActive) {
+            stopDictation();
+            return;
+        }
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert("הדפדפן שלך לא תומך בהקראה קולית ישירות דרך האתר. באייפון כדאי להשתמש בדפדפן ספארי (Safari) או כרום (Chrome) מעודכן.");
+            return;
+        }
+
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'he-IL';
+
+        recognition.onstart = function() {
+            dictationActive = true;
+            document.getElementById('btn-dictation').classList.add('dictation-active');
+            document.getElementById('dictation-status').style.display = 'block';
+            document.getElementById('dictation-status').innerText = "🔴 מקשיב... תגיד את המספר ואז 'פסיק' בסוף";
+        };
+
+        recognition.onresult = function(event) {
+            let interimTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                let transcript = event.results[i][0].transcript;
+                
+                if (event.results[i].isFinal) {
+                    // מוצא רק מספרים ופסיקים (או את המילים פסיק/סיום/שמור)
+                    let tokens = transcript.match(/פסיק|,|סיום|שמור|\d+/g);
+                    if (tokens) {
+                        tokens.forEach(token => {
+                            if (token === 'סיום' || token === 'שמור') {
+                                stopDictation();
+                            } else if (token === 'פסיק' || token === ',') {
+                                const input = document.getElementById('barcode-input');
+                                let val = input.value.trim();
+                                if (val.length > 0) {
+                                    if (parseInt(val) <= 9999) {
+                                        handleScan({ preventDefault: () => {} });
+                                    } else {
+                                        console.warn("מספר גדול מדי:", val);
+                                        input.value = ''; // מוחק מספר שגוי/ארוך מדי
+                                    }
+                                }
+                            } else {
+                                // מדובר במספר - נצבור אותו בתוך תיבת הטקסט!
+                                const input = document.getElementById('barcode-input');
+                                input.value += token;
+                            }
+                        });
+                    }
+                } else {
+                    interimTranscript += transcript;
+                }
+            }
+            
+            // עדכון חיווי למשתמש בזמן אמת מה המכשיר שומע הרגע
+            const statusDiv = document.getElementById('dictation-status');
+            if (interimTranscript.trim().length > 0) {
+                statusDiv.innerText = "🔴 שומע: " + interimTranscript;
+            } else {
+                statusDiv.innerText = "🔴 מקשיב... תגיד את המספר ואז 'פסיק' בסוף";
+            }
+        };
+
+        recognition.onerror = function(event) {
+            console.error("Dictation error:", event.error);
+            alert("שגיאת מיקרופון: " + event.error + "\nאם מופיע not-allowed, זה אומר שאין הרשאה בהגדרות של האייפון לכרום לגשת למיקרופון.");
+            stopDictation();
+        };
+
+        recognition.onend = function() {
+            // מנגנון הריצה הרציפה - אם המיקרופון נסגר לבד (הדפדפן מכבה אם יש שקט), נדליק אותו מחדש
+            if (dictationActive) {
+                try { recognition.start(); } catch(e) {}
+            }
+        };
+
+        try {
+            recognition.start();
+        } catch(e) {
+            alert("שגיאה בהפעלת ההקראה: " + e.message);
+            console.error("Start error", e);
+        }
+    }
+
+    function stopDictation() {
+        dictationActive = false;
+        if (recognition) {
+            recognition.stop();
+        }
+        document.getElementById('btn-dictation').classList.remove('dictation-active');
+        document.getElementById('dictation-status').style.display = 'none';
+        
+        // שמירה אוטומטית אם יש פריטים ברשימה
+        if (scannedItems.length > 0) {
+            submitBatch();
+        }
+    }
+</script>
+{% endblock %}

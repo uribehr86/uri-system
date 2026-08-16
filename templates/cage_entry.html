@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block title %}כניסה לכלוב{% endblock %}
+
+{% block content %}
+<div class="main">
+    <div class="page-header">
+        <h1>📦 ניהול כלובים</h1>
+    </div>
+
+    <div class="card" style="max-width: 400px; margin: 40px auto; text-align: center;">
+        <h3 style="margin-bottom: 20px;">הזן מספר כלוב</h3>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="flashes" style="margin-bottom: 20px;">
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <div id="reader-container" style="display: none; margin-bottom: 20px;">
+            <div id="reader" style="width: 100%; max-width: 400px; margin: 0 auto; border-radius: 12px; overflow: hidden; border: 2px solid var(--accent2);"></div>
+            <button type="button" class="btn btn-danger" onclick="stopCamera()" style="margin-top: 15px; width: 100%; padding: 10px;">ביטול מצלמה</button>
+        </div>
+
+        <form action="{{ url_for('cage_entry') }}" method="POST" id="cageForm" style="display: flex; flex-direction: column; gap: 15px;">
+            <input type="text" name="cage_id" id="cage_id_input" class="form-control" placeholder="לדוגמה: 52 (או לסרוק)" style="font-size: 1.5rem; text-align: center; padding: 15px;" autofocus required>
+            <button type="submit" class="btn btn-blue" style="padding: 15px; font-size: 1.2rem; font-weight: bold;">היכנס לכלוב</button>
+            <button type="button" class="btn btn-ghost" id="start-camera-btn" style="padding: 15px; font-size: 1.1rem; border: 1px solid var(--border);">📸 פתח מצלמה לסריקה</button>
+        </form>
+    </div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script>
+    let html5QrcodeScanner = null;
+
+    document.getElementById('start-camera-btn').addEventListener('click', function() {
+        document.getElementById('reader-container').style.display = 'block';
+        this.style.display = 'none';
+
+        if (!html5QrcodeScanner) {
+            html5QrcodeScanner = new Html5Qrcode("reader");
+        }
+        
+        html5QrcodeScanner.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 150 } },
+            (decodedText) => {
+                // Stop scanner
+                stopCamera();
+                // Fill input
+                let cage_val = decodedText.trim();
+                // Remove 'c-' prefix if scanned from cage barcode
+                if(cage_val.toLowerCase().startsWith('c-')) {
+                    cage_val = cage_val.substring(2);
+                }
+                document.getElementById('cage_id_input').value = cage_val;
+                // Auto submit
+                document.getElementById('cageForm').submit();
+            },
+            (errorMessage) => {
+                // Ignore parse errors
+            }
+        ).catch((err) => {
+            alert("שגיאה בהפעלת המצלמה: " + err);
+            stopCamera();
+        });
+    });
+
+    function stopCamera() {
+        if (html5QrcodeScanner) {
+            html5QrcodeScanner.stop().then(() => {
+                document.getElementById('reader-container').style.display = 'none';
+                document.getElementById('start-camera-btn').style.display = 'block';
+            }).catch(err => console.error("Failed to stop scanner", err));
+        }
+    }
+</script>
+{% endblock %}

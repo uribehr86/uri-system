@@ -149,10 +149,10 @@
         </a>
 
 
-        <a href="{{ url_for('scan_dashboard') }}" class="portal-card" style="border-color: var(--success);">
+        <a href="{{ url_for('exam_attendance') }}" class="portal-card" style="border-color: var(--success);">
             <div class="icon-wrapper" style="color: var(--success)">📋</div>
             <h3>ניהול נוכחות נבחנים</h3>
-            <p>מעקב נוכחות בשידור חי, ניהול תקלות והחלפת מחשבים בזמן בחינה.</p>
+            <p>העלאת נבחנים מאקסל, יצירת ברקודים (Word) וסריקת נוכחות למערכת.</p>
         </a>
 
         {% if session.get('role') == 'admin' or session.get('user') == 'admin_uri' %}

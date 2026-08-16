@@ -31,7 +31,7 @@ SCOPES = [
 # כותרות ברירת מחדל — לפי מבנה האקסל
 DEFAULT_HEADERS = [
     'שם פרטי', 'שם משפחה', 'ת.ז', 'התאמות', 'סיסמה',
-    'שם משתמש', 'גרסה', "סה' אולם", 'טור', 'כסא',
+    'שם משתמש', 'גרסה', 'אולם/כיתה', 'טור', 'כסא',
     'מ.מחשב', 'נוכחות', 'שעת סריקה', 'טכנאי'
 ]
 
@@ -101,11 +101,24 @@ def _create_sheet_with_headers(gs, drive, name, parent_id):
     # הוספת כותרות
     sh = gs.open_by_key(sheet_id)
     ws = sh.sheet1
-    ws.update(values=[DEFAULT_HEADERS], range_name='A1')
+    # יצירת נתונים: שורה 1 - כותרת ממוזגת, שורה 2 - כותרות עמודות
+    title_row = [name] + [''] * (len(DEFAULT_HEADERS) - 1)
+    ws.update(values=[title_row, DEFAULT_HEADERS], range_name='A1')
 
-    # עיצוב כותרות
+    # עיצוב
     last_col = chr(ord('A') + len(DEFAULT_HEADERS) - 1)
+    
+    # מיזוג ועיצוב שורה 1 (כותרת ראשית)
+    ws.merge_cells(f'A1:{last_col}1')
     ws.format(f'A1:{last_col}1', {
+        'textFormat': {'bold': True, 'fontSize': 14},
+        'backgroundColor': {'red': 0.9, 'green': 0.9, 'blue': 0.9}, # אפור בהיר
+        'horizontalAlignment': 'CENTER',
+        'verticalAlignment': 'MIDDLE'
+    })
+
+    # עיצוב שורה 2 (עמודות)
+    ws.format(f'A2:{last_col}2', {
         'textFormat': {'bold': True},
         'backgroundColor': {'red': 0.8, 'green': 0.9, 'blue': 1.0},
         'horizontalAlignment': 'CENTER'
@@ -165,9 +178,19 @@ def create_folder_and_sheet_if_not_exists(project_name):
                 print(f"[Sheets] Tab already exists: '{project_name}'", flush=True)
             else:
                 ws_new = sh.add_worksheet(title=project_name, rows=1000, cols=20)
-                ws_new.update(values=[DEFAULT_HEADERS], range_name='A1')
+                title_row = [project_name] + [''] * (len(DEFAULT_HEADERS) - 1)
+                ws_new.update(values=[title_row, DEFAULT_HEADERS], range_name='A1')
+                
                 last_col = chr(ord('A') + len(DEFAULT_HEADERS) - 1)
+                
+                ws_new.merge_cells(f'A1:{last_col}1')
                 ws_new.format(f'A1:{last_col}1', {
+                    'textFormat': {'bold': True, 'fontSize': 14},
+                    'backgroundColor': {'red': 0.9, 'green': 0.9, 'blue': 0.9},
+                    'horizontalAlignment': 'CENTER',
+                    'verticalAlignment': 'MIDDLE'
+                })
+                ws_new.format(f'A2:{last_col}2', {
                     'textFormat': {'bold': True},
                     'backgroundColor': {'red': 0.8, 'green': 0.9, 'blue': 1.0},
                     'horizontalAlignment': 'CENTER'

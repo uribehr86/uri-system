@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+{% block title %}ניהול כלוב {{ cage_id }}{% endblock %}
+
+{% block content %}
+<style>
+    .cage-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    .progress-container {
+        background: rgba(255,255,255,0.1);
+        border-radius: 12px;
+        height: 24px;
+        width: 100%;
+        overflow: hidden;
+        margin-bottom: 20px;
+        position: relative;
+    }
+    .progress-bar {
+        height: 100%;
+        background: var(--accent2);
+        width: {{ (total / 50) * 100 }}%;
+        max-width: 100%;
+        transition: width 0.3s, background-color 0.3s;
+    }
+    .progress-bar.full {
+        background: var(--accent);
+    }
+    .progress-text {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 0.9rem;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+    }
+    
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .action-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        margin-top: 30px;
+    }
+    .btn-massive {
+        display: block;
+        width: 100%;
+        padding: 20px;
+        font-size: 1.2rem;
+        font-weight: bold;
+        text-align: center;
+        border-radius: 12px;
+        text-decoration: none;
+    }
+    .computer-list {
+        background: var(--card);
+        border-radius: var(--radius);
+        padding: 15px;
+        margin-top: 20px;
+    }
+    .computer-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px;
+        border-bottom: 1px solid var(--border);
+    }
+    .computer-item:last-child {
+        border-bottom: none;
+    }
+</style>
+
+<div class="main">
+    <div class="page-header cage-header">
+        <h1>ניהול כלוב {{ cage_id }}</h1>
+        <a href="{{ url_for('computers') }}" class="btn btn-ghost">חזור למלאי</a>
+    </div>
+
+    <div class="card">
+        <h3>התקדמות איסוף לכלוב ({{ total }} / 50)</h3>
+        <div class="progress-container">
+            <div class="progress-bar {% if total >= 50 %}full{% endif %}"></div>
+            <div class="progress-text">{{ total }} מתוך 50</div>
+        </div>
+        
+        <div class="stats-row">
+            <div class="stat-card blue">
+                <div class="number">{{ stats.Dell }}</div>
+                <div class="label">Dell</div>
+            </div>
+            <div class="stat-card red">
+                <div class="number">{{ stats.Lenovo }}</div>
+                <div class="label">Lenovo</div>
+            </div>
+            <div class="stat-card green">
+                <div class="number">{{ stats.HP }}</div>
+                <div class="label">HP</div>
+            </div>
+        </div>
+        
+        <div class="action-buttons">
+            <form action="{{ url_for('api_cage_verify', cage_id=cage_id) }}" method="POST" style="margin:0;">
+                <button type="submit" class="btn btn-green btn-massive">✅ הכל תואם - שמור מצב</button>
+            </form>
+            <a href="{{ url_for('cage_edit', cage_id=cage_id) }}" class="btn btn-warning btn-massive" style="background:#f59e0b; color:white;">✏️ לא תואם - ערוך / קפל מחדש</a>
+        </div>
+        
+        <div class="computer-list">
+            <h3 style="display:flex; justify-content:space-between; align-items:center;">
+                מחשבים הרשומים כרגע בכלוב:
+                <span id="checked-count" style="font-size:1rem; font-weight:normal; color:var(--text-muted);">0 / {{ computers|length }} סומנו</span>
+            </h3>
+            {% for c in computers %}
+            <div class="computer-item" style="cursor: pointer; transition: all 0.2s;" onclick="toggleCheck(this, event)">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <input type="checkbox" class="verify-checkbox" style="transform: scale(1.5);">
+                    <strong class="barcode-text">{{ c.barcode }}</strong>
+                    <span class="badge badge-blue">{{ c.mfg }}</span>
+                </div>
+            </div>
+            {% else %}
+            <p>אין מחשבים בכלוב זה.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleCheck(element, event) {
+        // Prevent double toggle if they clicked directly on the checkbox
+        if (event && event.target.tagName === 'INPUT') {
+            // Do nothing, let the browser toggle the checkbox naturally, then update styles
+            setTimeout(() => updateStyles(element), 10);
+            return;
+        }
+        
+        let cb = element.querySelector('.verify-checkbox');
+        if (cb) {
+            cb.checked = !cb.checked;
+            updateStyles(element);
+        }
+    }
+    
+    function updateStyles(element) {
+        let cb = element.querySelector('.verify-checkbox');
+        let text = element.querySelector('.barcode-text');
+        if (cb && cb.checked) {
+            element.style.backgroundColor = 'rgba(34, 197, 94, 0.15)';
+            text.style.textDecoration = 'line-through';
+            text.style.color = 'var(--text-muted)';
+        } else {
+            element.style.backgroundColor = 'transparent';
+            text.style.textDecoration = 'none';
+            text.style.color = 'var(--text)';
+        }
+        updateCount();
+    }
+    
+    function updateCount() {
+        let checked = document.querySelectorAll('.verify-checkbox:checked').length;
+        let total = document.querySelectorAll('.verify-checkbox').length;
+        let counter = document.getElementById('checked-count');
+        if (counter) {
+            counter.innerText = checked + ' / ' + total + ' סומנו';
+            if(checked === total && total > 0) {
+                counter.style.color = 'var(--success)';
+                counter.style.fontWeight = 'bold';
+            } else {
+                counter.style.color = 'var(--text-muted)';
+                counter.style.fontWeight = 'normal';
+            }
+        }
+    }
+    
+    // Add event listeners to direct checkbox clicks just in case
+    document.querySelectorAll('.verify-checkbox').forEach(cb => {
+        cb.addEventListener('change', function(e) {
+            updateStyles(this.closest('.computer-item'));
+        });
+    });
+</script>
+{% endblock %}

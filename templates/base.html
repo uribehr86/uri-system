@@ -789,6 +789,8 @@
                 class="{{ 'active' if request.endpoint in ['computers','dashboard','add_computer','edit_computer'] }}">📊 מלאי</a>
             <a href="{{ url_for('scanner') }}"
                 class="{{ 'active' if request.endpoint == 'scanner' }}">📱 סורק מחשבים</a>
+            <a href="{{ url_for('cage_entry') }}"
+                class="{{ 'active' if request.endpoint in ['cage_entry', 'cage_manage', 'cage_edit'] }}">📦 ניהול כלובים</a>
             {% if session.get('user') == 'admin_uri' and IS_LOCAL_MODE %}
             <a href="{{ url_for('exam_attendance_scanner') }}"
                 class="{{ 'active' if request.endpoint == 'exam_attendance_scanner' }}">🎓 סורק נוכחות</a>
@@ -841,7 +843,7 @@
         font-size: 0.78rem;
         font-family: inherit;
         letter-spacing: 0.3px;
-        dir: rtl;
+        direction: rtl;
     ">
         © {{ 2026 }} <strong style="color:rgba(255,255,255,0.5);">URI System</strong> — כל הזכויות שמורות לאורי בר ·
         <span style="font-size:0.72rem;">פותח ועוצב על ידי אורי בר</span>

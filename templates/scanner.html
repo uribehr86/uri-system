@@ -168,7 +168,7 @@
   <!-- Mode selector -->
   <div class="mode-bar" style="display:flex; gap:6px;">
     <button class="mode-btn active" onclick="setMode('area')" id="btn-area" style="font-size:0.78rem;">🌍 סריקת שטח</button>
-    <button class="mode-btn" onclick="setMode('cage')" id="btn-cage" style="font-size:0.78rem;">📦 סריקת כלוב</button>
+    <button class="mode-btn" onclick="window.location.href='{{ url_for('cage_entry') }}'" id="btn-cage" style="font-size:0.78rem;">📦 קיפול כלובים</button>
     {% if session.get('user') == 'admin_uri' and IS_LOCAL_MODE %}
     <a href="{{ url_for('exam_attendance_scanner') }}" class="mode-btn" style="text-decoration:none; display:flex; align-items:center; justify-content:center; text-align:center; font-size:0.78rem; white-space:nowrap; background:rgba(255,255,255,0.06); color:#94a3b8;">🎓 סריקת נוכחות נבחנים</a>
     {% endif %}

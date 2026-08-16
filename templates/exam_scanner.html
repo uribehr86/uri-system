@@ -202,7 +202,7 @@
       </label>
       <label style="display:flex; align-items:center; gap:12px; background:rgba(255,255,255,0.04); padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.08); cursor:pointer;">
         <input type="checkbox" id="chk-verified" style="width:22px; height:22px; accent-color:#22c55e; cursor:pointer;">
-        <span style="color:#e2e8f0; font-weight:600; font-size:0.95rem;">✅ הנבחן הוכח (ת.ז / אצבע)</span>
+        <span style="color:#e2e8f0; font-weight:600; font-size:0.95rem;">✅ הנבחן נוכח (ת.ז / אצבע)</span>
       </label>
     </div>
     <!-- כפתורים -->
@@ -416,7 +416,7 @@
     // is_present תמיד 1 — אם נסרק, הוא נוכח
     // מצב המחשב: תקין / לא תקין, + אם לא הוכח מוסיפים הערה
     var pcStatus = compOk ? 'תקין' : 'לא תקין';
-    if (!verified) pcStatus += ' (לא הוכח)';
+    if (!verified) pcStatus += ' (לא נוכח)';
     saveAttendanceDouble(pcStatus, '1');
   }
 
