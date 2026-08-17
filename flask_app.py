@@ -262,7 +262,7 @@ def get_db_connection():
             # IS_LOCAL_MODE נקבע לפי RENDER env var — לא משנים כאן
         db_pool_initialized = True
 
-    if IS_LOCAL_MODE or not db_pool:
+    if not db_pool:
         # Fallback to SQLite
         try:
             conn = sqlite3.connect('system_data.db', check_same_thread=False)
@@ -555,6 +555,28 @@ def israel_time_filter(dt):
         il = dt + timedelta(hours=3)
     return il.strftime('%H:%M %d/%m/%Y')
 
+@app.template_filter('israel_time_only')
+def israel_time_only_filter(dt):
+    """ממיר datetime מ-UTC לשעון ישראל (UTC+3) ומחזיר רק שעה"""
+    if not dt:
+        return ''
+    
+    from datetime import timedelta, timezone, datetime
+    if isinstance(dt, str):
+        try:
+            dt = datetime.fromisoformat(dt.replace('Z', '+00:00'))
+        except ValueError:
+            try:
+                dt = datetime.strptime(dt.split('.')[0], '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                return dt
+
+    if hasattr(dt, 'tzinfo') and dt.tzinfo is not None:
+        il = dt.astimezone(timezone(timedelta(hours=3)))
+    else:
+        il = dt + timedelta(hours=3)
+    return il.strftime('%H:%M')
+
 
 def get_auto_spec(barcode):
     """מחזיר מפרט אוטומטי לפי מספר מחשב"""
@@ -826,6 +848,34 @@ def api_change_admin_credentials():
 
 
 
+@app.route('/api/cpu-stats')
+@login_required
+def api_cpu_stats():
+    conn = get_db_connection()
+    if not conn:
+        return {"error": "db"}, 500
+    try:
+        cur = get_safe_cursor(conn)
+        cur.execute("""
+            SELECT
+                COUNT(CASE WHEN LOWER(specs) LIKE '%i5%' THEN 1 END) AS total_i5,
+                COUNT(CASE WHEN LOWER(specs) LIKE '%i7%' THEN 1 END) AS total_i7,
+                COUNT(*) AS total
+            FROM computers
+        """)
+        r = cur.fetchone()
+        cur.close()
+        return {
+            "i5": r["total_i5"],
+            "i7": r["total_i7"],
+            "total": r["total"]
+        }
+    except Exception as e:
+        return {"error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
+
 @app.route('/api/inventory-stats')
 @login_required
 def api_inventory_stats():
@@ -841,17 +891,44 @@ def api_inventory_stats():
                 COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 6001 AND 6400 THEN 1 END) AS hp2023,
                 COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 2001 AND 2200 THEN 1 END) AS hp2018,
                 COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 3001 AND 3200 THEN 1 END) AS dell_barut,
-                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 4001 AND 4400 THEN 1 END) AS lenovo
+                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 4001 AND 4400 THEN 1 END) AS lenovo,
+                -- i5/i7 breakdown for Dell 2018
+                COUNT(CASE WHEN (barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 1 AND 600)
+                                 OR (barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 1001 AND 1600)
+                                THEN CASE WHEN LOWER(specs) LIKE '%i5%' THEN 1 END END) AS dell2018_i5,
+                COUNT(CASE WHEN (barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 1 AND 600)
+                                 OR (barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 1001 AND 1600)
+                                THEN CASE WHEN LOWER(specs) LIKE '%i7%' THEN 1 END END) AS dell2018_i7,
+                -- i5/i7 breakdown for HP 2023
+                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 6001 AND 6400
+                                THEN CASE WHEN LOWER(specs) LIKE '%i5%' THEN 1 END END) AS hp2023_i5,
+                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 6001 AND 6400
+                                THEN CASE WHEN LOWER(specs) LIKE '%i7%' THEN 1 END END) AS hp2023_i7,
+                -- i5/i7 breakdown for HP 2018
+                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 2001 AND 2200
+                                THEN CASE WHEN LOWER(specs) LIKE '%i5%' THEN 1 END END) AS hp2018_i5,
+                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 2001 AND 2200
+                                THEN CASE WHEN LOWER(specs) LIKE '%i7%' THEN 1 END END) AS hp2018_i7,
+                -- i5/i7 breakdown for Dell Bagrut
+                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 3001 AND 3200
+                                THEN CASE WHEN LOWER(specs) LIKE '%i5%' THEN 1 END END) AS dell_barut_i5,
+                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 3001 AND 3200
+                                THEN CASE WHEN LOWER(specs) LIKE '%i7%' THEN 1 END END) AS dell_barut_i7,
+                -- i5/i7 breakdown for Lenovo
+                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 4001 AND 4400
+                                THEN CASE WHEN LOWER(specs) LIKE '%i5%' THEN 1 END END) AS lenovo_i5,
+                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 4001 AND 4400
+                                THEN CASE WHEN LOWER(specs) LIKE '%i7%' THEN 1 END END) AS lenovo_i7
             FROM computers WHERE barcode ~ '^[0-9]+$'
         """)
         r = cur.fetchone()
         cur.close()
         return {"items": [
-            {"name": "Dell 2018",  "spec": "i5/i7",     "count": r["dell2018"],  "capacity": 1200, "range": "1-600, 1001-1600", "color": "#4A90D9", "pct": round(r["dell2018"]  / 1200 * 100)},
-            {"name": "HP 2023",    "spec": "i7-1195G7", "count": r["hp2023"],    "capacity": 400,  "range": "6001-6400",        "color": "#34C759", "pct": round(r["hp2023"]    / 400  * 100)},
-            {"name": "HP 2018",    "spec": "i5-7200U",  "count": r["hp2018"],    "capacity": 200,  "range": "2001-2200",        "color": "#FF9500", "pct": round(r["hp2018"]    / 200  * 100)},
-            {"name": "Dell Bagrut", "spec": "i7-8550U",  "count": r["dell_barut"],"capacity": 200,  "range": "3001-3200",        "color": "#AF52DE", "pct": round(r["dell_barut"]/ 200  * 100)},
-            {"name": "Lenovo",     "spec": "i5-7200U",  "count": r["lenovo"],    "capacity": 400,  "range": "4001-4400",        "color": "#FF2D55", "pct": round(r["lenovo"]    / 400  * 100)},
+            {"name": "Dell 2018",   "spec": "i5/i7",     "count": r["dell2018"],   "capacity": 1200, "range": "1-600, 1001-1600", "color": "#4A90D9", "pct": round(r["dell2018"]   / 1200 * 100), "i5": r["dell2018_i5"],   "i7": r["dell2018_i7"]},
+            {"name": "HP 2023",     "spec": "i7-1195G7", "count": r["hp2023"],     "capacity": 400,  "range": "6001-6400",        "color": "#34C759", "pct": round(r["hp2023"]     / 400  * 100), "i5": r["hp2023_i5"],     "i7": r["hp2023_i7"]},
+            {"name": "HP 2018",     "spec": "i5-7200U",  "count": r["hp2018"],     "capacity": 200,  "range": "2001-2200",        "color": "#FF9500", "pct": round(r["hp2018"]     / 200  * 100), "i5": r["hp2018_i5"],     "i7": r["hp2018_i7"]},
+            {"name": "Dell Bagrut", "spec": "i7-8550U",  "count": r["dell_barut"], "capacity": 200,  "range": "3001-3200",        "color": "#AF52DE", "pct": round(r["dell_barut"] / 200  * 100), "i5": r["dell_barut_i5"], "i7": r["dell_barut_i7"]},
+            {"name": "Lenovo",      "spec": "i5-7200U",  "count": r["lenovo"],     "capacity": 400,  "range": "4001-4400",        "color": "#FF2D55", "pct": round(r["lenovo"]     / 400  * 100), "i5": r["lenovo_i5"],     "i7": r["lenovo_i7"]},
         ]}
     except Exception as e:
         return {"error": str(e)}, 500
