@@ -316,6 +316,7 @@
     </div>
 </div>
 
+
 <div id="inv-widget" style="margin-bottom:20px;">
     <div style="font-size:0.85rem;color:var(--muted);margin-bottom:10px;font-weight:600;">📦 מלאי לפי דגם</div>
     <div id="inv-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;">
@@ -522,7 +523,7 @@
                         {% endif %}
                     </td>
                     <td style="color: var(--accent2); font-weight: 600; font-size: 0.9rem; line-height: 1.2;">
-                        {{ c.last_technician or '—' }} <span style="font-size: 0.8em; font-weight: normal; color: var(--muted); margin-right: 4px;">{{ c.last_seen | israel_time_only if c.last_seen else '' }}</span>
+                        {{ c.last_technician or '—' }}
                     </td>
                     <td class="hide-mobile" style="color:var(--muted); font-size:0.75rem;">
                         {{ c.last_seen | israel_time if c.last_seen else '—' }}
