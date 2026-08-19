@@ -474,8 +474,19 @@ def run_startup_migrations():
     finally:
         release_db_connection(conn)
 
-with app.app_context():
-    run_startup_migrations()
+def _run_migrations_background():
+    """מריץ migrations ברקע כדי שgunicorn לא יחכה"""
+    import time
+    time.sleep(3)  # תן ל-gunicorn להתחיל קודם
+    with app.app_context():
+        try:
+            run_startup_migrations()
+            print("[OK] Startup migrations completed in background", flush=True)
+        except Exception as _me:
+            print(f"[WARNING] Startup migrations error: {_me}", flush=True)
+
+_migration_thread = threading.Thread(target=_run_migrations_background, daemon=True, name="StartupMigrations")
+_migration_thread.start()
 
 
 def get_google_creds(scopes):
@@ -520,7 +531,7 @@ def utility_processor():
             return {'manufacturer': 'Lenovo', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': 'ðŸ–¥ï¸'}
         return None
 
-    return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, get_computer_spec=get_computer_spec, APP_VERSION="v2.7.2")
+    return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, get_computer_spec=get_computer_spec, APP_VERSION="v2.7.3")
 
 
 
