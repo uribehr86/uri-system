@@ -517,7 +517,7 @@
 
                     <td style="text-align:center;">
                         {% if c.notes %}
-                        <button class="notes-btn" onclick="openNotesPopup('{{ c.notes | replace("'", "&#39;") | replace('"', '&quot;') | replace('\n', '\\n') }}')" title="לחץ לצפייה בהערה">📝</button>
+                        <button class="notes-btn" data-notes="{{ c.notes | replace('"', '&quot;') | replace('\n', '&#10;') }}" onclick="openNotesPopup(this.dataset.notes.replace(/&#10;/g,'\n'))" title="לחץ לצפייה בהערה">📝</button>
                         {% else %}
                         <span style="color:var(--muted)">—</span>
                         {% endif %}
@@ -533,7 +533,7 @@
                             style="text-decoration:none; margin-left:8px;" title="עריכה">✏️</a>
                         {% if session.get('role') == 'admin' %}
                         <form method="POST" action="{{ url_for('delete_computer', cid=c.id) }}" style="display:inline;"
-                            onsubmit="return confirm('למחוק את המחשב {{ c.barcode }}?');">
+                            onsubmit="return confirm('למחוק את המחשב ' + this.dataset.barcode + '?');" data-barcode="{{ c.barcode }}">
                             <button type="submit" style="background:none; border:none; cursor:pointer;"
                                 title="מחיקה">🗑️</button>
                         </form>

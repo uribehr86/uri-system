@@ -176,7 +176,7 @@
         renderBatchList();
     }
     
-    const initialSessionCount = {{ session_count|default(0) }};
+    const initialSessionCount = parseInt("{{ session_count|default(0) }}", 10);
     
     function updateCount() {
         const count = scannedItems.filter(x => x.checked).length;
