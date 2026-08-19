@@ -5,6 +5,8 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn flask_app:app --workers 1 --timeout 120 --bind 0.0.0.0:$PORT
     envVars:
+      - key: RENDER
+        value: true
       - key: DATABASE_URL
         sync: false
       - key: RENDER_DB_URL
@@ -17,3 +19,4 @@ services:
         sync: false
       - key: GOOGLE_SERVICE_ACCOUNT_FILE
         value: service_account.json
+
