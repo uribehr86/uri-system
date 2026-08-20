@@ -181,7 +181,7 @@ except Exception as e:
 db_pool = None
 db_pool_initialized = False
 # אם RENDER=true → ענן. אחרת → מקומי (גם אם ה-DB ענני)
-IS_LOCAL_MODE = not bool(os.getenv('RENDER'))
+IS_LOCAL_MODE = bool(os.getenv('IS_LOCAL_MODE')) or not bool(os.getenv('RENDER'))
 
 # מטמון גלובלי למניעת בדיקה כפולה איטית בגוגל שיטס
 attendance_cache = {}
@@ -232,35 +232,39 @@ def get_db_connection():
     global db_pool, db_pool_initialized, IS_LOCAL_MODE
     
     if not db_pool_initialized:
-        db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
-        if not db_url:
-            # ברירת מחדל להתחברות למסד הנתונים בענן בשרת Render
-            db_url = "postgresql://uri_system_db_user:VfsC66ho76RaIYZFYgIFZytreG3JaUtc@dpg-d6nhhuv5gffc73bkekmg-a.oregon-postgres.render.com/uri_system_db?sslmode=require"
-        if db_url:
-            if 'connect_timeout' not in db_url:
-                db_url += ('&' if '?' in db_url else '?') + 'connect_timeout=15'
-            try:
-                # Fast check: extract host and try resolving to prevent DNS blocking
-                import urllib.parse
-                parsed = urllib.parse.urlparse(db_url)
-                host = parsed.hostname
-                if host:
-                    import socket
-                    # Set a short timeout for socket calls
-                    pass  # socket timeout removed
-                    pass  # DNS pre-check removed
-                
-                db_pool = psycopg2.pool.SimpleConnectionPool(1, 15, db_url)
-                print("[OK] Database connection pool created successfully (lazy)", flush=True)
-                # IS_LOCAL_MODE נקבע לפי RENDER env var — לא משנים כאן
-            except Exception as e:
-                print(f"[FALLBACK] Cloud DB init failed: {e}. Switching to Local SQLite.", flush=True)
+        if IS_LOCAL_MODE:
+            # מצב מקומי — דלג על PostgreSQL, עבור ישירות ל-SQLite
+            db_pool = None
+            db_pool_initialized = True
+            print("[LOCAL] Running in local mode — using SQLite directly", flush=True)
+        else:
+            db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
+            if not db_url:
+                # ברירת מחדל להתחברות למסד הנתונים בענן בשרת Render
+                db_url = "postgresql://uri_system_db_user:VfsC66ho76RaIYZFYgIFZytreG3JaUtc@dpg-d6nhhuv5gffc73bkekmg-a.oregon-postgres.render.com/uri_system_db?sslmode=require"
+            if db_url:
+                if 'connect_timeout' not in db_url:
+                    db_url += ('&' if '?' in db_url else '?') + 'connect_timeout=15'
+                try:
+                    import urllib.parse
+                    parsed = urllib.parse.urlparse(db_url)
+                    host = parsed.hostname
+                    if host:
+                        import socket
+                        pass  # socket timeout removed
+                        pass  # DNS pre-check removed
+                    
+                    db_pool = psycopg2.pool.ThreadedConnectionPool(2, 20, db_url)
+                    print("[OK] Database connection pool created successfully (lazy)", flush=True)
+                    # IS_LOCAL_MODE נקבע לפי RENDER env var — לא משנים כאן
+                except Exception as e:
+                    print(f"[FALLBACK] Cloud DB init failed: {e}. Switching to Local SQLite.", flush=True)
+                    db_pool = None
+                    # IS_LOCAL_MODE נקבע לפי RENDER env var — לא משנים כאן
+            else:
                 db_pool = None
                 # IS_LOCAL_MODE נקבע לפי RENDER env var — לא משנים כאן
-        else:
-            db_pool = None
-            # IS_LOCAL_MODE נקבע לפי RENDER env var — לא משנים כאן
-        db_pool_initialized = True
+            db_pool_initialized = True
 
     if IS_LOCAL_MODE or not db_pool:
         # Fallback to SQLite
@@ -284,14 +288,24 @@ def get_db_connection():
             conn = db_pool.getconn()
         return conn
     except Exception as e:
-        print(f"[FALLBACK] Cloud DB checkout failed: {e}. Switching to Local SQLite.", flush=True)
+        print(f"[WARNING] Pool getconn failed ({e}), trying direct Postgres connection.", flush=True)
+        # נסה חיבור ישיר לפוסטגרס במקום לנפול ל-SQLite ריק
         try:
-            conn = sqlite3.connect('system_data.db', check_same_thread=False)
-            conn.row_factory = dict_factory
-            return conn
+            db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL') or \
+                "postgresql://uri_system_db_user:VfsC66ho76RaIYZFYgIFZytreG3JaUtc@dpg-d6nhhuv5gffc73bkekmg-a.oregon-postgres.render.com/uri_system_db?sslmode=require"
+            direct_conn = psycopg2.connect(db_url, connect_timeout=10)
+            direct_conn.autocommit = False
+            print("[OK] Direct Postgres connection established as fallback.", flush=True)
+            return direct_conn
         except Exception as e2:
-            print(f"[CRITICAL] All DB connections failed: {e2}")
-            return None
+            print(f"[CRITICAL] All Postgres connections failed: {e2}. Falling back to empty SQLite — DATA WILL BE EMPTY!", flush=True)
+            try:
+                conn = sqlite3.connect('system_data.db', check_same_thread=False)
+                conn.row_factory = dict_factory
+                return conn
+            except Exception as e3:
+                print(f"[CRITICAL] SQLite also failed: {e3}")
+                return None
 
 def get_safe_cursor(conn):
     if isinstance(conn, sqlite3.Connection):
