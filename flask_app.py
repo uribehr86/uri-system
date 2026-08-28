@@ -266,8 +266,8 @@ def get_db_connection():
                 # IS_LOCAL_MODE נקבע לפי RENDER env var — לא משנים כאן
             db_pool_initialized = True
 
-    if IS_LOCAL_MODE or not db_pool:
-        # Fallback to SQLite
+    if IS_LOCAL_MODE:
+        # מצב מקומי — SQLite בלבד
         try:
             conn = sqlite3.connect('system_data.db', check_same_thread=False)
             conn.row_factory = dict_factory
@@ -275,6 +275,26 @@ def get_db_connection():
         except Exception as e:
             print(f"[CRITICAL] SQLite connection failed: {e}", flush=True)
             return None
+
+    if not db_pool:
+        # ב-Render אבל הפול לא אותחל — ננסה חיבור ישיר לפוסטגרס
+        print("[WARNING] db_pool is None on Render — attempting direct Postgres connection.", flush=True)
+        try:
+            _db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL') or \
+                "postgresql://uri_system_db_user:VfsC66ho76RaIYZFYgIFZytreG3JaUtc@dpg-d6nhhuv5gffc73bkekmg-a.oregon-postgres.render.com/uri_system_db?sslmode=require"
+            direct_conn = psycopg2.connect(_db_url, connect_timeout=10)
+            direct_conn.autocommit = False
+            print("[OK] Direct Postgres connection established (pool was None).", flush=True)
+            return direct_conn
+        except Exception as e:
+            print(f"[CRITICAL] Direct Postgres also failed: {e} — DATA WILL BE EMPTY (SQLite fallback)!", flush=True)
+            try:
+                conn = sqlite3.connect('system_data.db', check_same_thread=False)
+                conn.row_factory = dict_factory
+                return conn
+            except Exception as e2:
+                print(f"[CRITICAL] SQLite also failed: {e2}", flush=True)
+                return None
             
     try:
         conn = db_pool.getconn()
