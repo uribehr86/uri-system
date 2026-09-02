@@ -2667,6 +2667,105 @@ def api_scan_stats():
         return {'today_total': today_total, 'total_computers': total_computers, 'broken': broken, 'workers': workers}
     finally: release_db_connection(conn)
 
+# ── API: ייבוא קובץ Excel תקולים ────────────────────────────────────────────────
+@app.route('/api/upload-faulty-excel', methods=['POST'])
+@login_required
+def api_upload_faulty_excel():
+    """
+    מקבל קובץ Excel של מחשבים תקולים ומעדכן את ה-DB:
+    עמודות: סוג מחשב | מספר מחשב | תקלה | בטיפול | במעבדה | תוקן
+    """
+    if 'file' not in request.files:
+        return {"success": False, "error": "לא נשלח קובץ"}, 400
+    file = request.files['file']
+    if not file or not file.filename.endswith(('.xlsx', '.xls')):
+        return {"success": False, "error": "יש להעלות קובץ Excel (.xlsx / .xls)"}, 400
+
+    try:
+        import io
+        wb = openpyxl.load_workbook(io.BytesIO(file.read()))
+        ws = wb.active
+    except Exception as e:
+        return {"success": False, "error": f"שגיאה בפתיחת הקובץ: {e}"}, 400
+
+    conn = get_db_connection()
+    if not conn:
+        return {"success": False, "error": "DB connection failed"}, 500
+
+    updated = 0
+    not_found = 0
+    errors = []
+
+    try:
+        cur = get_safe_cursor(conn)
+        # דלג על שורת כותרת
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if not row or row[1] is None:
+                continue
+            try:
+                barcode = str(int(row[1])).strip()
+            except (ValueError, TypeError):
+                continue
+
+            fault_desc  = str(row[2] or '').strip()   # תקלה
+            in_repair   = bool(row[3])                  # בטיפול אצלינו
+            in_lab      = bool(row[4])                  # במעבדה
+            fixed       = bool(row[5])                  # תוקן
+
+            # קבע סטטוס ומיקום
+            if fixed:
+                new_status   = 'תקין'
+                new_location = ''
+            elif in_lab:
+                new_status   = 'בתיקון'
+                new_location = 'במעבדה'
+            elif in_repair:
+                new_status   = 'בתיקון'
+                new_location = 'בטיפול'
+            else:
+                new_status   = 'תקול'
+                new_location = ''
+
+            # בדוק קיום מחשב
+            cur.execute("SELECT id, status, location, notes FROM computers WHERE barcode = %s", (barcode,))
+            computer = cur.fetchone()
+            if not computer:
+                not_found += 1
+                continue
+
+            cid = computer['id']
+            # עדכן
+            cur.execute("""
+                UPDATE computers
+                SET status = %s, location = %s, notes = %s, last_technician = %s
+                WHERE id = %s
+            """, (new_status, new_location, fault_desc, session.get('username'), cid))
+
+            # רשום היסטוריה
+            old_val = json.dumps({'status': computer['status'], 'location': computer['location'], 'notes': computer['notes']}, ensure_ascii=False)
+            new_val = json.dumps({'status': new_status, 'location': new_location, 'notes': fault_desc}, ensure_ascii=False)
+            cur.execute("""
+                INSERT INTO inventory_history (computer_id, technician, change_type, old_value, new_value)
+                VALUES (%s, %s, 'Excel Import', %s, %s)
+            """, (cid, session.get('username'), old_val, new_val))
+
+            updated += 1
+
+        conn.commit()
+        cur.close()
+        trigger_debounced_sync()
+        return {
+            "success": True,
+            "updated": updated,
+            "not_found": not_found,
+            "message": f"עודכנו {updated} מחשבים | לא נמצאו: {not_found}"
+        }
+    except Exception as e:
+        print(f"Error in upload_faulty_excel: {e}")
+        return {"success": False, "error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
 @app.route('/export/computers')
 @login_required
 def export_computers():

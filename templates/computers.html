@@ -360,8 +360,75 @@
     <span id="auto-sync-badge" style="font-size:0.78rem; background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.3); color:#4ade80; padding:4px 10px; border-radius:20px; margin-right:4px;">
         🔄 AUTO <span id="auto-sync-ago">...</span>
     </span>
+    <button onclick="document.getElementById('excel-upload-modal').style.display='flex'"
+        style="background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.4);color:#fbbf24;padding:9px 16px;border-radius:8px;font-weight:800;cursor:pointer;font-size:0.85rem;">
+        📥 ייבוא תקולים מ-Excel
+    </button>
 </div>
 {% endif %}
+
+<!-- ── Excel Upload Modal ── -->
+<div id="excel-upload-modal" dir="rtl" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;">
+    <div style="background:linear-gradient(135deg,#0f1f4a,#0a1530);border:1px solid rgba(251,191,36,0.4);border-radius:18px;padding:32px 28px;max-width:460px;width:90%;box-shadow:0 0 50px rgba(251,191,36,0.15);">
+        <h2 style="margin:0 0 8px;color:#fbbf24;font-size:1.3rem;">📥 ייבוא מחשבים תקולים מ-Excel</h2>
+        <p style="color:#94a3b8;font-size:0.88rem;margin-bottom:20px;">
+            הקובץ חייב לכלול עמודות:<br>
+            <strong style="color:#e2e8f0;">סוג מחשב | מספר מחשב | תקלה | בטיפול | במעבדה | תוקן</strong>
+        </p>
+        <input type="file" id="excel-file-input" accept=".xlsx,.xls"
+            style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:white;padding:10px;border-radius:8px;width:100%;box-sizing:border-box;margin-bottom:16px;cursor:pointer;">
+        <div id="excel-upload-result" style="display:none;padding:12px;border-radius:8px;margin-bottom:16px;font-weight:700;font-size:0.9rem;"></div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button onclick="document.getElementById('excel-upload-modal').style.display='none';document.getElementById('excel-upload-result').style.display='none';"
+                style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#94a3b8;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:700;">
+                ✕ סגור
+            </button>
+            <button onclick="uploadFaultyExcel()"
+                style="background:linear-gradient(135deg,#f59e0b,#d97706);border:none;color:white;padding:10px 24px;border-radius:8px;cursor:pointer;font-weight:800;font-size:0.95rem;">
+                📤 העלה ועדכן
+            </button>
+        </div>
+    </div>
+</div>
+<script>
+async function uploadFaultyExcel() {
+    const fileInput = document.getElementById('excel-file-input');
+    const resultBox = document.getElementById('excel-upload-result');
+    if (!fileInput.files[0]) {
+        resultBox.style.display = 'block';
+        resultBox.style.background = 'rgba(239,68,68,0.15)';
+        resultBox.style.color = '#f87171';
+        resultBox.textContent = '⚠️ יש לבחור קובץ קודם';
+        return;
+    }
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    resultBox.style.display = 'block';
+    resultBox.style.background = 'rgba(99,102,241,0.15)';
+    resultBox.style.color = '#a5b4fc';
+    resultBox.textContent = '⏳ מעלה ומעדכן...';
+    try {
+        const res = await fetch('/api/upload-faulty-excel', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+            resultBox.style.background = 'rgba(34,197,94,0.15)';
+            resultBox.style.color = '#4ade80';
+            resultBox.textContent = '✅ ' + data.message;
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            resultBox.style.background = 'rgba(239,68,68,0.15)';
+            resultBox.style.color = '#f87171';
+            resultBox.textContent = '❌ ' + (data.error || 'שגיאה לא ידועה');
+        }
+    } catch(e) {
+        resultBox.style.background = 'rgba(239,68,68,0.15)';
+        resultBox.style.color = '#f87171';
+        resultBox.textContent = '❌ שגיאת רשת: ' + e.message;
+    }
+}
+</script>
+
+
 
 <div class="card">
     <form method="GET" class="search-bar" style="margin-bottom: 12px; gap: 8px;">
