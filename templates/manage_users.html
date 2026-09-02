@@ -19,6 +19,17 @@
             0%, 100% { opacity: 1; box-shadow: 0 0 6px #22c55e; }
             50% { opacity: 0.6; box-shadow: 0 0 12px #22c55e; }
         }
+        .pass-wrap { position: relative; }
+        .pass-wrap .form-control { padding-left: 40px; }
+        .eye-btn {
+            position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+            background: none; border: none; cursor: pointer;
+            color: #64748b; font-size: 1.05rem;
+            display: flex; align-items: center; padding: 4px;
+            transition: color .2s;
+            z-index: 2;
+        }
+        .eye-btn:hover { color: #94a3b8; }
     </style>
 </head>
 <body>
@@ -145,11 +156,17 @@
                 </div>
                 <div class="col-md-4">
                     <label class="form-label small text-white-50 fw-bold">סיסמה חדשה</label>
-                    <input type="password" id="new_admin_pass" class="form-control py-2" placeholder="השאר ריק לא לשנות" autocomplete="new-password">
+                    <div class="pass-wrap">
+                        <input type="password" id="new_admin_pass" class="form-control py-2" placeholder="השאר ריק לא לשנות" autocomplete="new-password">
+                        <button type="button" class="eye-btn" onclick="togglePass('new_admin_pass', this)" title="הצג/הסתר סיסמה">👁️</button>
+                    </div>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label small text-white-50 fw-bold">אישור סיסמה</label>
-                    <input type="password" id="confirm_admin_pass" class="form-control py-2" placeholder="חזור על הסיסמה" autocomplete="new-password">
+                    <div class="pass-wrap">
+                        <input type="password" id="confirm_admin_pass" class="form-control py-2" placeholder="חזור על הסיסמה" autocomplete="new-password">
+                        <button type="button" class="eye-btn" onclick="togglePass('confirm_admin_pass', this)" title="הצג/הסתר סיסמה">👁️</button>
+                    </div>
                 </div>
             </div>
             <div class="mt-3 d-flex align-items-center gap-3">
@@ -371,6 +388,13 @@
                 else { alert('שגיאה: ' + (res.error || 'לא ידוע')); }
             });
         }
+
+        function togglePass(inputId, btn) {
+            const inp = document.getElementById(inputId);
+            const show = inp.type === 'password';
+            inp.type = show ? 'text' : 'password';
+            btn.textContent = show ? '🙈' : '👁️';
+        }
     </script>
 
 <!-- מודאל עריכת משתמש -->
@@ -385,8 +409,11 @@
     </div>
     <div class="mb-3">
         <label style="font-size:0.78rem;color:#94a3b8;font-weight:700;display:block;margin-bottom:5px;">סיסמה חדשה <span style="color:#64748b;">(השאר ריק לא לשנות)</span></label>
-        <input type="password" id="edit-modal-password" autocomplete="new-password" placeholder="••••••"
-            style="width:100%;background:#0f172a;color:#fff;border:1px solid #475569;border-radius:10px;padding:10px;font-size:0.95rem;box-sizing:border-box;">
+        <div style="position:relative;">
+            <input type="password" id="edit-modal-password" autocomplete="new-password" placeholder="••••••"
+                style="width:100%;background:#0f172a;color:#fff;border:1px solid #475569;border-radius:10px;padding:10px;padding-left:40px;font-size:0.95rem;box-sizing:border-box;">
+            <button type="button" class="eye-btn" onclick="togglePass('edit-modal-password', this)" title="הצג/הסתר סיסמה">👁️</button>
+        </div>
     </div>
     <div class="mb-3">
         <label style="font-size:0.78rem;color:#94a3b8;font-weight:700;display:block;margin-bottom:5px;">הרשאה</label>
