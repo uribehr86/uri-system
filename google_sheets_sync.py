@@ -392,6 +392,16 @@ def import_from_sheets():
             "notes": 8,
         }
 
+        # בדיקת בטיחות: אם הגיליון מכיל פחות מ-50% ממה שיש ב-DB
+        # כנראה שהגיליון טרם סונכרן — לא מסמנים מחיקות!
+        sheet_count = len(sheet_barcodes)
+        db_count = len(db_rows)
+        if db_count > 5 and sheet_count < db_count * 0.5:
+            conn.commit()
+            cur.close()
+            conn.close()
+            return False, f"גיליון נראה לא מעודכן ({sheet_count} שורות לעומת {db_count} ב-DB) — ייבוא בוטל למניעת מחיקות שגויות.", {}
+
         for db_row in db_rows:
             bc = db_row['barcode'] if not is_sqlite else db_row[1]
             db_id = db_row['id'] if not is_sqlite else db_row[0]
@@ -403,6 +413,7 @@ def import_from_sheets():
                     upd = upd.replace('%s', '?').replace('TRUE', '1')
                 cur.execute(upd, (db_id,))
                 stats["delete_flagged"] += 1
+
             else:
                 sheet_row = sheet_rows_by_barcode[bc]
                 updates = []

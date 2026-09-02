@@ -14,9 +14,8 @@ import os
 import threading
 from dotenv import load_dotenv
 from functools import wraps
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import json
-import io
 import base64
 import qrcode
 import re
@@ -84,7 +83,6 @@ _poller_thread = threading.Thread(target=_auto_import_loop, daemon=True, name="S
 _poller_thread.start()
 print("[AUTO-SYNC] ðŸ”„ Auto-poller הופעל â€” יסנכרן שיטסâ†’אתר כל 3 דקות", flush=True)
 
-
 # ── DB STORAGE MONITOR: checks DB size every hour ──────────────────────────
 DB_SIZE_LIMIT_GB = 10.0  # plan limit in GB
 
@@ -126,7 +124,6 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'uri_system_2026')
 
-from datetime import timedelta
 app.permanent_session_lifetime = timedelta(days=365)
 app.config['SESSION_COOKIE_SECURE']   = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -169,10 +166,18 @@ def refresh_session():
         print(f'[BEFORE_REQUEST ERROR] {_ex}', flush=True)
         session.clear()
 
-
 # Initialize Google AI (Gemini)
 try:
-    genai_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+    # New google-genai SDK (preferred)
+    if genai is not None and hasattr(genai, 'Client'):
+        genai_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+    elif genai is not None:
+        # Old google-generativeai SDK fallback
+        genai_client = genai.GenerativeModel('gemini-2.0-flash')
+        genai_client._legacy_mode = True
+    else:
+        genai_client = None
+        print("[WARNING] Google AI (genai) not installed — AI features disabled")
 except Exception as e:
     print(f"[WARNING] Google AI init failed: {e}")
     genai_client = None
@@ -185,7 +190,6 @@ IS_LOCAL_MODE = bool(os.getenv('IS_LOCAL_MODE')) or not bool(os.getenv('RENDER')
 
 # מטמון גלובלי למניעת בדיקה כפולה איטית בגוגל שיטס
 attendance_cache = {}
-
 
 class SafeCursor:
     """Wrapper for cursor to handle %s -> ? translation for SQLite"""
@@ -251,8 +255,6 @@ def get_db_connection():
                     host = parsed.hostname
                     if host:
                         import socket
-                        pass  # socket timeout removed
-                        pass  # DNS pre-check removed
                     
                     db_pool = psycopg2.pool.ThreadedConnectionPool(2, 20, db_url)
                     print("[OK] Database connection pool created successfully (lazy)", flush=True)
@@ -345,13 +347,6 @@ def release_db_connection(conn):
                 conn.close()
             except:
                 pass
-
-
-@app.teardown_appcontext
-def close_db(error):
-    # This ensures connections are released if forgotten, 
-    # though it's better to do it manually in routes.
-    pass
 
 def run_startup_migrations():
     """הוספת עמודות חדשות למסד אם עדיין לא קיימות"""
@@ -522,7 +517,6 @@ def _run_migrations_background():
 _migration_thread = threading.Thread(target=_run_migrations_background, daemon=True, name="StartupMigrations")
 _migration_thread.start()
 
-
 def get_google_creds(scopes):
     """Load Google credentials from env var (Render) or local file."""
     from google.oauth2.service_account import Credentials
@@ -537,7 +531,6 @@ def get_google_creds(scopes):
     if os.path.exists(sa_file):
         return Credentials.from_service_account_file(sa_file, scopes=scopes)
     raise FileNotFoundError(f"Google credentials not found. Set GOOGLE_SERVICE_ACCOUNT_JSON on Render.")
-
 
 @app.context_processor
 def utility_processor():
@@ -567,8 +560,6 @@ def utility_processor():
 
     return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, get_computer_spec=get_computer_spec, APP_VERSION="v2.7.3")
 
-
-
 @app.template_filter('format_history')
 def format_history_filter(val_str):
     return format_history(val_str)
@@ -583,7 +574,6 @@ def israel_time_filter(dt):
     if not dt:
         return '—'
     
-    from datetime import timedelta, timezone, datetime
     if isinstance(dt, str):
         try:
             # Handle possible ISO format or SQL format
@@ -599,7 +589,6 @@ def israel_time_filter(dt):
     else:
         il = dt + timedelta(hours=3)
     return il.strftime('%H:%M %d/%m/%Y')
-
 
 def get_auto_spec(barcode):
     """מחזיר מפרט אוטומטי לפי מספר מחשב"""
@@ -621,16 +610,16 @@ def get_auto_spec(barcode):
         return '11th Gen Intel(R) Core(TM) i7-1195G7 @ 2.90GHz'
     return ''
 
-
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user' not in session: return redirect(url_for('login', next=request.url))
+        session.permanent = True
         return f(*args, **kwargs)
     return decorated_function
 
 def local_only(f):
-    """חוסם גישה ל-route כאשר רצים על Render (אינטרנט) â€” רק לשימוש מקומי"""
+    """חוסם גישה ל-route כאשר רצים על Render (אינטרנט) — רק לשימוש מקומי"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not IS_LOCAL_MODE:
@@ -668,9 +657,6 @@ def login():
         password = request.form.get('password', '').strip()
         
         # בדוק admin_uri מהמסד תחילה (אם קיים שם) â€” אחרת fallback לקשיח
-        admin_matched = False
-        if username.lower() in ("uri", "admin_uri") or True:  # always try DB first for any user
-            pass  # falls through to DB check below
 
         # Hardcoded super-admin fallback (only if DB has no custom admin record)
         if username.lower() in ("uri", "admin_uri"):
@@ -809,7 +795,6 @@ def register():
 def portal():
     return render_template('portal.html')
 
-
 # â”€â”€ API: שינוי פרטי כניסה של admin_uri â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.route('/api/change-admin-credentials', methods=['POST'])
 @login_required
@@ -868,8 +853,6 @@ def api_change_admin_credentials():
         return {"success": False, "error": str(e)}, 500
     finally:
         release_db_connection(conn)
-
-
 
 @app.route('/api/inventory-stats')
 @login_required
@@ -1198,8 +1181,6 @@ def exam_page():
     finally:
         release_db_connection(conn)
 
-import re
-
 @app.route('/history')
 @login_required
 def history_page():
@@ -1525,29 +1506,34 @@ def api_ai_chat():
         משתמש נוכחי: {session.get('username')}
         """
         
-        response = genai_client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=[system_prompt, user_msg]
-        )
-        
         # Try Claude Sonnet first, fallback to Gemini
         anthropic_key = os.getenv('ANTHROPIC_API_KEY')
         if anthropic_key:
-            import anthropic
-            client = anthropic.Anthropic(api_key=anthropic_key)
-            msg = client.messages.create(
-                model='claude-sonnet-4-5',
-                max_tokens=1024,
-                system=system_prompt,
-                messages=[{'role': 'user', 'content': user_msg}]
-            )
-            return {'response': msg.content[0].text}
+            try:
+                import anthropic
+                client = anthropic.Anthropic(api_key=anthropic_key)
+                msg = client.messages.create(
+                    model='claude-sonnet-4-5',
+                    max_tokens=1024,
+                    system=system_prompt,
+                    messages=[{'role': 'user', 'content': user_msg}]
+                )
+                return {'response': msg.content[0].text}
+            except Exception as anthropic_err:
+                print(f"[AI] Anthropic failed ({anthropic_err}), falling back to Gemini")
+
+        # Fallback: Gemini
+        if not genai_client:
+            return {'response': 'מערכת ה-AI אינה זמינה כרגע (מפתח API חסר)'}, 503
+        if getattr(genai_client, '_legacy_mode', False):
+            # Old SDK
+            response = genai_client.generate_content([system_prompt, user_msg])
         else:
             response = genai_client.models.generate_content(
                 model='gemini-2.0-flash',
                 contents=[system_prompt, user_msg]
             )
-            return {'response': response.text}
+        return {'response': response.text}
         
     except Exception as e:
         print(f"AI Error: {e}")
@@ -1629,7 +1615,6 @@ def api_batch_delete():
     finally:
         release_db_connection(conn)
 
-
 # â”€â”€ API: Google Sheets Sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.route('/api/sync-to-sheets', methods=['POST'])
 @login_required
@@ -1645,7 +1630,6 @@ def api_sync_to_sheets():
     else:
         return {"success": False, "error": message}, 500
 
-
 @app.route('/api/find-duplicates', methods=['GET'])
 @login_required
 def api_find_duplicates():
@@ -1655,9 +1639,9 @@ def api_find_duplicates():
     try:
         cur = get_safe_cursor(conn)
         cur.execute("""
-            SELECT computer_number, COUNT(*) as cnt
+            SELECT barcode, COUNT(*) as cnt
             FROM computers
-            GROUP BY computer_number
+            GROUP BY barcode
             HAVING COUNT(*) > 1
             ORDER BY cnt DESC
         """)
@@ -1665,16 +1649,15 @@ def api_find_duplicates():
         duplicates = []
         for r in rows:
             if hasattr(r, 'keys'):
-                duplicates.append({'computer_number': r['computer_number'], 'count': r['cnt']})
+                duplicates.append({'barcode': r['barcode'], 'count': r['cnt']})
             else:
-                duplicates.append({'computer_number': r[0], 'count': r[1]})
+                duplicates.append({'barcode': r[0], 'count': r[1]})
         cur.close()
         return jsonify({"success": True, "duplicates": duplicates, "total": len(duplicates)})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
     finally:
         release_db_connection(conn)
-
 
 @app.route('/api/delete-duplicates', methods=['POST'])
 @login_required
@@ -1689,9 +1672,9 @@ def api_delete_duplicates():
         cur.execute("""
             DELETE FROM computers
             WHERE id NOT IN (
-                SELECT DISTINCT ON (computer_number) id
+                SELECT DISTINCT ON (barcode) id
                 FROM computers
-                ORDER BY computer_number, last_scan DESC NULLS LAST
+                ORDER BY barcode, scan_time DESC NULLS LAST
             )
         """)
         deleted = cur.rowcount
@@ -1704,7 +1687,6 @@ def api_delete_duplicates():
     finally:
         release_db_connection(conn)
 
-
 # â”€â”€ API: ייבוא מגוגל שיטס â†’ מסד (רק admin) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.route('/api/import-from-sheets', methods=['POST'])
 @login_required
@@ -1714,7 +1696,6 @@ def api_import_from_sheets():
     from google_sheets_sync import import_from_sheets
     success, message, stats = import_from_sheets()
     return {"success": success, "message": message, "stats": stats}
-
 
 # â”€â”€ API: אישור מחיקה סופית (רק admin) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.route('/api/approve-sheets-delete', methods=['POST'])
@@ -1770,7 +1751,6 @@ def api_approve_sheets_delete():
         return {"success": False, "error": str(e)}, 500
     finally:
         release_db_connection(conn)
-
 
 # â”€â”€ API: שליפת מידע כלוב â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.route('/api/cage/<cage_id>', methods=['GET'])
@@ -2118,7 +2098,6 @@ def api_cage_mark_returned(cage_id):
         
     return redirect(url_for('cage_manage', cage_id=cage_id))
 
-
 # â”€â”€ API: סריקה מהירה (ללא חלון) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.route('/api/fast-scan', methods=['POST'])
 @login_required
@@ -2177,8 +2156,10 @@ def api_fast_scan():
             fields_to_update.extend(["scan_time = NOW()", "last_technician = %s"])
             params.extend([technician, old_val['id']])
             
-            query = f"UPDATE computers SET {', '.join(fields_to_update)} WHERE id = %s RETURNING *"
+            query = f"UPDATE computers SET {', '.join(fields_to_update)} WHERE id = %s"
+            # RETURNING * is not supported in SQLite; fetch separately
             cur.execute(query, params)
+            cur.execute("SELECT * FROM computers WHERE id = %s", (old_val['id'],))
             new_computer = cur.fetchone()
             
             cur.execute("SELECT technician, timestamp FROM inventory_history WHERE computer_id = %s ORDER BY timestamp DESC LIMIT 1", (new_computer['id'],))
@@ -2210,8 +2191,14 @@ def api_fast_scan():
                 params.append('תקין')
                 
             placeholders = ', '.join(['%s'] * len(fields))
-            query = f"INSERT INTO computers ({', '.join(fields)}) VALUES ({placeholders}) RETURNING *"
+            query = f"INSERT INTO computers ({', '.join(fields)}) VALUES ({placeholders})"
             cur.execute(query, params)
+            # RETURNING * is not supported in SQLite; use lastrowid fallback
+            last_id = cur.lastrowid if hasattr(cur, 'lastrowid') else None
+            if last_id:
+                cur.execute("SELECT * FROM computers WHERE id = %s", (last_id,))
+            else:
+                cur.execute("SELECT * FROM computers WHERE barcode = %s ORDER BY id DESC LIMIT 1", (barcode,))
             new_computer = cur.fetchone()
 
         cur.execute("""
@@ -2243,7 +2230,6 @@ def api_fast_scan():
         return {"success": False, "error": str(e)}, 500
     finally:
         release_db_connection(conn)
-
 
 @app.route('/api/admin_approve_delete', methods=['POST'])
 @login_required
@@ -2392,7 +2378,6 @@ def api_update_user():
     finally:
         release_db_connection(conn)
 
-
 @app.route('/api/update_user_password', methods=['POST'])
 @login_required
 def api_update_user_password():
@@ -2416,7 +2401,6 @@ def api_update_user_password():
         return {"success": False, "error": str(e)}, 500
     finally:
         release_db_connection(conn)
-
 
 @app.route('/api/update_user_role', methods=['POST'])
 @login_required
@@ -2443,7 +2427,6 @@ def api_update_user_role():
         return {"success": False, "error": str(e)}, 500
     finally:
         release_db_connection(conn)
-
 
 @app.route('/api/delete_user/<username>', methods=['DELETE'])
 @login_required
@@ -2543,13 +2526,24 @@ def api_pack_cage_photo():
     try:
         # Call Gemini Vision
         prompt = "Look at the handwritten numbers written in white on the edges of the laptops in the cage. Extract all of them. Return ONLY a JSON array of strings (e.g. [\"1064\", \"366\", \"1480\"]). Do not add any markdown, comments, or other text."
-        response = genai_client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=[
-                genai.types.Part.from_bytes(data=image_data, mime_type="image/jpeg"),
-                prompt
-            ]
-        )
+
+        if not genai_client:
+            return {"success": False, "error": "מפתח GOOGLE_API_KEY חסר — תכונת זיהוי תמונה לא זמינה"}, 503
+
+        if getattr(genai_client, '_legacy_mode', False):
+            # Old google-generativeai SDK
+            import PIL.Image
+            img_pil = PIL.Image.open(io.BytesIO(image_data))
+            response = genai_client.generate_content([prompt, img_pil])
+        else:
+            # New google-genai SDK
+            response = genai_client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=[
+                    genai.types.Part.from_bytes(data=image_data, mime_type="image/jpeg"),
+                    prompt
+                ]
+            )
         
         try:
             # Clean response text just in case Gemini adds markdown
@@ -2988,9 +2982,6 @@ def exam_attendance_import():
         flash(f"שגיאה בייבוא: {e}", "danger")
     return redirect(url_for('exam_attendance'))
 
-
-
-
 @app.route('/api/generate-word-docs', methods=['POST'])
 @login_required
 def generate_word_docs():
@@ -3349,7 +3340,6 @@ def generate_word_docs():
                 run_seat.font.bold = True
                 run_seat.font.name = 'Tahoma'
 
-
             # DEBUG: שמור כל מסמך נפרד לבדיקה (רק בהרצה מקומית, כדי למנוע קריסה ב-Render)
             if IS_LOCAL_MODE:
                 try:
@@ -3647,7 +3637,6 @@ def api_check_computer_used():
         print(f"[check-computer-used] Error: {ex}", flush=True)
         return jsonify({"in_use": False})
 
-
 @app.route('/api/exam-scan-double', methods=['POST'])
 @local_only
 @login_required
@@ -3907,15 +3896,13 @@ def api_exam_scan_double():
 
     return jsonify({"success": True})
 
-
-
 @app.route('/api/undo-last-scan', methods=['POST'])
 @login_required
 def undo_last_scan():
     """ביטול סריקה אחרונה וניקוי סטטוס נוכחות בגוגל שיטס"""
     global attendance_cache
     try:
-        import gspread, os
+        import gspread
         from google.oauth2.service_account import Credentials
         scopes   = ['https://www.googleapis.com/auth/spreadsheets',
                     'https://www.googleapis.com/auth/drive']
@@ -4072,7 +4059,6 @@ def exam_attendance_clear():
 def exam_attendance_scanner():
     """עמוד סריקת נוכחות"""
     return render_template('exam_scanner.html')
-
 
 @app.route('/logout')
 def logout():
@@ -4290,7 +4276,6 @@ def cage_info_page(cage_id):
     finally:
         release_db_connection(conn)
 
-
 @app.route('/cages/print/<cage_id>')
 @login_required
 def print_cage_page(cage_id):
@@ -4328,8 +4313,6 @@ def print_cage_page(cage_id):
         return f"<h1>Error: {e}</h1>", 500
     finally:
         release_db_connection(conn)
-
-
 
 # --- End of Routes ---
 
