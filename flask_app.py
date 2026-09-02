@@ -53,35 +53,25 @@ def trigger_debounced_sync():
     _sync_timer = Timer(5.0, sync_inventory_to_sheets)
     _sync_timer.start()
 
-# â”€â”€ AUTO-POLLER: שיטס â†’ אתר כל 3 דקות â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── AUTO-POLLER: סנכרון אוטומטי הוסר ──────────────────────────────────────────
 def _auto_import_loop():
-    """לולאה ברקע: כל 3 דקות מושכת שינויים מגוגל שיטס לאתר"""
+    """לולאה ברקע: מושבתת"""
     import time
     global _last_sheets_import
     # המתן 30 שניות לפני הריצה הראשונה (לתת ל-Flask להתייצב)
     time.sleep(30)
     while True:
         try:
-            from google_sheets_sync import import_from_sheets
-            success, msg, stats = import_from_sheets()
-            _last_sheets_import = datetime.now()
-            if success:
-                updated = stats.get('updated', 0)
-                if updated > 0:
-                    print(f"[AUTO-SYNC] âœ… {_last_sheets_import.strftime('%H:%M:%S')} â€” עודכנו {updated} רשומות מגיליון שיטס", flush=True)
-                    trigger_debounced_sync()
-                else:
-                    print(f"[AUTO-SYNC] â³ {_last_sheets_import.strftime('%H:%M:%S')} â€” אין שינויים בשיטס", flush=True)
-            else:
-                print(f"[AUTO-SYNC] âš ï¸ {msg}", flush=True)
+            # הסנכרון הוסר
+            pass
         except Exception as ex:
-            print(f"[AUTO-SYNC] âŒ שגיאה: {ex}", flush=True)
+            print(f"[AUTO-SYNC] ❌ שגיאה: {ex}", flush=True)
         time.sleep(180)  # 3 דקות
 
 # הפעל את הפולר בתחילת האפליקציה
 _poller_thread = threading.Thread(target=_auto_import_loop, daemon=True, name="SheetsAutoPoller")
 _poller_thread.start()
-print("[AUTO-SYNC] ðŸ”„ Auto-poller הופעל â€” יסנכרן שיטסâ†’אתר כל 3 דקות", flush=True)
+print("[AUTO-SYNC] 🔄 Auto-poller הופעל — סנכרון אוטומטי הוסר", flush=True)
 
 # ── DB STORAGE MONITOR: checks DB size every hour ──────────────────────────
 DB_SIZE_LIMIT_GB = 10.0  # plan limit in GB
@@ -547,15 +537,15 @@ def utility_processor():
         except (ValueError, TypeError):
             return None
         if 1 <= num <= 600:
-            return {'manufacturer': 'Dell', 'cpu': 'i7-8550U @ 1.80GHz', 'ram': '32GB', 'icon': 'ðŸ–¥ï¸'}
+            return {'manufacturer': 'Dell', 'cpu': 'i7-8550U @ 1.80GHz', 'ram': '32GB', 'icon': '💻'}
         elif 1001 <= num <= 1600:
-            return {'manufacturer': 'HP', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': 'ðŸ–¥ï¸'}
+            return {'manufacturer': 'HP', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': '💻'}
         elif 2001 <= num <= 2400:
-            return {'manufacturer': 'HP', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': 'ðŸ–¥ï¸'}
+            return {'manufacturer': 'HP', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': '💻'}
         elif 3001 <= num <= 3200:
-            return {'manufacturer': 'Dell', 'cpu': 'i7-8550U @ 1.80GHz', 'ram': '16GB', 'icon': 'ðŸ–¥ï¸'}
+            return {'manufacturer': 'Dell', 'cpu': 'i7-8550U @ 1.80GHz', 'ram': '16GB', 'icon': '💻'}
         elif 4001 <= num <= 4300:
-            return {'manufacturer': 'Lenovo', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': 'ðŸ–¥ï¸'}
+            return {'manufacturer': 'Lenovo', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': '💻'}
         return None
 
     return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, get_computer_spec=get_computer_spec, APP_VERSION="v2.7.3")
@@ -656,7 +646,7 @@ def login():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
         
-        # בדוק admin_uri מהמסד תחילה (אם קיים שם) â€” אחרת fallback לקשיח
+        # בדוק admin_uri מהמסד תחילה (אם קיים שם) — אחרת fallback לקשיח
 
         # Hardcoded super-admin fallback (only if DB has no custom admin record)
         if username.lower() in ("uri", "admin_uri"):
@@ -795,7 +785,7 @@ def register():
 def portal():
     return render_template('portal.html')
 
-# â”€â”€ API: שינוי פרטי כניסה של admin_uri â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── API: שינוי פרטי כניסה של admin_uri ─────────────────────────────────────────
 @app.route('/api/change-admin-credentials', methods=['POST'])
 @login_required
 def api_change_admin_credentials():
@@ -928,7 +918,7 @@ def computers():
     sort_dir = 'ASC' if direction == 'asc' else 'DESC'
     
     conn = get_db_connection()
-    if not conn: return "<h1>âš ï¸ המערכת לא מצליחה להתחבר לענן. בדוק חיבור אינטרנט.</h1>"
+    if not conn: return "<h1>⚠️ המערכת לא מצליחה להתחבר לענן. בדוק חיבור אינטרנט.</h1>"
     try:
         cur = get_safe_cursor(conn)
         
@@ -1049,7 +1039,7 @@ def add_computer():
 
             if existing and not force_update:
                 existing_cage = existing['cage_number'] or 'לא ידוע'
-                flash(f"âš ï¸ מחשב {barcode} כבר קיים בכלוב {existing_cage}", "warning")
+                flash(f"⚠️ מחשב {barcode} כבר קיים בכלוב {existing_cage}", "warning")
                 return render_template('computer_form.html', action='add', computer=None,
                                        existing_barcode=barcode, existing_cage=existing_cage,
                                        existing_id=existing['id'], prefill=data)
@@ -1215,7 +1205,7 @@ def history_page():
     finally:
         release_db_connection(conn)
 
-# â”€â”€ SHARED SCAN SESSION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── SHARED SCAN SESSION ────────────────────────────────────────────────────────
 # מאפשר לטכנאי אחד להגדיר הגדרות, והשאר מצטרפים עם קוד קצר
 import random
 import string
@@ -1240,7 +1230,7 @@ def _cleanup_old_sessions():
 @app.route('/api/shared-session/create', methods=['POST'])
 @login_required
 def create_shared_session():
-    """יוצר session חדש עם הגדרות â€” מחזיר קוד קצר לשיתוף"""
+    """יוצר session חדש עם הגדרות — מחזיר קוד קצר לשיתוף"""
     _cleanup_old_sessions()
     data = request.json or {}
     settings = {
@@ -1294,7 +1284,7 @@ def close_shared_session(code):
         if _shared_sessions[code]['owner'] == session.get('username'):
             del _shared_sessions[code]
     return {'success': True}
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─────────────────────────────────────────────────────────────────────────────
 
 @app.route('/api/process-scan', methods=['POST'])
 @login_required
@@ -1304,7 +1294,7 @@ def process_scan():
         return {"error": "No barcode provided"}, 400
     barcode = re.sub(r'^0+(?=\d)', '', barcode)
 
-    # â”€â”€ חסימת QR קודים של נבחנים â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── חסימת QR קודים של נבחנים ────────────────────────────────────────────────
     # מזהים: מכיל | (pipe) עם נתוני בחינה, מילות מפתח של מבחן/ערעור/נבחן
     EXAM_KEYWORDS = ['במבחן', 'ערעור', 'נבחן', 'בחינה', 'תעודה']
     is_exam_qr = (
@@ -1314,19 +1304,19 @@ def process_scan():
     if is_exam_qr:
         print(f"[BLOCKED] Examinee QR rejected: {barcode[:30]}...")
         return {
-            "error": "âŒ QR זה שייך לנבחן â€” לא ניתן לסרוק אותו כמחשב!",
+            "error": "❌ QR זה שייך לנבחן — לא ניתן לסרוק אותו כמחשב!",
             "blocked": True
         }, 400
-    # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ─────────────────────────────────────────────────────────────────────────────
 
-    # â”€â”€ ולידציה: ברקוד חייב להיות מספרי בלבד ובטווח 1-9999 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── ולידציה: ברקוד חייב להיות מספרי בלבד ובטווח 1-9999 ────────────────────────
     if not barcode.isdigit() or not (1 <= int(barcode) <= 9999):
         print(f"[BLOCKED] Invalid barcode rejected: '{barcode}'")
         return {
-            "error": "âŒ הברקוד דפוק",
+            "error": "❌ הברקוד דפוק",
             "blocked": True
         }, 400
-    # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ─────────────────────────────────────────────────────────────────────────────
 
     conn = get_db_connection()
     if not conn: return {"error": "DB connection failed"}, 500
@@ -1473,7 +1463,7 @@ def api_update_computer():
     finally:
         release_db_connection(conn)
 
-# â”€â”€ AI ASSISTANT (GEMINI) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── AI ASSISTANT (GEMINI) ────────────────────────────────────────────────────
 @app.route('/api/ai-chat', methods=['POST'])
 @login_required
 def api_ai_chat():
@@ -1541,7 +1531,7 @@ def api_ai_chat():
     finally:
         release_db_connection(conn)
 
-# â”€â”€ API: Batch Operations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── API: Batch Operations ──────────────────────────────────────────────────
 @app.route('/api/batch-update', methods=['POST'])
 @login_required
 def api_batch_update():
@@ -1687,15 +1677,12 @@ def api_delete_duplicates():
     finally:
         release_db_connection(conn)
 
-# â”€â”€ API: ייבוא מגוגל שיטס â†’ מסד (רק admin) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+# -- API: import-from-sheets removed --
 @app.route('/api/import-from-sheets', methods=['POST'])
 @login_required
 def api_import_from_sheets():
-    if session.get('role') != 'admin' and session.get('user') != 'admin_uri':
-        return {"success": False, "error": "גישה מותרת לאדמין בלבד"}, 403
-    from google_sheets_sync import import_from_sheets
-    success, message, stats = import_from_sheets()
-    return {"success": success, "message": message, "stats": stats}
+    return {"success": False, "message": "removed"}, 410
 
 # â”€â”€ API: אישור מחיקה סופית (רק admin) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.route('/api/approve-sheets-delete', methods=['POST'])
