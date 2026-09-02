@@ -2415,6 +2415,29 @@ def api_update_user_role():
     finally:
         release_db_connection(conn)
 
+@app.route('/api/reset_user_password/<username>', methods=['POST'])
+@login_required
+def api_reset_user_password(username):
+    """Reset a user's password to the default: username* (e.g. daniel*)"""
+    if session.get('role') != 'admin' and session.get('user') not in ('uri', 'admin_uri'):
+        return {"success": False, "error": "Unauthorized"}, 403
+    if username == 'admin_uri':
+        return {"success": False, "error": "לא ניתן לאפס את admin_uri"}, 400
+    default_password = username + '*'
+    conn = get_db_connection()
+    if not conn: return {"success": False, "error": "DB connection failed"}, 500
+    try:
+        cur = get_safe_cursor(conn)
+        hashed = generate_password_hash(default_password)
+        cur.execute("UPDATE users SET password = %s WHERE username = %s", (hashed, username))
+        conn.commit()
+        cur.close()
+        return {"success": True, "message": f"סיסמא אופסה ל: {default_password}"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}, 500
+    finally:
+        release_db_connection(conn)
+
 @app.route('/api/delete_user/<username>', methods=['DELETE'])
 @login_required
 def api_delete_user(username):
