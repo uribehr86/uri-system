@@ -222,6 +222,24 @@
   let scanner = null;
   let isPaused = false;
   let isSheetOpen = false;
+  let wakeLock = null;
+
+  /* ── WAKE LOCK (מניעת שינה של המסך) ── */
+  async function requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch (err) {
+      console.warn('[WakeLock] Failed:', err);
+    }
+  }
+  // כשהדפדפן חוזר לפוקוס אחרי שינה / החלפת אפליקציה — נרכוש מחדש
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && wakeLock === null) {
+      await requestWakeLock();
+    }
+  });
 
   // Camera handling
   function startScanner() {
@@ -703,6 +721,9 @@
     startScanner().then(() => {
       resetFailTimer();
     });
+
+    // מניעת שינה של המסך
+    requestWakeLock();
   });
 </script>
 {% endblock %}
