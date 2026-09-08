@@ -868,6 +868,22 @@
                 el.style.backgroundColor = el.getAttribute('data-bgcolor');
             });
         });
+        // ── Wake Lock: מונע כיבוי מסך על אייפון/אנדרואיד ──
+        (async function keepScreenOn() {
+            if (!('wakeLock' in navigator)) return;
+            let lock = null;
+            async function acquire() {
+                try {
+                    lock = await navigator.wakeLock.request('screen');
+                    lock.addEventListener('release', () => { lock = null; });
+                } catch(e) {}
+            }
+            await acquire();
+            // כשחוזרים לדף אחרי שינה / החלפת אפליקציה — רוכשים מחדש
+            document.addEventListener('visibilitychange', async () => {
+                if (document.visibilityState === 'visible' && !lock) await acquire();
+            });
+        })();
     </script>
 </body>
 
