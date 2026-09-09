@@ -539,7 +539,7 @@ def utility_processor():
         if 1 <= num <= 600:
             return {'manufacturer': 'Dell', 'cpu': 'i7-8550U @ 1.80GHz', 'ram': '32GB', 'icon': '💻'}
         elif 1001 <= num <= 1600:
-            return {'manufacturer': 'HP', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': '💻'}
+            return {'manufacturer': 'Dell', 'cpu': 'i7-8550U @ 1.80GHz', 'ram': '32GB', 'icon': '💻'}
         elif 2001 <= num <= 2400:
             return {'manufacturer': 'HP', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': '💻'}
         elif 3001 <= num <= 3200:
@@ -589,7 +589,7 @@ def get_auto_spec(barcode):
     if 1 <= num <= 600:
         return 'Dell | i7-8550U @ 1.80GHz | 32GB RAM'
     elif 1001 <= num <= 1600:
-        return 'HP | i5-7200U @ 2.50GHz | 8GB RAM'
+        return 'Dell | i7-8550U @ 1.80GHz | 32GB RAM'
     elif 2001 <= num <= 2400:
         return 'HP | i5-7200U @ 2.50GHz | 8GB RAM'
     elif 3001 <= num <= 3200:
