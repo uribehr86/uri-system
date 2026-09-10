@@ -381,17 +381,28 @@ def get_safe_cursor(conn):
         return conn.cursor(cursor_factory=RealDictCursor)
 
 def release_db_connection(conn):
+    if not conn:
+        return
     if isinstance(conn, sqlite3.Connection):
-        if conn: conn.close()
-    elif db_pool and conn:
+        conn.close()
+        return
+    if not db_pool:
+        # החיבור נפתח ישירות (הפול לא אותחל) — חייבים לסגור אותו בעצמנו,
+        # אחרת כל בקשה מדליפה חיבור עד שנגמרות ההרשאות במסד.
         try:
-            db_pool.putconn(conn)
+            conn.close()
         except Exception as e:
-            print(f"[ERROR] Failed to return connection to pool: {e}", flush=True)
-            try:
-                conn.close()
-            except:
-                pass
+            print(f"[ERROR] Failed to close direct connection: {e}", flush=True)
+        return
+    try:
+        db_pool.putconn(conn)
+    except Exception as e:
+        # ייתכן שזה חיבור ישיר שלא שייך לפול — putconn ייכשל, ואז נסגור ידנית.
+        print(f"[ERROR] Failed to return connection to pool: {e}", flush=True)
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 def run_startup_migrations():
     """הוספת עמודות חדשות למסד אם עדיין לא קיימות"""
@@ -1457,9 +1468,10 @@ def api_update_computer():
                 params.append(val)
 
         # Only update notes if a non-empty value was explicitly sent
-        if data.get('notes', '').strip():
+        notes_val = data.get('notes')
+        if isinstance(notes_val, str) and notes_val.strip():
             updates.append("notes = %s")
-            params.append(data['notes'].strip())
+            params.append(notes_val.strip())
 
         
         # Always update last_technician on scan update
