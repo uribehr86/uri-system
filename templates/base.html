@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{% block title %}URI System{% endblock %}</title>
+    <title>{% if IS_TEST_ENV %}🧪 טסט · {% endif %}{% block title %}URI System{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet" />
@@ -82,6 +82,24 @@
             background: radial-gradient(circle at top right, #0B1B42, #050A1F);
             color: var(--text);
             transition: all 0.3s ease;
+        }
+
+        /* ── Test environment marker ── */
+        .env-badge {
+            background: #f59e0b;
+            color: #111;
+            font-size: 0.7rem;
+            font-weight: 900;
+            padding: 3px 10px;
+            border-radius: 999px;
+            letter-spacing: 0.5px;
+            margin-inline-start: 10px;
+            white-space: nowrap;
+        }
+
+        .top-nav.is-test {
+            border-bottom: 3px solid #f59e0b;
+            box-shadow: inset 0 3px 0 #f59e0b;
         }
 
         /* ── Top Navigation ── */
@@ -821,8 +839,8 @@
 
 <body class="no-sidebar">
     {% if session.get('user_id') %}
-    <header class="top-nav">
-        <a href="{{ url_for('portal') }}" class="brand"><span>🖥️</span> URI System</a>
+    <header class="top-nav{% if IS_TEST_ENV %} is-test{% endif %}">
+        <a href="{{ url_for('portal') }}" class="brand"><span>🖥️</span> URI System{% if IS_TEST_ENV %}<span class="env-badge">🧪 סביבת טסט</span>{% endif %}</a>
 
         <div class="nav-links">
             <a href="{{ url_for('computers') }}"

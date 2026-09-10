@@ -178,6 +178,17 @@ db_pool_initialized = False
 # אם RENDER=true → ענן. אחרת → מקומי (גם אם ה-DB ענני)
 IS_LOCAL_MODE = bool(os.getenv('IS_LOCAL_MODE')) or not bool(os.getenv('RENDER'))
 
+
+def is_test_env():
+    """סביבת טסט — מסומנת בכותרת כדי שלא יתבלבלו בינה לבין הפרודקשן.
+    מזוהה לפי APP_ENV=test, ואם לא הוגדר — לפי 'test' בכתובת האתר."""
+    if os.getenv('APP_ENV', '').strip().lower() == 'test':
+        return True
+    try:
+        return 'test' in (request.host or '').lower()
+    except Exception:
+        return False
+
 # ── מצב DEGRADED: אין חיבור ל-PostgreSQL ──────────────────────────────────
 # בענן, כשהחיבור ל-PostgreSQL נכשל, האפליקציה נופלת ל-SQLite ריק. בלי סימון
 # המסך פשוט נראה ריק — כאילו הנתונים נמחקו. הדגל הזה מוצג כבאנר בכל עמוד.
@@ -577,7 +588,7 @@ def utility_processor():
             return {'manufacturer': 'Lenovo', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': '💻'}
         return None
 
-    return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, get_computer_spec=get_computer_spec, db_degraded=DB_DEGRADED, APP_VERSION="v2.7.3")
+    return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, IS_TEST_ENV=is_test_env(), get_computer_spec=get_computer_spec, db_degraded=DB_DEGRADED, APP_VERSION="v2.7.3")
 
 @app.template_filter('format_history')
 def format_history_filter(val_str):
