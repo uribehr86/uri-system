@@ -647,6 +647,17 @@
                 gap: 6px;
             }
 
+            /* התג גוזל את הרוחב שקישורי הניווט צריכים - במסך צר משאירים רק את הסמל */
+            .env-badge-text {
+                display: none;
+            }
+
+            .env-badge {
+                font-size: 0.75rem;
+                padding: 2px 6px;
+                margin-inline-start: 6px;
+            }
+
             .user-badge {
                 padding: 4px 10px;
                 gap: 8px;
@@ -840,7 +851,7 @@
 <body class="no-sidebar">
     {% if session.get('user_id') %}
     <header class="top-nav{% if IS_TEST_ENV %} is-test{% endif %}">
-        <a href="{{ url_for('portal') }}" class="brand"><span>🖥️</span> URI System{% if IS_TEST_ENV %}<span class="env-badge">🧪 סביבת טסט</span>{% endif %}</a>
+        <a href="{{ url_for('portal') }}" class="brand"><span>🖥️</span> URI System{% if IS_TEST_ENV %}<span class="env-badge">🧪<span class="env-badge-text"> סביבת טסט</span></span>{% endif %}</a>
 
         <div class="nav-links">
             <a href="{{ url_for('computers') }}"
