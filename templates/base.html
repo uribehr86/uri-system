@@ -521,6 +521,46 @@
         }
 
         /* ── Flash messages ── */
+        .db-degraded {
+            background: rgba(248, 81, 73, .15);
+            border: 1px solid #f85149;
+            border-right: 5px solid #f85149;
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-bottom: 18px;
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+        }
+
+        .db-degraded .icon {
+            font-size: 1.6rem;
+            line-height: 1;
+        }
+
+        .db-degraded strong {
+            display: block;
+            color: #ff7b72;
+            font-size: 1.05rem;
+            margin-bottom: 4px;
+        }
+
+        .db-degraded p {
+            margin: 0;
+            font-size: .9rem;
+            line-height: 1.5;
+        }
+
+        .db-degraded code {
+            display: block;
+            margin-top: 8px;
+            font-size: .75rem;
+            opacity: .75;
+            word-break: break-all;
+            direction: ltr;
+            text-align: left;
+        }
+
         .flashes {
             margin-bottom: 20px;
         }
@@ -822,6 +862,22 @@
     {% endif %}
 
     <main class="main">
+        {% if db_degraded and db_degraded.active %}
+        <div class="db-degraded">
+            <span class="icon">🔌</span>
+            <div>
+                <strong>אין חיבור למסד הנתונים</strong>
+                <p>
+                    מה שמוצג כאן <b>אינו הנתונים שלך</b> — המערכת לא מצליחה להתחבר למסד
+                    ומציגה מאגר ריק זמני. <b>הנתונים שלך לא נמחקו.</b><br>
+                    אל תוסיף ואל תערוך שום דבר עד שהחיבור יחזור — שינויים לא יישמרו.
+                </p>
+                {% if session.get('role') == 'admin' or session.get('user') == 'admin_uri' %}
+                <code>{{ db_degraded.reason }}</code>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
         <div class="flashes">
             {% for cat, msg in get_flashed_messages(with_categories=true) %}
             <div class="alert alert-{{ cat }}">

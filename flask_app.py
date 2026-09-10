@@ -178,6 +178,28 @@ db_pool_initialized = False
 # אם RENDER=true → ענן. אחרת → מקומי (גם אם ה-DB ענני)
 IS_LOCAL_MODE = bool(os.getenv('IS_LOCAL_MODE')) or not bool(os.getenv('RENDER'))
 
+# ── מצב DEGRADED: אין חיבור ל-PostgreSQL ──────────────────────────────────
+# בענן, כשהחיבור ל-PostgreSQL נכשל, האפליקציה נופלת ל-SQLite ריק. בלי סימון
+# המסך פשוט נראה ריק — כאילו הנתונים נמחקו. הדגל הזה מוצג כבאנר בכל עמוד.
+DB_DEGRADED = {'active': False, 'reason': '', 'since': None}
+
+def _mark_db_degraded(reason):
+    """מסמן שהחיבור ל-PostgreSQL נכשל והאפליקציה עובדת על SQLite ריק."""
+    if not DB_DEGRADED['active']:
+        DB_DEGRADED['since'] = datetime.now()
+        print('[DEGRADED] No PostgreSQL connection — serving from empty SQLite. '
+              'A warning banner is now shown on every page.', flush=True)
+    DB_DEGRADED['active'] = True
+    DB_DEGRADED['reason'] = str(reason).strip()[:300]
+
+def _mark_db_healthy():
+    """מנקה את מצב ה-DEGRADED אחרי שהחיבור ל-PostgreSQL חזר."""
+    if DB_DEGRADED['active']:
+        print('[OK] PostgreSQL connection restored — degraded banner cleared.', flush=True)
+    DB_DEGRADED['active'] = False
+    DB_DEGRADED['reason'] = ''
+    DB_DEGRADED['since'] = None
+
 # מטמון גלובלי למניעת בדיקה כפולה איטית בגוגל שיטס
 attendance_cache = {}
 
@@ -248,9 +270,11 @@ def get_db_connection():
                     
                     db_pool = psycopg2.pool.ThreadedConnectionPool(2, 20, db_url)
                     print("[OK] Database connection pool created successfully (lazy)", flush=True)
+                    _mark_db_healthy()
                     # IS_LOCAL_MODE נקבע לפי RENDER env var — לא משנים כאן
                 except Exception as e:
                     print(f"[FALLBACK] Cloud DB init failed: {e}. Switching to Local SQLite.", flush=True)
+                    _mark_db_degraded(e)
                     db_pool = None
                     # IS_LOCAL_MODE נקבע לפי RENDER env var — לא משנים כאן
             else:
@@ -277,9 +301,11 @@ def get_db_connection():
             direct_conn = psycopg2.connect(_db_url, connect_timeout=10)
             direct_conn.autocommit = False
             print("[OK] Direct Postgres connection established (pool was None).", flush=True)
+            _mark_db_healthy()
             return direct_conn
         except Exception as e:
             print(f"[CRITICAL] Direct Postgres also failed: {e} — DATA WILL BE EMPTY (SQLite fallback)!", flush=True)
+            _mark_db_degraded(e)
             try:
                 conn = sqlite3.connect('system_data.db', check_same_thread=False)
                 conn.row_factory = dict_factory
@@ -298,6 +324,7 @@ def get_db_connection():
             # Connection is dead, throw it away and get a new one
             db_pool.putconn(conn, close=True)
             conn = db_pool.getconn()
+        _mark_db_healthy()
         return conn
     except Exception as e:
         print(f"[WARNING] Pool getconn failed ({e}), trying direct Postgres connection.", flush=True)
@@ -308,9 +335,11 @@ def get_db_connection():
             direct_conn = psycopg2.connect(db_url, connect_timeout=10)
             direct_conn.autocommit = False
             print("[OK] Direct Postgres connection established as fallback.", flush=True)
+            _mark_db_healthy()
             return direct_conn
         except Exception as e2:
             print(f"[CRITICAL] All Postgres connections failed: {e2}. Falling back to empty SQLite — DATA WILL BE EMPTY!", flush=True)
+            _mark_db_degraded(e2)
             try:
                 conn = sqlite3.connect('system_data.db', check_same_thread=False)
                 conn.row_factory = dict_factory
@@ -548,7 +577,7 @@ def utility_processor():
             return {'manufacturer': 'Lenovo', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': '💻'}
         return None
 
-    return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, get_computer_spec=get_computer_spec, APP_VERSION="v2.7.3")
+    return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, get_computer_spec=get_computer_spec, db_degraded=DB_DEGRADED, APP_VERSION="v2.7.3")
 
 @app.template_filter('format_history')
 def format_history_filter(val_str):
