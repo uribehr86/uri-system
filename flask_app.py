@@ -242,6 +242,17 @@ def dict_factory(cursor, row):
         d[col[0]] = row[idx]
     return d
 
+def _resolve_db_url():
+    """מחזיר את מחרוזת החיבור ל-PostgreSQL ממשתני הסביבה.
+    אין ברירת מחדל קשיחה — בענן (RENDER) חובה להגדיר RENDER_DB_URL או DATABASE_URL."""
+    url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
+    if not url and not IS_LOCAL_MODE:
+        raise RuntimeError(
+            "No database URL configured. RENDER is set, so PostgreSQL is required — "
+            "set RENDER_DB_URL or DATABASE_URL in the environment."
+        )
+    return url
+
 def get_db_connection():
     global db_pool, db_pool_initialized, IS_LOCAL_MODE
     
@@ -252,10 +263,7 @@ def get_db_connection():
             db_pool_initialized = True
             print("[LOCAL] Running in local mode — using SQLite directly", flush=True)
         else:
-            db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
-            if not db_url:
-                # ברירת מחדל להתחברות למסד הנתונים בענן בשרת Render
-                db_url = "postgresql://uri_system_db_user:VfsC66ho76RaIYZFYgIFZytreG3JaUtc@dpg-d6nhhuv5gffc73bkekmg-a.oregon-postgres.render.com/uri_system_db?sslmode=require"
+            db_url = _resolve_db_url()
             if db_url:
                 if 'connect_timeout' not in db_url:
                     db_url += ('&' if '?' in db_url else '?') + 'connect_timeout=15'
@@ -292,8 +300,7 @@ def get_db_connection():
         # ב-Render אבל הפול לא אותחל — ננסה חיבור ישיר לפוסטגרס
         print("[WARNING] db_pool is None on Render — attempting direct Postgres connection.", flush=True)
         try:
-            _db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL') or \
-                "postgresql://uri_system_db_user:VfsC66ho76RaIYZFYgIFZytreG3JaUtc@dpg-d6nhhuv5gffc73bkekmg-a.oregon-postgres.render.com/uri_system_db?sslmode=require"
+            _db_url = _resolve_db_url()
             direct_conn = psycopg2.connect(_db_url, connect_timeout=10)
             direct_conn.autocommit = False
             print("[OK] Direct Postgres connection established (pool was None).", flush=True)
@@ -323,8 +330,7 @@ def get_db_connection():
         print(f"[WARNING] Pool getconn failed ({e}), trying direct Postgres connection.", flush=True)
         # נסה חיבור ישיר לפוסטגרס במקום לנפול ל-SQLite ריק
         try:
-            db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL') or \
-                "postgresql://uri_system_db_user:VfsC66ho76RaIYZFYgIFZytreG3JaUtc@dpg-d6nhhuv5gffc73bkekmg-a.oregon-postgres.render.com/uri_system_db?sslmode=require"
+            db_url = _resolve_db_url()
             direct_conn = psycopg2.connect(db_url, connect_timeout=10)
             direct_conn.autocommit = False
             print("[OK] Direct Postgres connection established as fallback.", flush=True)
@@ -819,10 +825,12 @@ def api_change_admin_credentials():
                 cur.execute("UPDATE users SET password=%s WHERE username=%s",
                             (hashed, current_username))
         else:
-            # צור רשומה חדשה במסד עם הפרטים החדשים
+            # אין רשומה במסד — חובה להזין סיסמה כדי ליצור חשבון אדמין חדש (אין ברירת מחדל)
+            if not new_password:
+                cur.close()
+                return {"success": False, "error": "כדי ליצור רשומת אדמין חדשה חובה להזין סיסמה חדשה"}, 400
             final_username = new_username or current_username
-            final_password = new_password or 'uri*'
-            hashed = generate_password_hash(final_password)
+            hashed = generate_password_hash(new_password)
             cur.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, 'admin')",
                         (final_username, hashed))
 
