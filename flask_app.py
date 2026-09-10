@@ -1818,13 +1818,13 @@ def cage_manage(cage_id):
             if 'Dell' in specs or 'i7' in specs:
                 mfg = 'Dell'
                 stats['Dell'] += 1
-            elif 'HP' in specs or (bc.isdigit() and (1001 <= int(bc) <= 1600 or 2001 <= int(bc) <= 2400)):
+            elif 'HP' in specs or (bc.isdigit() and 2001 <= int(bc) <= 2400):
                 mfg = 'HP'
                 stats['HP'] += 1
             elif 'Lenovo' in specs or (bc.isdigit() and 4001 <= int(bc) <= 4300):
                 mfg = 'Lenovo'
                 stats['Lenovo'] += 1
-            elif bc.isdigit() and 1 <= int(bc) <= 600:
+            elif bc.isdigit() and (1 <= int(bc) <= 600 or 1001 <= int(bc) <= 1600):
                 mfg = 'Dell'
                 stats['Dell'] += 1
             else:
