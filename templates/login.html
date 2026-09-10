@@ -137,9 +137,15 @@
                 <label for="rememberMe" style="margin-bottom: 0; cursor: pointer;">זכור אותי במכשיר זה</label>
             </div>
             <button type="submit" class="btn-login" onclick="saveCredentials()">🔓 כניסה</button>
+            {% if allow_self_registration %}
             <div class="hint">
                 עובד חדש? <a href="{{ url_for('register') }}">לחץ כאן להרשמה</a>
             </div>
+            {% else %}
+            <div class="hint">
+                עובד חדש? פנה למנהל המערכת לפתיחת חשבון.
+            </div>
+            {% endif %}
         </form>
     </div>
 </div>

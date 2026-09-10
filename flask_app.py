@@ -11,6 +11,7 @@ import sqlite3
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
 import os
+import secrets
 import threading
 from dotenv import load_dotenv
 from functools import wraps
@@ -74,7 +75,7 @@ _poller_thread.start()
 print("[AUTO-SYNC] 🔄 Auto-poller הופעל — סנכרון אוטומטי הוסר", flush=True)
 
 # ── DB STORAGE MONITOR: checks DB size every hour ──────────────────────────
-DB_SIZE_LIMIT_GB = 10.0  # plan limit in GB
+DB_SIZE_LIMIT_GB = 1.0  # plan limit in GB (Basic-256mb instance ships 1 GB of storage)
 
 def _db_storage_monitor_loop():
     import time
@@ -112,13 +113,32 @@ print('[DB-MONITOR] DB Storage Monitor started - checks DB size every hour', flu
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'uri_system_2026')
+
+# SECRET_KEY: required from the environment in production (RENDER present).
+# For local dev only, fall back to a random ephemeral key (sessions reset on restart).
+_secret_key = os.getenv('SECRET_KEY')
+if not _secret_key:
+    if os.getenv('RENDER'):
+        raise RuntimeError(
+            "SECRET_KEY environment variable is required in production (RENDER detected) but is not set."
+        )
+    _secret_key = secrets.token_hex(32)
+    print("[WARNING] SECRET_KEY not set — generated an ephemeral key for local dev "
+          "(sessions will not persist across restarts).", flush=True)
+app.secret_key = _secret_key
 
 app.permanent_session_lifetime = timedelta(days=365)
 app.config['SESSION_COOKIE_SECURE']   = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['JSON_AS_ASCII']           = False  # Hebrew in JSON stays as Hebrew
+app.config['MAX_CONTENT_LENGTH']      = 16 * 1024 * 1024  # cap uploads at 16 MB
+
+# Rate limiting (Flask-Limiter) — used to throttle sensitive routes such as /login
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address, app=app)
 
 @app.after_request
 def set_utf8_charset(response):
@@ -178,6 +198,10 @@ db_pool_initialized = False
 # אם RENDER=true → ענן. אחרת → מקומי (גם אם ה-DB ענני)
 IS_LOCAL_MODE = bool(os.getenv('IS_LOCAL_MODE')) or not bool(os.getenv('RENDER'))
 
+# הרשמה עצמית סגורה כברירת מחדל: /register היה פתוח לכל האינטרנט וכל אדם
+# יכול היה לפתוח לעצמו חשבון טכנאי עם גישה מלאה למלאי. משתמשים חדשים נוצרים
+# דרך פאנל הניהול. להחזרה: הגדר ALLOW_SELF_REGISTRATION=true במשתני הסביבה.
+ALLOW_SELF_REGISTRATION = os.getenv('ALLOW_SELF_REGISTRATION', '').strip().lower() in ('1', 'true', 'yes')
 
 def is_test_env():
     """סביבת טסט — מסומנת בכותרת כדי שלא יתבלבלו בינה לבין הפרודקשן.
@@ -255,6 +279,17 @@ def dict_factory(cursor, row):
         d[col[0]] = row[idx]
     return d
 
+def _resolve_db_url():
+    """מחזיר את מחרוזת החיבור ל-PostgreSQL ממשתני הסביבה.
+    אין ברירת מחדל קשיחה — בענן (RENDER) חובה להגדיר RENDER_DB_URL או DATABASE_URL."""
+    url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
+    if not url and not IS_LOCAL_MODE:
+        raise RuntimeError(
+            "No database URL configured. RENDER is set, so PostgreSQL is required — "
+            "set RENDER_DB_URL or DATABASE_URL in the environment."
+        )
+    return url
+
 def get_db_connection():
     global db_pool, db_pool_initialized, IS_LOCAL_MODE
     
@@ -265,10 +300,7 @@ def get_db_connection():
             db_pool_initialized = True
             print("[LOCAL] Running in local mode — using SQLite directly", flush=True)
         else:
-            db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL')
-            if not db_url:
-                # ברירת מחדל להתחברות למסד הנתונים בענן בשרת Render
-                db_url = "postgresql://uri_system_db_user:VfsC66ho76RaIYZFYgIFZytreG3JaUtc@dpg-d6nhhuv5gffc73bkekmg-a.oregon-postgres.render.com/uri_system_db?sslmode=require"
+            db_url = _resolve_db_url()
             if db_url:
                 if 'connect_timeout' not in db_url:
                     db_url += ('&' if '?' in db_url else '?') + 'connect_timeout=15'
@@ -307,8 +339,7 @@ def get_db_connection():
         # ב-Render אבל הפול לא אותחל — ננסה חיבור ישיר לפוסטגרס
         print("[WARNING] db_pool is None on Render — attempting direct Postgres connection.", flush=True)
         try:
-            _db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL') or \
-                "postgresql://uri_system_db_user:VfsC66ho76RaIYZFYgIFZytreG3JaUtc@dpg-d6nhhuv5gffc73bkekmg-a.oregon-postgres.render.com/uri_system_db?sslmode=require"
+            _db_url = _resolve_db_url()
             direct_conn = psycopg2.connect(_db_url, connect_timeout=10)
             direct_conn.autocommit = False
             print("[OK] Direct Postgres connection established (pool was None).", flush=True)
@@ -341,8 +372,7 @@ def get_db_connection():
         print(f"[WARNING] Pool getconn failed ({e}), trying direct Postgres connection.", flush=True)
         # נסה חיבור ישיר לפוסטגרס במקום לנפול ל-SQLite ריק
         try:
-            db_url = os.getenv('RENDER_DB_URL') or os.getenv('DATABASE_URL') or \
-                "postgresql://uri_system_db_user:VfsC66ho76RaIYZFYgIFZytreG3JaUtc@dpg-d6nhhuv5gffc73bkekmg-a.oregon-postgres.render.com/uri_system_db?sslmode=require"
+            db_url = _resolve_db_url()
             direct_conn = psycopg2.connect(db_url, connect_timeout=10)
             direct_conn.autocommit = False
             print("[OK] Direct Postgres connection established as fallback.", flush=True)
@@ -366,17 +396,28 @@ def get_safe_cursor(conn):
         return conn.cursor(cursor_factory=RealDictCursor)
 
 def release_db_connection(conn):
+    if not conn:
+        return
     if isinstance(conn, sqlite3.Connection):
-        if conn: conn.close()
-    elif db_pool and conn:
+        conn.close()
+        return
+    if not db_pool:
+        # החיבור נפתח ישירות (הפול לא אותחל) — חייבים לסגור אותו בעצמנו,
+        # אחרת כל בקשה מדליפה חיבור עד שנגמרות ההרשאות במסד.
         try:
-            db_pool.putconn(conn)
+            conn.close()
         except Exception as e:
-            print(f"[ERROR] Failed to return connection to pool: {e}", flush=True)
-            try:
-                conn.close()
-            except:
-                pass
+            print(f"[ERROR] Failed to close direct connection: {e}", flush=True)
+        return
+    try:
+        db_pool.putconn(conn)
+    except Exception as e:
+        # ייתכן שזה חיבור ישיר שלא שייך לפול — putconn ייכשל, ואז נסגור ידנית.
+        print(f"[ERROR] Failed to return connection to pool: {e}", flush=True)
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 def run_startup_migrations():
     """הוספת עמודות חדשות למסד אם עדיין לא קיימות"""
@@ -460,8 +501,17 @@ def run_startup_migrations():
                 sl_cur.execute("SELECT COUNT(*) as cnt FROM users")
                 if sl_cur.fetchone()['cnt'] == 0:
                     from werkzeug.security import generate_password_hash
-                    sl_cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", ("admin_uri", generate_password_hash("uri*"), "admin"))
-                    sl_cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", ("uri", generate_password_hash("1234"), "admin"))
+                    _seed_user = os.getenv('SEED_ADMIN_USERNAME', 'admin_uri')
+                    _seed_pass = os.getenv('SEED_ADMIN_PASSWORD')
+                    if not _seed_pass:
+                        _seed_pass = secrets.token_urlsafe(18)
+                        print("=" * 64, flush=True)
+                        print(f"[SEED] Created initial admin user '{_seed_user}'.", flush=True)
+                        print(f"[SEED] Generated password: {_seed_pass}", flush=True)
+                        print("[SEED] Save this now — it is printed only once. "
+                              "Set SEED_ADMIN_USERNAME / SEED_ADMIN_PASSWORD to control it.", flush=True)
+                        print("=" * 64, flush=True)
+                    sl_cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", (_seed_user, generate_password_hash(_seed_pass), "admin"))
                 sl_conn.commit()
         except Exception as e_sl:
             print(f"[ERROR] SQLite fallback initialization failed: {e_sl}", flush=True)
@@ -562,6 +612,53 @@ def get_google_creds(scopes):
         return Credentials.from_service_account_file(sa_file, scopes=scopes)
     raise FileNotFoundError(f"Google credentials not found. Set GOOGLE_SERVICE_ACCOUNT_JSON on Render.")
 
+# ── מיפוי טווחי ברקוד לדגמים — מקור אמת יחיד ──────────────────────────────
+# עד 10/09/2026 הכלל הזה היה משוכפל בארבעה מקומות שלא הסכימו ביניהם:
+# HP נחשב 2001-2400 בשלושה מקומות ו-2001-2200 בלוח הבקרה, Lenovo 4001-4300
+# מול 4001-4400, ו-HP 2023 (6001-6400) נעדר משניים מהם. התוצאה: מחשבים
+# נספרו תחת יצרן שגוי או לא נספרו כלל. כל שינוי טווח נעשה כאן בלבד.
+COMPUTER_MODELS = [
+    {'key': 'dell2018', 'name': 'Dell 2018', 'manufacturer': 'Dell',
+     'cpu': 'i7-8550U @ 1.80GHz', 'ram': '32GB', 'spec_label': 'i5/i7', 'color': '#4A90D9',
+     'ranges': [(1, 600), (1001, 1600)],
+     'auto_spec': 'Dell | i7-8550U @ 1.80GHz | 32GB RAM'},
+    {'key': 'hp2023', 'name': 'HP 2023', 'manufacturer': 'HP',
+     'cpu': 'i7-1195G7 @ 2.90GHz', 'ram': '', 'spec_label': 'i7-1195G7', 'color': '#34C759',
+     'ranges': [(6001, 6400)],
+     'auto_spec': '11th Gen Intel(R) Core(TM) i7-1195G7 @ 2.90GHz'},
+    {'key': 'hp2018', 'name': 'HP 2018', 'manufacturer': 'HP',
+     'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'spec_label': 'i5-7200U', 'color': '#FF9500',
+     'ranges': [(2001, 2400)],
+     'auto_spec': 'HP | i5-7200U @ 2.50GHz | 8GB RAM'},
+    {'key': 'dell_barut', 'name': 'Dell Bagrut', 'manufacturer': 'Dell',
+     'cpu': 'i7-8550U @ 1.80GHz', 'ram': '16GB', 'spec_label': 'i7-8550U', 'color': '#AF52DE',
+     'ranges': [(3001, 3200)],
+     'auto_spec': 'Dell | i7-8550U @ 1.80GHz | 16GB RAM'},
+    {'key': 'lenovo', 'name': 'Lenovo', 'manufacturer': 'Lenovo',
+     'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'spec_label': 'i5-7200U', 'color': '#FF2D55',
+     'ranges': [(4001, 4400)],
+     'auto_spec': 'Lenovo | i5-7200U @ 2.50GHz | 8GB RAM'},
+]
+
+def _model_capacity(model):
+    """כמה מספרים יש בטווחי הדגם."""
+    return sum(hi - lo + 1 for lo, hi in model['ranges'])
+
+def _model_range_label(model):
+    return ', '.join(f"{lo}-{hi}" for lo, hi in model['ranges'])
+
+def get_model_for_barcode(barcode):
+    """מחזיר את הגדרת הדגם לפי מספר המחשב, או None אם המספר מחוץ לכל טווח."""
+    try:
+        num = int(str(barcode).strip())
+    except (ValueError, TypeError):
+        return None
+    for model in COMPUTER_MODELS:
+        for lo, hi in model['ranges']:
+            if lo <= num <= hi:
+                return model
+    return None
+
 @app.context_processor
 def utility_processor():
     def get_cage_color(cage):
@@ -571,24 +668,14 @@ def utility_processor():
         return f"hsl({hue}, 70%, 65%)"
 
     def get_computer_spec(computer_number):
-        """מחזיר מפרט לפי מספר מחשב"""
-        try:
-            num = int(str(computer_number).strip())
-        except (ValueError, TypeError):
+        """מחזיר מפרט לפי מספר מחשב — לפי COMPUTER_MODELS."""
+        model = get_model_for_barcode(computer_number)
+        if not model:
             return None
-        if 1 <= num <= 600:
-            return {'manufacturer': 'Dell', 'cpu': 'i7-8550U @ 1.80GHz', 'ram': '32GB', 'icon': '💻'}
-        elif 1001 <= num <= 1600:
-            return {'manufacturer': 'Dell', 'cpu': 'i7-8550U @ 1.80GHz', 'ram': '32GB', 'icon': '💻'}
-        elif 2001 <= num <= 2400:
-            return {'manufacturer': 'HP', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': '💻'}
-        elif 3001 <= num <= 3200:
-            return {'manufacturer': 'Dell', 'cpu': 'i7-8550U @ 1.80GHz', 'ram': '16GB', 'icon': '💻'}
-        elif 4001 <= num <= 4300:
-            return {'manufacturer': 'Lenovo', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': '💻'}
-        return None
+        return {'manufacturer': model['manufacturer'], 'cpu': model['cpu'],
+                'ram': model['ram'], 'icon': '💻'}
 
-    return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, IS_TEST_ENV=is_test_env(), get_computer_spec=get_computer_spec, db_degraded=DB_DEGRADED, APP_VERSION="v2.7.3")
+    return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, IS_TEST_ENV=is_test_env(), get_computer_spec=get_computer_spec, db_degraded=DB_DEGRADED, allow_self_registration=ALLOW_SELF_REGISTRATION, APP_VERSION="v2.7.3")
 
 @app.template_filter('format_history')
 def format_history_filter(val_str):
@@ -621,24 +708,9 @@ def israel_time_filter(dt):
     return il.strftime('%H:%M %d/%m/%Y')
 
 def get_auto_spec(barcode):
-    """מחזיר מפרט אוטומטי לפי מספר מחשב"""
-    try:
-        num = int(str(barcode).strip())
-    except (ValueError, TypeError):
-        return ''
-    if 1 <= num <= 600:
-        return 'Dell | i7-8550U @ 1.80GHz | 32GB RAM'
-    elif 1001 <= num <= 1600:
-        return 'Dell | i7-8550U @ 1.80GHz | 32GB RAM'
-    elif 2001 <= num <= 2400:
-        return 'HP | i5-7200U @ 2.50GHz | 8GB RAM'
-    elif 3001 <= num <= 3200:
-        return 'Dell | i7-8550U @ 1.80GHz | 16GB RAM'
-    elif 4001 <= num <= 4300:
-        return 'Lenovo | i5-7200U @ 2.50GHz | 8GB RAM'
-    elif 6001 <= num <= 6400:
-        return '11th Gen Intel(R) Core(TM) i7-1195G7 @ 2.90GHz'
-    return ''
+    """מחזיר מפרט אוטומטי לפי מספר מחשב — לפי COMPUTER_MODELS."""
+    model = get_model_for_barcode(barcode)
+    return model['auto_spec'] if model else ''
 
 def login_required(f):
     @wraps(f)
@@ -681,47 +753,13 @@ def index():
     return redirect(url_for('portal')) if 'user' in session else redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute", methods=["POST"])
 def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
-        
-        # בדוק admin_uri מהמסד תחילה (אם קיים שם) — אחרת fallback לקשיח
 
-        # Hardcoded super-admin fallback (only if DB has no custom admin record)
-        if username.lower() in ("uri", "admin_uri"):
-            conn_check = get_db_connection()
-            db_admin = None
-            if conn_check:
-                try:
-                    cur_check = get_safe_cursor(conn_check)
-                    cur_check.execute("SELECT username, password FROM users WHERE role='admin' AND username NOT IN ('uri','admin_uri') LIMIT 1")
-                    # נסה למצוא admin_uri בDB
-                    cur_check.execute("SELECT username, password FROM users WHERE username = %s", (username,))
-                    db_admin = cur_check.fetchone()
-                    cur_check.close()
-                except Exception:
-                    pass
-                finally:
-                    release_db_connection(conn_check)
-            
-            if not db_admin:
-                # fallback hardcoded
-                if (username.lower() == "uri" and password == "1234") or (username.lower() == "admin_uri" and password == "uri*"):
-                    session.update({
-                        'user': username,
-                        'user_id': 1,
-                        'username': username,
-                        'role': 'admin'
-                    })
-                    session.permanent = True
-                    print(f"[OK] User {username} logged in (hardcoded fallback)")
-                    next_page = request.args.get('next')
-                    if next_page and next_page.startswith('/') and not next_page.startswith('//'):
-                        return redirect(next_page)
-                    return redirect(url_for('portal'))
-
-        # Check database
+        # All authentication goes through the database — no hardcoded fallback.
         conn = get_db_connection()
         if conn:
             try:
@@ -787,6 +825,9 @@ def login():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    if not ALLOW_SELF_REGISTRATION:
+        # אין הרשמה עצמית — משתמשים נוצרים רק מפאנל הניהול
+        abort(404)
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
@@ -864,10 +905,12 @@ def api_change_admin_credentials():
                 cur.execute("UPDATE users SET password=%s WHERE username=%s",
                             (hashed, current_username))
         else:
-            # צור רשומה חדשה במסד עם הפרטים החדשים
+            # אין רשומה במסד — חובה להזין סיסמה כדי ליצור חשבון אדמין חדש (אין ברירת מחדל)
+            if not new_password:
+                cur.close()
+                return {"success": False, "error": "כדי ליצור רשומת אדמין חדשה חובה להזין סיסמה חדשה"}, 400
             final_username = new_username or current_username
-            final_password = new_password or 'uri*'
-            hashed = generate_password_hash(final_password)
+            hashed = generate_password_hash(new_password)
             cur.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, 'admin')",
                         (final_username, hashed))
 
@@ -892,25 +935,33 @@ def api_inventory_stats():
         return {"error": "db"}, 500
     try:
         cur = get_safe_cursor(conn)
-        cur.execute("""
-            SELECT
-                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 1    AND 600  THEN 1
-                           WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 1001 AND 1600 THEN 1 END) AS dell2018,
-                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 6001 AND 6400 THEN 1 END) AS hp2023,
-                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 2001 AND 2200 THEN 1 END) AS hp2018,
-                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 3001 AND 3200 THEN 1 END) AS dell_barut,
-                COUNT(CASE WHEN barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN 4001 AND 4400 THEN 1 END) AS lenovo
-            FROM computers WHERE barcode ~ '^[0-9]+$'
-        """)
+        # ה-SQL נבנה מ-COMPUTER_MODELS כדי שהספירה והמפרט לעולם לא יסתרו זה את זה.
+        # כל הערכים הם מספרים שלמים מקבוע פנימי — אין כאן קלט משתמש.
+        selects = []
+        for _m in COMPUTER_MODELS:
+            # שומרים את בדיקת הספרות בתוך כל CASE, כמו בקוד המקורי: אסור להסתמך
+            # על כך ש-WHERE יורץ לפני ההשלכה, אחרת ::integer ייפול על ברקוד לא מספרי.
+            _conds = " OR ".join(
+                f"(barcode ~ '^[0-9]+$' AND barcode::integer BETWEEN {lo} AND {hi})"
+                for lo, hi in _m['ranges']
+            )
+            selects.append(f"COUNT(CASE WHEN ({_conds}) THEN 1 END) AS {_m['key']}")
+        cur.execute(
+            "SELECT " + ", ".join(selects) +
+            " FROM computers WHERE barcode ~ '^[0-9]+$'"
+        )
         r = cur.fetchone()
         cur.close()
-        return {"items": [
-            {"name": "Dell 2018",  "spec": "i5/i7",     "count": r["dell2018"],  "capacity": 1200, "range": "1-600, 1001-1600", "color": "#4A90D9", "pct": round(r["dell2018"]  / 1200 * 100)},
-            {"name": "HP 2023",    "spec": "i7-1195G7", "count": r["hp2023"],    "capacity": 400,  "range": "6001-6400",        "color": "#34C759", "pct": round(r["hp2023"]    / 400  * 100)},
-            {"name": "HP 2018",    "spec": "i5-7200U",  "count": r["hp2018"],    "capacity": 200,  "range": "2001-2200",        "color": "#FF9500", "pct": round(r["hp2018"]    / 200  * 100)},
-            {"name": "Dell Bagrut", "spec": "i7-8550U",  "count": r["dell_barut"],"capacity": 200,  "range": "3001-3200",        "color": "#AF52DE", "pct": round(r["dell_barut"]/ 200  * 100)},
-            {"name": "Lenovo",     "spec": "i5-7200U",  "count": r["lenovo"],    "capacity": 400,  "range": "4001-4400",        "color": "#FF2D55", "pct": round(r["lenovo"]    / 400  * 100)},
-        ]}
+        items = []
+        for _m in COMPUTER_MODELS:
+            _count = r[_m['key']] or 0
+            _cap = _model_capacity(_m)
+            items.append({
+                "name": _m['name'], "spec": _m['spec_label'], "count": _count,
+                "capacity": _cap, "range": _model_range_label(_m),
+                "color": _m['color'], "pct": round(_count / _cap * 100) if _cap else 0,
+            })
+        return {"items": items}
     except Exception as e:
         return {"error": str(e)}, 500
     finally:
@@ -1465,9 +1516,10 @@ def api_update_computer():
                 params.append(val)
 
         # Only update notes if a non-empty value was explicitly sent
-        if data.get('notes', '').strip():
+        notes_val = data.get('notes')
+        if isinstance(notes_val, str) and notes_val.strip():
             updates.append("notes = %s")
-            params.append(data['notes'].strip())
+            params.append(notes_val.strip())
 
         
         # Always update last_technician on scan update
@@ -1854,24 +1906,20 @@ def cage_manage(cage_id):
             bc = str(c.get('barcode', ''))
             specs = c.get('specs', '') or ''
             mfg = 'אחר'
-            
-            if 'Dell' in specs or 'i7' in specs:
+
+            # מספר המחשב הוא הקובע. קודם היה נבדק כאן טקסט המפרט לפני הברקוד,
+            # ולכן HP 2023 (המפרט שלו מכיל "i7-1195G7") נספר כ-Dell.
+            model = get_model_for_barcode(bc)
+            if model:
+                mfg = model['manufacturer']
+            elif 'Dell' in specs:
                 mfg = 'Dell'
-                stats['Dell'] += 1
-            elif 'HP' in specs or (bc.isdigit() and 2001 <= int(bc) <= 2400):
+            elif 'HP' in specs:
                 mfg = 'HP'
-                stats['HP'] += 1
-            elif 'Lenovo' in specs or (bc.isdigit() and 4001 <= int(bc) <= 4300):
+            elif 'Lenovo' in specs:
                 mfg = 'Lenovo'
-                stats['Lenovo'] += 1
-            elif bc.isdigit() and (1 <= int(bc) <= 600 or 1001 <= int(bc) <= 1600):
-                mfg = 'Dell'
-                stats['Dell'] += 1
-            else:
-                # Default logic if needed
-                if bc.isdigit() and 3001 <= int(bc) <= 3200:
-                    mfg = 'Dell'
-                    stats['Dell'] += 1
+            if mfg in stats:
+                stats[mfg] += 1
             
             enriched_computers.append({
                 'barcode': bc,
@@ -4488,4 +4536,4 @@ if __name__ == '__main__':
     else:
         ssl_ctx = 'adhoc'
         print("[WARN] Custom cert not found, using adhoc SSL")
-    app.run(host='0.0.0.0', debug=True, port=5000, ssl_context=ssl_ctx)
+    app.run(host='0.0.0.0', debug=IS_LOCAL_MODE, port=5000, ssl_context=ssl_ctx)
