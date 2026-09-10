@@ -942,6 +942,44 @@
                 el.style.backgroundColor = el.getAttribute('data-bgcolor');
             });
         });
+        // ── KeepAwake: השארת המסך דלוק לפי בקשה מפורשת ──────────────────
+        // אייפון מרשה בקשה כזו רק כשהיא יוצאת ממגע ישיר של המשתמש. לכן דפים
+        // עם הקלטה קולית קוראים ל-KeepAwake.on() מתוך הלחיצה על המיקרופון
+        // עצמה, ומקבלים חיווי גלוי אם הבקשה נדחתה - במקום כישלון שקט.
+        window.KeepAwake = (function () {
+            let lock = null, wanted = false, notify = null;
+
+            function tell(state, detail) { if (notify) notify(state, detail || ''); }
+
+            async function grab() {
+                if (!('wakeLock' in navigator)) { tell('unsupported'); return; }
+                try {
+                    lock = await navigator.wakeLock.request('screen');
+                    lock.addEventListener('release', function () {
+                        lock = null;
+                        if (wanted) grab();   // המערכת שחררה באמצע - מבקשים שוב
+                    });
+                    tell('on');
+                } catch (e) {
+                    lock = null;
+                    tell('denied', (e && e.name) ? e.name : String(e));
+                }
+            }
+
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'visible' && wanted && !lock) grab();
+            });
+
+            return {
+                on: function (cb) { notify = cb || null; wanted = true; return grab(); },
+                off: function () {
+                    wanted = false;
+                    if (lock) { try { lock.release(); } catch (e) {} }
+                    lock = null;
+                }
+            };
+        })();
+
         // ── Wake Lock: מונע כיבוי מסך על אייפון/אנדרואיד ──
         (async function keepScreenOn() {
             if (!('wakeLock' in navigator)) return;
