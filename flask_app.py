@@ -11,6 +11,7 @@ import sqlite3
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
 import os
+import secrets
 import threading
 from dotenv import load_dotenv
 from functools import wraps
@@ -112,13 +113,32 @@ print('[DB-MONITOR] DB Storage Monitor started - checks DB size every hour', flu
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'uri_system_2026')
+
+# SECRET_KEY: required from the environment in production (RENDER present).
+# For local dev only, fall back to a random ephemeral key (sessions reset on restart).
+_secret_key = os.getenv('SECRET_KEY')
+if not _secret_key:
+    if os.getenv('RENDER'):
+        raise RuntimeError(
+            "SECRET_KEY environment variable is required in production (RENDER detected) but is not set."
+        )
+    _secret_key = secrets.token_hex(32)
+    print("[WARNING] SECRET_KEY not set — generated an ephemeral key for local dev "
+          "(sessions will not persist across restarts).", flush=True)
+app.secret_key = _secret_key
 
 app.permanent_session_lifetime = timedelta(days=365)
 app.config['SESSION_COOKIE_SECURE']   = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['JSON_AS_ASCII']           = False  # Hebrew in JSON stays as Hebrew
+app.config['MAX_CONTENT_LENGTH']      = 16 * 1024 * 1024  # cap uploads at 16 MB
+
+# Rate limiting (Flask-Limiter) — used to throttle sensitive routes such as /login
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address, app=app)
 
 @app.after_request
 def set_utf8_charset(response):
@@ -420,8 +440,17 @@ def run_startup_migrations():
                 sl_cur.execute("SELECT COUNT(*) as cnt FROM users")
                 if sl_cur.fetchone()['cnt'] == 0:
                     from werkzeug.security import generate_password_hash
-                    sl_cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", ("admin_uri", generate_password_hash("uri*"), "admin"))
-                    sl_cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", ("uri", generate_password_hash("1234"), "admin"))
+                    _seed_user = os.getenv('SEED_ADMIN_USERNAME', 'admin_uri')
+                    _seed_pass = os.getenv('SEED_ADMIN_PASSWORD')
+                    if not _seed_pass:
+                        _seed_pass = secrets.token_urlsafe(18)
+                        print("=" * 64, flush=True)
+                        print(f"[SEED] Created initial admin user '{_seed_user}'.", flush=True)
+                        print(f"[SEED] Generated password: {_seed_pass}", flush=True)
+                        print("[SEED] Save this now — it is printed only once. "
+                              "Set SEED_ADMIN_USERNAME / SEED_ADMIN_PASSWORD to control it.", flush=True)
+                        print("=" * 64, flush=True)
+                    sl_cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", (_seed_user, generate_password_hash(_seed_pass), "admin"))
                 sl_conn.commit()
         except Exception as e_sl:
             print(f"[ERROR] SQLite fallback initialization failed: {e_sl}", flush=True)
@@ -641,47 +670,13 @@ def index():
     return redirect(url_for('portal')) if 'user' in session else redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute", methods=["POST"])
 def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
-        
-        # בדוק admin_uri מהמסד תחילה (אם קיים שם) — אחרת fallback לקשיח
 
-        # Hardcoded super-admin fallback (only if DB has no custom admin record)
-        if username.lower() in ("uri", "admin_uri"):
-            conn_check = get_db_connection()
-            db_admin = None
-            if conn_check:
-                try:
-                    cur_check = get_safe_cursor(conn_check)
-                    cur_check.execute("SELECT username, password FROM users WHERE role='admin' AND username NOT IN ('uri','admin_uri') LIMIT 1")
-                    # נסה למצוא admin_uri בDB
-                    cur_check.execute("SELECT username, password FROM users WHERE username = %s", (username,))
-                    db_admin = cur_check.fetchone()
-                    cur_check.close()
-                except Exception:
-                    pass
-                finally:
-                    release_db_connection(conn_check)
-            
-            if not db_admin:
-                # fallback hardcoded
-                if (username.lower() == "uri" and password == "1234") or (username.lower() == "admin_uri" and password == "uri*"):
-                    session.update({
-                        'user': username,
-                        'user_id': 1,
-                        'username': username,
-                        'role': 'admin'
-                    })
-                    session.permanent = True
-                    print(f"[OK] User {username} logged in (hardcoded fallback)")
-                    next_page = request.args.get('next')
-                    if next_page and next_page.startswith('/') and not next_page.startswith('//'):
-                        return redirect(next_page)
-                    return redirect(url_for('portal'))
-
-        # Check database
+        # All authentication goes through the database — no hardcoded fallback.
         conn = get_db_connection()
         if conn:
             try:
@@ -4448,4 +4443,4 @@ if __name__ == '__main__':
     else:
         ssl_ctx = 'adhoc'
         print("[WARN] Custom cert not found, using adhoc SSL")
-    app.run(host='0.0.0.0', debug=True, port=5000, ssl_context=ssl_ctx)
+    app.run(host='0.0.0.0', debug=IS_LOCAL_MODE, port=5000, ssl_context=ssl_ctx)

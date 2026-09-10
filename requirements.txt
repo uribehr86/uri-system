@@ -1,4 +1,5 @@
 Flask==3.0.0
+Flask-Limiter==4.1.1
 psycopg2-binary>=2.9.9
 python-dotenv==1.0.0
 gunicorn==21.2.0
@@ -7,8 +8,8 @@ pytz==2023.3.post1
 requests==2.31.0
 openpyxl==3.1.5
 qrcode==7.4.2
-google-generativeai
-google-genai
+google-generativeai==0.8.6
+google-genai==2.22.0
 gspread==6.1.0
 google-auth==2.29.0
 google-api-python-client>=2.100.0
