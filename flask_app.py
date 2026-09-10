@@ -198,6 +198,11 @@ db_pool_initialized = False
 # אם RENDER=true → ענן. אחרת → מקומי (גם אם ה-DB ענני)
 IS_LOCAL_MODE = bool(os.getenv('IS_LOCAL_MODE')) or not bool(os.getenv('RENDER'))
 
+# הרשמה עצמית סגורה כברירת מחדל: /register היה פתוח לכל האינטרנט וכל אדם
+# יכול היה לפתוח לעצמו חשבון טכנאי עם גישה מלאה למלאי. משתמשים חדשים נוצרים
+# דרך פאנל הניהול. להחזרה: הגדר ALLOW_SELF_REGISTRATION=true במשתני הסביבה.
+ALLOW_SELF_REGISTRATION = os.getenv('ALLOW_SELF_REGISTRATION', '').strip().lower() in ('1', 'true', 'yes')
+
 # ── מצב DEGRADED: אין חיבור ל-PostgreSQL ──────────────────────────────────
 # בענן, כשהחיבור ל-PostgreSQL נכשל, האפליקציה נופלת ל-SQLite ריק. בלי סימון
 # המסך פשוט נראה ריק — כאילו הנתונים נמחקו. הדגל הזה מוצג כבאנר בכל עמוד.
@@ -623,7 +628,7 @@ def utility_processor():
             return {'manufacturer': 'Lenovo', 'cpu': 'i5-7200U @ 2.50GHz', 'ram': '8GB', 'icon': '💻'}
         return None
 
-    return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, get_computer_spec=get_computer_spec, db_degraded=DB_DEGRADED, APP_VERSION="v2.7.3")
+    return dict(get_cage_color=get_cage_color, IS_LOCAL_MODE=IS_LOCAL_MODE, get_computer_spec=get_computer_spec, db_degraded=DB_DEGRADED, allow_self_registration=ALLOW_SELF_REGISTRATION, APP_VERSION="v2.7.3")
 
 @app.template_filter('format_history')
 def format_history_filter(val_str):
@@ -788,6 +793,9 @@ def login():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    if not ALLOW_SELF_REGISTRATION:
+        # אין הרשמה עצמית — משתמשים נוצרים רק מפאנל הניהול
+        abort(404)
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
