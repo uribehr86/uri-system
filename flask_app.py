@@ -203,6 +203,15 @@ IS_LOCAL_MODE = bool(os.getenv('IS_LOCAL_MODE')) or not bool(os.getenv('RENDER')
 # דרך פאנל הניהול. להחזרה: הגדר ALLOW_SELF_REGISTRATION=true במשתני הסביבה.
 ALLOW_SELF_REGISTRATION = os.getenv('ALLOW_SELF_REGISTRATION', '').strip().lower() in ('1', 'true', 'yes')
 
+# אזור הזמן של ישראל, כולל שעון קיץ. אם בסיס נתוני אזורי הזמן חסר בסביבה,
+# נשארים עם ההתנהגות הישנה (UTC+3 קבוע) במקום להפיל את רינדור העמוד.
+try:
+    from zoneinfo import ZoneInfo
+    _ISRAEL_TZ = ZoneInfo('Asia/Jerusalem')
+except Exception as _tz_err:
+    print(f"[WARNING] Asia/Jerusalem timezone unavailable ({_tz_err}); falling back to fixed UTC+3.", flush=True)
+    _ISRAEL_TZ = None
+
 def is_test_env():
     """סביבת טסט — מסומנת בכותרת כדי שלא יתבלבלו בינה לבין הפרודקשן.
     מזוהה לפי APP_ENV=test, ואם לא הוגדר — לפי 'test' בכתובת האתר."""
@@ -687,7 +696,7 @@ def summarize_history_filter(entry):
 
 @app.template_filter('israel_time')
 def israel_time_filter(dt):
-    """ממיר datetime מ-UTC לשעון ישראל (UTC+3)"""
+    """ממיר datetime מ-UTC לשעון ישראל, כולל מעבר שעון קיץ/חורף."""
     if not dt:
         return '—'
     
@@ -701,10 +710,14 @@ def israel_time_filter(dt):
             except ValueError:
                 return dt  # Return as-is if unparseable
 
-    if hasattr(dt, 'tzinfo') and dt.tzinfo is not None:
-        il = dt.astimezone(timezone(timedelta(hours=3)))
+    # ישראל היא UTC+3 בקיץ ו-UTC+2 בחורף. הקוד הקודם הוסיף תמיד 3 שעות,
+    # ולכן מסוף אוקטובר ועד סוף מרץ כל השעות באתר הוצגו שעה מאוחר מדי.
+    if getattr(dt, 'tzinfo', None) is None:
+        dt = dt.replace(tzinfo=timezone.utc)   # זמני המסד נשמרים ב-UTC
+    if _ISRAEL_TZ is not None:
+        il = dt.astimezone(_ISRAEL_TZ)
     else:
-        il = dt + timedelta(hours=3)
+        il = dt.astimezone(timezone(timedelta(hours=3)))
     return il.strftime('%H:%M %d/%m/%Y')
 
 def get_auto_spec(barcode):
@@ -1751,11 +1764,16 @@ def api_delete_duplicates():
         return jsonify({"success": False, "error": "DB error"}), 500
     try:
         cur = get_safe_cursor(conn)
+        # רק רשומות עם ברקוד אמיתי משתתפות בניכוי כפילויות.
+        # DISTINCT ON מקבץ את כל ה-NULL יחד, ולכן בלי הסינון הזה כל המחשבים
+        # שאין להם ברקוד היו נחשבים "כפילויות" זה של זה ונמחקים חוץ מאחד.
         cur.execute("""
             DELETE FROM computers
-            WHERE id NOT IN (
+            WHERE barcode IS NOT NULL AND TRIM(barcode) <> ''
+              AND id NOT IN (
                 SELECT DISTINCT ON (barcode) id
                 FROM computers
+                WHERE barcode IS NOT NULL AND TRIM(barcode) <> ''
                 ORDER BY barcode, scan_time DESC NULLS LAST
             )
         """)
