@@ -69,12 +69,12 @@
 <div class="exam-container {% if not loop.last %}page-break{% endif %}">
     <div class="top-info">
         <div class="ev-box">EV1</div>
-        <div class="seat-box">{{ e.laptop_number or '' }}</div>
+        <div class="seat-box">{{ e.computer or '' }}</div>
     </div>
 
     <div class="header-section">
         <h1>משרד הבריאות – מינהל האחיות – מומחיות – טיפול תומך</h1>
-        <p>{{ e.classroom or 'בניין REIT1, אפעל 6, פתח תקווה, מליאה' }}</p>
+        <p>{{ e.hall or 'בניין REIT1, אפעל 6, פתח תקווה, מליאה' }}</p>
         <div class="doc-title">טופס התחברות לבחינה</div>
     </div>
 
@@ -98,7 +98,7 @@
                 <td>סיסמה</td>
             </tr>
             <tr>
-                <td>{{ e.notes or '' }}</td>
+                <td>{{ e.adaptations or '' }}</td>
                 <td>התאמות</td>
             </tr>
         </table>
@@ -113,7 +113,7 @@
     </div>
 
     <div class="bottom-seat">
-        «{{ e.laptop_number or '' }}»
+        «{{ e.computer or '' }}»
     </div>
 
     <div class="footer-line">
