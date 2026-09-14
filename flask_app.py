@@ -2943,6 +2943,11 @@ def exam_attendance_add():
         if not conn: return "DB Error", 500
         try:
             cur = get_safe_cursor(conn)
+            # שם המבחן נשמר בצורתו הקנונית — אותה צורה שהייבוא והסריקה
+            # משתמשים בה, אחרת נבחן שנוסף ידנית לא יימצא בסריקה
+            from exam_naming import parse_exam_title as _pet
+            _raw_exam = data.get('exam_name', '').strip()
+            _canonical_exam = _pet(_raw_exam)['exam_name'] if _raw_exam else ''
             # שמות העמודות חייבים להתאים להגדרת הטבלה (hall / computer / adaptations)
             cur.execute("""
                 INSERT INTO examinees (full_name, id_number, username, password, hall,
@@ -2954,7 +2959,7 @@ def exam_attendance_add():
                 data.get('username','').strip(),
                 data.get('password','').strip(),
                 data.get('location','').strip(),
-                data.get('exam_name','').strip(),
+                _canonical_exam,
                 data.get('computer','').strip(),
                 data.get('row','').strip(),
                 data.get('seat','').strip(),
@@ -2993,6 +2998,13 @@ def upsert_examinees(records, exam_name):
                 cur.execute(
                     "SELECT id FROM examinees WHERE exam_name = %s AND id_number = %s",
                     (exam_name, id_number))
+                existing = cur.fetchone()
+            elif full_name:
+                # בלי ת.ז — זיהוי לפי שם, אחרת כל ייבוא חוזר משכפל את השורה
+                cur.execute(
+                    "SELECT id FROM examinees WHERE exam_name = %s AND full_name = %s "
+                    "AND (id_number IS NULL OR id_number = '')",
+                    (exam_name, full_name))
                 existing = cur.fetchone()
 
             params = (
@@ -3198,7 +3210,7 @@ def exam_attendance_import():
             elif 'טור' in h or 'עמודה' in h:                        col_map['row_number'] = i
             elif 'כסא' in h or 'כיסא' in h or 'seat' in h_lower or 'מושב' in h:   col_map['seat_number']= i
             elif 'מיקום' in h or 'כיתה' in h or 'location' in h_lower or 'אולם' in h: col_map['hall']= i
-            elif 'בחינה' in h or 'exam' in h_lower:                 col_map['exam_name']  = i
+            elif 'בחינה' in h or 'גרסה' in h or 'exam' in h_lower:  col_map['exam_name']  = i
             elif 'מחשב' in h or 'computer' in h_lower:              col_map['computer']   = i
             elif 'התאמות' in h or 'notes' in h_lower:               col_map['adaptations'] = i
 
@@ -3255,6 +3267,10 @@ def exam_attendance_import():
             return redirect(url_for('exam_attendance'))
 
         # ── שם המשרד/מבחן/תאריך — מכותרת שורה 1, ובהיעדרה משם הקובץ ──
+        # כשהכותרות עצמן בשורה 1 אין שורת כותרת ממוזגת, ו-exam_title_row1
+        # מחזיק את שם העמודה הראשונה ("שם פרטי") — לא שם מבחן.
+        if header_row_idx <= 1:
+            exam_title_row1 = ''
         from exam_naming import parse_exam_title
         info = parse_exam_title(exam_title_row1, file.filename)
         exam_name = info['exam_name']
@@ -3761,21 +3777,34 @@ def api_simple_scan():
     if not qr_text.startswith('EXAMINEE|'):
         return {"error": "QR לא תקין"}, 400
 
-    parts = qr_text.split('|')
-    id_number = parts[1] if len(parts) > 1 else ''
-    name = parts[2] if len(parts) > 2 else ''
+    from exam_naming import parse_examinee_qr, parse_exam_title
+    qr = parse_examinee_qr(qr_text)
+    if not qr:
+        return {"error": "QR לא תקין"}, 400
+    id_number = qr['id_number']
+    name = qr['full_name']
+    canonical_exam = parse_exam_title(qr['exam_title'])['exam_name'] if qr['exam_title'] else ''
 
     conn = get_db_connection()
     if not conn: return {"error": "DB Error"}, 500
     try:
         cur = get_safe_cursor(conn)
-        cur.execute("SELECT * FROM examinees WHERE id_number = %s", (id_number,))
-        if not cur.fetchone():
+        # מסויג למבחן כשה-QR נושא אותו, אחרת הנוכחות הייתה מסומנת
+        # בכל המבחנים שהנבחן רשום אליהם
+        if canonical_exam:
+            cur.execute("SELECT * FROM examinees WHERE id_number = %s AND exam_name = %s",
+                        (id_number, canonical_exam))
+        else:
+            cur.execute("SELECT * FROM examinees WHERE id_number = %s ORDER BY id DESC",
+                        (id_number,))
+        examinee = cur.fetchone()
+        if not examinee:
             return {"error": f"נבחן עם ת.ז. {id_number} לא במערכת"}, 404
 
         cur.execute("""
-            UPDATE examinees SET is_present = 1, scan_time = %s, technician = %s WHERE id_number = %s
-        """, (datetime.now(), session.get('username',''), id_number))
+            UPDATE examinees SET is_present = 1, scan_time = %s, technician = %s WHERE id = %s
+        """, (datetime.now().strftime('%d/%m/%Y %H:%M:%S'), session.get('username',''),
+              dict(examinee)['id']))
         conn.commit()
         return {"success": True, "name": name, "id": id_number}
     except Exception as e:
@@ -3799,12 +3828,21 @@ def api_exam_scan_beacon():
     col        = (request.args.get('col', '') or '').strip()
     technician = session.get('username', '')
 
-    parts = qr_text.split('|')
-    if len(parts) >= 3:
-        id_number  = parts[1] if len(parts) > 1 else ''
-        full_name  = parts[2] if len(parts) > 2 else ''
-        exam_name_qr = parts[6] if len(parts) > 6 else ''
-        classroom_qr = parts[5] if len(parts) > 5 else ''
+    from exam_naming import parse_examinee_qr
+    qr = parse_examinee_qr(qr_text)
+    if qr:
+        id_number  = qr['id_number']
+        full_name  = qr['full_name']
+        # אותו פירוק כמו בסריקה הכפולה — QR של Word בלי כותרת היה
+        # נקרא כאן לפי הפריסה הישנה, והמבחן זוהה כמספר כסא
+        exam_name_qr = qr['exam_title']
+        classroom_qr = qr['hall']
+        if not computer and qr['computer']:
+            computer = qr['computer']
+        if not col and qr['row']:
+            col = qr['row']
+        if not seat and qr['seat']:
+            seat = qr['seat']
         scan_time_str = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
 
         # שם המבחן: מה-QR, ואם אין — מהמסד לפי ת.ז
@@ -3987,29 +4025,25 @@ def api_exam_scan_double():
     pc_status = (data.get('pc_status', '') or '').strip()
     is_present = int(data.get('is_present', 1) or 1)
 
-    parts = qr_text.split('|')
-    if len(parts) < 3:
+    # פירוק ה-QR — לוגיקה משותפת לכל נקודות הסריקה (exam_naming)
+    from exam_naming import parse_examinee_qr
+    qr = parse_examinee_qr(qr_text)
+    if not qr:
         return {"error": "QR לא מזוהה כנבחן"}, 400
 
-    # קריאת נתונים ישירות מה-QR - לא תלוי ב-DB
-    id_number   = parts[1] if len(parts) > 1 else ''
-    full_name   = parts[2] if len(parts) > 2 else ''
-    # פורמט ה-QR תלוי במקור ההדפסה:
-    #   מסמכי Word:  exam|id|name|user|pass|row|seat
-    #   דף ההדפסה:   EXAMINEE|id|name|user|pass|hall|exam|computer
-    is_legacy_qr = parts[0] == 'EXAMINEE'
-    qr_username = parts[3] if len(parts) > 3 else ''
-    qr_password = parts[4] if len(parts) > 4 else ''
-    qr_row      = '' if is_legacy_qr else (parts[5] if len(parts) > 5 else '')
-    qr_seat     = '' if is_legacy_qr else (parts[6] if len(parts) > 6 else '')
+    id_number   = qr['id_number']
+    full_name   = qr['full_name']
+    qr_username = qr['username']
+    qr_password = qr['password']
     # col/seat: מה-form אם נשלח, אחרת מה-QR
-    if not col  and qr_row:  col  = qr_row
-    if not seat and qr_seat: seat = qr_seat
+    if not col  and qr['row']:  col  = qr['row']
+    if not seat and qr['seat']: seat = qr['seat']
+    if not computer and qr['computer']: computer = qr['computer']
 
     # שם המבחן — מהפרמטר, מה-QR, ולבסוף מהמסד לפי ת.ז
     exam_name = (data.get('exam_name', '') or '').strip()
     if not exam_name:
-        exam_name = (parts[6] if len(parts) > 6 else '') if is_legacy_qr else parts[0]
+        exam_name = qr['exam_title']
     if not exam_name and id_number:
         conn_lookup = get_db_connection()
         if conn_lookup:
@@ -4281,8 +4315,11 @@ def undo_last_scan():
         if id_col is None:
             return {"success": True, "sheet": False}
 
-        # עמודות הסריקה לפי הכותרות בפועל — לא מיקום קבוע
-        scan_cols = sorted(mapping[f] for f in SCAN_FIELDS if f in mapping)
+        # עמודות הסריקה לפי הכותרות בפועל — לא מיקום קבוע.
+        # מ.מחשב נשמר, בדיוק כמו במסד: הוא עשוי להגיע מרשימת הייבוא,
+        # וביטול סריקה מבטל נוכחות — לא הקצאת מחשב.
+        scan_cols = sorted(mapping[f] for f in SCAN_FIELDS
+                           if f in mapping and f != 'computer')
 
         for idx, r in enumerate(all_vals[hdr_idx + 1:], start=hdr_idx + 2):
             if id_col < len(r) and str(r[id_col]).strip() == str(last_id_number).strip():
@@ -4308,18 +4345,25 @@ def api_exam_scan():
     if not qr_text:
         return {"error": "לא התקבל QR"}, 400
 
-    # פרמט: שם_בחינה|ת.ז.|שם|קוד|סיסמא|טור|כסא
-    parts = qr_text.split('|')
-    if len(parts) < 6:
+    from exam_naming import parse_examinee_qr, parse_exam_title
+    qr = parse_examinee_qr(qr_text)
+    if not qr or not qr['id_number']:
         return {"error": "QR לא מזוהה כנבחן", "type": "unknown"}, 400
 
-    id_number = parts[1] if len(parts) > 1 else ''
+    id_number = qr['id_number']
+    canonical_exam = parse_exam_title(qr['exam_title'])['exam_name'] if qr['exam_title'] else ''
 
     conn = get_db_connection()
     if not conn: return {"error": "DB Error"}, 500
     try:
         cur = get_safe_cursor(conn)
-        cur.execute("SELECT * FROM examinees WHERE id_number = %s", (id_number,))
+        # מסויג למבחן, אחרת הנוכחות נרשמת בכל המבחנים של אותה ת.ז
+        if canonical_exam:
+            cur.execute("SELECT * FROM examinees WHERE id_number = %s AND exam_name = %s",
+                        (id_number, canonical_exam))
+        else:
+            cur.execute("SELECT * FROM examinees WHERE id_number = %s ORDER BY id DESC",
+                        (id_number,))
         examinee = cur.fetchone()
         if not examinee:
             return {"error": f"נבחן עם ת.ז. {id_number} לא נמצא במערכת"}, 404
@@ -4330,8 +4374,9 @@ def api_exam_scan():
 
         # סמן כנוכח
         cur.execute("""
-            UPDATE examinees SET is_present = 1, scan_time = %s, technician = %s WHERE id_number = %s
-        """, (datetime.now(), session.get('username',''), id_number))
+            UPDATE examinees SET is_present = 1, scan_time = %s, technician = %s WHERE id = %s
+        """, (datetime.now().strftime('%d/%m/%Y %H:%M:%S'), session.get('username',''),
+              dict(examinee)['id']))
         conn.commit()
 
         # סנכרון לגוגל דרייב ברקע

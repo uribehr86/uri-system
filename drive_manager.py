@@ -354,9 +354,11 @@ def merge_examinees_into_sheet(ws, records, title_text=None, include_scan_column
         if key:
             existing.setdefault(key, offset)
 
-    protected = set() if include_scan_columns else {
-        mapping[f] for f in SCAN_FIELDS if f in mapping
-    }
+    scan_cols = {mapping[f] for f in SCAN_FIELDS if f in mapping}
+    protected = set() if include_scan_columns else scan_cols
+    # בסנכרון נוכחות המסד הוא מקור האמת, ולכן ערך ריק שם חייב לנקות
+    # את התא בגיליון (ביטול סריקה). בייבוא ערך ריק לעולם לא מוחק.
+    blankable = scan_cols if include_scan_columns else set()
 
     updates = []
     to_append = []
@@ -373,8 +375,10 @@ def merge_examinees_into_sheet(ws, records, title_text=None, include_scan_column
         if sheet_row:
             current = all_values[sheet_row - 1]
             for idx, val in enumerate(values):
-                if idx in protected or val == '':
-                    continue  # לא נוגעים בנתוני סריקה, ולא מוחקים בערך ריק
+                if idx in protected:
+                    continue  # נתוני סריקה מוגנים מפני ייבוא רשימה
+                if val == '' and idx not in blankable:
+                    continue  # ערך ריק לא מוחק נתון קיים
                 old = current[idx].strip() if idx < len(current) else ''
                 if old != str(val):
                     updates.append({

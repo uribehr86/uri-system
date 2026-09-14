@@ -51,7 +51,9 @@ def _to_sheet_record(r):
         'is_present':  _present_flag(r.get('is_present')),
         'scan_time':   _scan_time_str(r.get('scan_time')),
         'technician':  r.get('technician', ''),
-        'version':     r.get('exam_name', ''),
+        # 'version' (גרסה) לא נכתב כאן בכוונה: הוא שייך לרשימת הייבוא.
+        # כתיבת exam_name לתוכו הייתה דורסת את הגרסאות האמיתיות של הנבחנים
+        # בכל סנכרון נוכחות.
     }
 
 

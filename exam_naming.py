@@ -124,6 +124,55 @@ def parse_exam_title(raw, filename=None):
     }
 
 
+# ── QR של נבחן ──────────────────────────────────────────────────────
+# שני פורמטים קיימים במערכת, ושניהם עשויים להתחיל ב-EXAMINEE:
+#   מסמכי Word (7 שדות):  exam|id|name|user|pass|row|seat
+#       exam יכול להיות 'EXAMINEE' כשאין כותרת בקובץ המקור
+#   דף ההדפסה  (8 שדות):  EXAMINEE|id|name|user|pass|hall|exam|computer
+# ההבחנה היא במספר השדות — לא בערך של parts[0] בלבד, אחרת QR של Word
+# בלי כותרת נקרא לפי הפריסה הלא נכונה והמבחן מזוהה כמספר כסא.
+QR_MIN_FIELDS = 3
+_LEGACY_PREFIX = 'EXAMINEE'
+_LEGACY_MIN_FIELDS = 8
+
+
+def parse_examinee_qr(qr_text):
+    """
+    מפרק QR של נבחן לשני הפורמטים. מחזיר dict, או None אם לא מזוהה.
+    מפתחות: id_number, full_name, username, password, row, seat, hall,
+             exam_title, computer, is_legacy.
+    """
+    parts = str(qr_text or '').strip().split('|')
+    if len(parts) < QR_MIN_FIELDS:
+        return None
+
+    def at(i):
+        return parts[i].strip() if len(parts) > i else ''
+
+    is_legacy = parts[0].strip() == _LEGACY_PREFIX and len(parts) >= _LEGACY_MIN_FIELDS
+
+    if is_legacy:
+        exam_title, hall, row, seat, computer = at(6), at(5), '', '', at(7)
+    else:
+        first = at(0)
+        exam_title = '' if first == _LEGACY_PREFIX else first
+        hall, computer = '', ''
+        row, seat = at(5), at(6)
+
+    return {
+        'id_number':  at(1),
+        'full_name':  at(2),
+        'username':   at(3),
+        'password':   at(4),
+        'row':        row,
+        'seat':       seat,
+        'hall':       hall,
+        'computer':   computer,
+        'exam_title': exam_title,
+        'is_legacy':  is_legacy,
+    }
+
+
 if __name__ == '__main__':
     import sys, io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
