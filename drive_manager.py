@@ -236,39 +236,81 @@ def _col_index(headers, keywords):
     return None
 
 
+# שדה → מילות מפתח לזיהוי העמודה בגיליון, לפי סדר DEFAULT_HEADERS
+FIELD_KEYWORDS = [
+    ('full_name',   ['שם פרטי', 'שם נבחן', 'שם', 'name']),
+    ('last_name',   ['שם משפחה', 'משפחה', 'family']),
+    ('id_number',   ['ת.ז', 'תעודת', 'id']),
+    ('adaptations', ['התאמות', 'הערות', 'notes']),
+    ('password',    ['סיסמה', 'סיסמא', 'סיסמ', 'password']),
+    ('username',    ['שם משתמש', 'משתמש', 'קוד', 'username', 'user']),
+    ('version',     ['גרסה', 'בחינה', 'exam']),
+    ('hall',        ['אולם', 'כיתה', 'מיקום', 'hall', 'location']),
+    ('row',         ['טור', 'עמודה']),
+    ('seat',        ['כסא', 'כיסא', 'מושב', 'seat']),
+    ('computer',    ['מ.מחשב', 'מחשב', 'computer']),
+    ('is_present',  ['נוכחות', 'הגיע', 'attendance']),
+    ('scan_time',   ['שעת', 'זמן', 'time', 'scan']),
+    ('technician',  ['טכנאי', 'technician']),
+]
+
+# השדות שהסריקה ממלאת — ייבוא רשימת נבחנים לעולם לא דורס אותם
+SCAN_FIELDS = {'computer', 'is_present', 'scan_time', 'technician'}
+
+
+def map_columns(headers):
+    """
+    ממפה שדה → אינדקס עמודה לפי הכותרות בפועל.
+    עמודה נתפסת פעם אחת בלבד, כדי ש'שם פרטי' ו'שם משפחה' לא ייפלו לאותו מקום.
+    """
+    headers = [str(h).strip() for h in headers]
+    mapping = {}
+    taken = set()
+    # סבב ראשון: התאמה מדויקת. סבב שני: הכלה חלקית.
+    for exact in (True, False):
+        for field, keywords in FIELD_KEYWORDS:
+            if field in mapping:
+                continue
+            for kw in keywords:
+                for i, h in enumerate(headers):
+                    if i in taken:
+                        continue
+                    hit = (h == kw) if exact else (kw in h)
+                    if hit:
+                        mapping[field] = i
+                        taken.add(i)
+                        break
+                if field in mapping:
+                    break
+    return mapping
+
+
 def build_examinee_row(rec, headers=None):
-    """ממפה רשומת נבחן לשורה לפי סדר DEFAULT_HEADERS."""
-    headers = headers or DEFAULT_HEADERS
-    return [
-        rec.get('full_name', ''),    # שם פרטי (שם מלא)
-        rec.get('last_name', ''),    # שם משפחה
-        rec.get('id_number', ''),    # ת.ז
-        rec.get('adaptations', ''),  # התאמות
-        rec.get('password', ''),     # סיסמה
-        rec.get('username', ''),     # שם משתמש
-        rec.get('version', ''),      # גרסה
-        rec.get('hall', ''),         # אולם/כיתה
-        rec.get('row', ''),          # טור
-        rec.get('seat', ''),         # כסא
-        rec.get('computer', ''),     # מ.מחשב   ← נסרק
-        rec.get('is_present', ''),   # נוכחות   ← נסרק
-        rec.get('scan_time', ''),    # שעת סריקה ← נסרק
-        rec.get('technician', ''),   # טכנאי    ← נסרק
-    ][:len(headers)]
+    """
+    בונה שורה לפי הכותרות בפועל של הגיליון — לא לפי מיקום קבוע,
+    כדי שגיליון בפריסה שונה לא יקבל נתונים בעמודות הלא נכונות.
+    """
+    if not headers:
+        headers = DEFAULT_HEADERS
+    mapping = map_columns(headers)
+    row = [''] * max(len(headers), max(mapping.values(), default=0) + 1)
+    for field, idx in mapping.items():
+        row[idx] = rec.get(field, '')
+    return row
 
 
-# עמודות שהסריקה ממלאת — ייבוא חוזר לעולם לא דורס אותן
-SCAN_COLUMNS = {10, 11, 12, 13}
-
-
-def merge_examinees_into_sheet(ws, records, title_text=None):
+def merge_examinees_into_sheet(ws, records, title_text=None, include_scan_columns=False):
     """
     ממזג נבחנים לגיליון קיים — בלי למחוק כלום.
 
     מבחן מחולק לאולמות מגיע בכמה קבצי אקסל, ולכן ייבוא חוזר חייב להוסיף
     ולעדכן, לא לאפס. לכל רשומה:
-      - ת.ז שכבר בגיליון  → מעדכן רק את עמודות הזיהוי (לא נוכחות/מחשב/שעה/טכנאי)
-      - ת.ז חדשה          → נוספת בסוף
+      - נבחן שכבר בגיליון → מעדכן שדות זיהוי בלבד
+      - נבחן חדש          → נוסף בסוף
+
+    include_scan_columns=True נדרש לסנכרון נוכחות (sync_exam_to_drive),
+    שבו עמודות הסריקה הן כל מטרת הכתיבה. בייבוא רשימה הוא נשאר False,
+    אחרת רשימה טרייה הייתה מוחקת נוכחות שכבר נסרקה.
 
     מחזיר (added, updated).
     """
@@ -276,7 +318,13 @@ def merge_examinees_into_sheet(ws, records, title_text=None):
     header_idx = find_header_row(all_values)
 
     if header_idx == -1:
-        # גיליון ריק (או בלי כותרות) — מתקין כותרות ומתחיל מאפס
+        has_content = any(any(str(c).strip() for c in row) for row in all_values)
+        if has_content:
+            # יש תוכן שלא זיהינו ככותרות — עדיף להיכשל מאשר לדרוס נתונים
+            raise ValueError(
+                "הגיליון מכיל נתונים אך לא נמצאה בו שורת כותרות מזוהה. "
+                "בדוק את הגיליון ידנית לפני ייבוא."
+            )
         apply_header_formatting(ws, title_text or 'נבחנים')
         all_values = ws.get_all_values()
         header_idx = find_header_row(all_values)
@@ -284,31 +332,48 @@ def merge_examinees_into_sheet(ws, records, title_text=None):
             header_idx = HEADER_ROWS - 1
 
     headers = [str(h).strip() for h in all_values[header_idx]]
-    id_col = _col_index(headers, ['ת.ז', 'תעודת', 'id'])
-    if id_col is None:
-        id_col = 2  # מיקום ת.ז בפריסת ברירת המחדל
+    mapping = map_columns(headers)
+    id_col = mapping.get('id_number')
+    name_col = mapping.get('full_name')
 
-    # מיפוי ת.ז → אינדקס שורה בגיליון (1-based)
+    def row_key(id_number, full_name):
+        """ת.ז היא המפתח; בהיעדרה — שם מלא, כדי שרשומה בלי ת.ז לא תשוכפל."""
+        id_number = str(id_number or '').strip()
+        if id_number:
+            return ('id', id_number)
+        full_name = str(full_name or '').strip()
+        return ('name', full_name) if full_name else None
+
+    # מיפוי מפתח → אינדקס שורה בגיליון (1-based)
     existing = {}
     for offset, row in enumerate(all_values[header_idx + 1:], start=header_idx + 2):
-        if id_col < len(row):
-            key = str(row[id_col]).strip()
-            if key:
-                existing.setdefault(key, offset)
+        key = row_key(
+            row[id_col] if id_col is not None and id_col < len(row) else '',
+            row[name_col] if name_col is not None and name_col < len(row) else '',
+        )
+        if key:
+            existing.setdefault(key, offset)
+
+    protected = set() if include_scan_columns else {
+        mapping[f] for f in SCAN_FIELDS if f in mapping
+    }
 
     updates = []
     to_append = []
     updated = 0
+    queued = set()   # מפתחות שכבר נוספו בקובץ הנוכחי
 
     for rec in records:
         values = build_examinee_row(rec, headers)
-        key = str(rec.get('id_number', '')).strip()
+        key = row_key(rec.get('id_number'), rec.get('full_name'))
+        if key and key in queued:
+            continue  # אותה רשומה מופיעה פעמיים באותו קובץ
         sheet_row = existing.get(key) if key else None
 
         if sheet_row:
             current = all_values[sheet_row - 1]
             for idx, val in enumerate(values):
-                if idx in SCAN_COLUMNS or not val:
+                if idx in protected or val == '':
                     continue  # לא נוגעים בנתוני סריקה, ולא מוחקים בערך ריק
                 old = current[idx].strip() if idx < len(current) else ''
                 if old != str(val):
@@ -319,6 +384,8 @@ def merge_examinees_into_sheet(ws, records, title_text=None):
             updated += 1
         else:
             to_append.append(values)
+            if key:
+                queued.add(key)
 
     if updates:
         ws.batch_update(updates, value_input_option='USER_ENTERED')

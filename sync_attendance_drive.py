@@ -72,9 +72,11 @@ def sync_exam_to_drive(exam_name, examinees_for_exam):
             return None, None
 
         records = [_to_sheet_record(r) for r in examinees_for_exam]
-        # מיזוג — הנוכחות שכבר בגיליון לא נמחקת, וגם שאר המבחנים של המשרד
+        # include_scan_columns=True — כאן הנוכחות היא כל מטרת הכתיבה.
+        # בייבוא רשימת נבחנים הדגל נשאר False, ושם הוא מגן על הנוכחות.
         merge_examinees_into_sheet(target['worksheet'], records,
-                                   title_text=info['exam_name'])
+                                   title_text=info['exam_name'],
+                                   include_scan_columns=True)
 
         print(f"[Drive] Success! URL: {target['url']}")
         return target['sheet_id'], target['url']

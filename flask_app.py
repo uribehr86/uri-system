@@ -3277,7 +3277,9 @@ def exam_attendance_import():
 
         sheet_url = None
         try:
-            target = get_exam_sheet(exam_title_row1 or file.filename, filename=file.filename)
+            # מעבירים כותרת ושם קובץ בנפרד — כך סיומת .xlsx נחתכת
+            # ושם הגיליון יוצא זהה ל-exam_name שנשמר במסד
+            target = get_exam_sheet(exam_title_row1, filename=file.filename)
             if target:
                 # מיזוג — לא מחיקה. מבחן מחולק לאולמות מיובא בכמה קבצים.
                 merge_examinees_into_sheet(target['worksheet'], all_rows, title_text=exam_name)
@@ -3805,19 +3807,39 @@ def api_exam_scan_beacon():
         classroom_qr = parts[5] if len(parts) > 5 else ''
         scan_time_str = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
 
+        # שם המבחן: מה-QR, ואם אין — מהמסד לפי ת.ז
+        if not exam_name_qr and id_number:
+            conn_b = get_db_connection()
+            if conn_b:
+                try:
+                    cur_b = get_safe_cursor(conn_b)
+                    cur_b.execute("SELECT exam_name FROM examinees WHERE id_number = %s "
+                                  "AND exam_name != '' ORDER BY id DESC", (id_number,))
+                    row_b = cur_b.fetchone()
+                    if row_b:
+                        exam_name_qr = row_b['exam_name']
+                    cur_b.close()
+                except Exception:
+                    pass
+                finally:
+                    release_db_connection(conn_b)
+
+        # הביקון זמין מהאינטרנט — הנוכחות חייבת להירשם במסד,
+        # ולא רק בגיליון הגלובלי הישן
+        from exam_naming import parse_exam_title
+        canonical_b = parse_exam_title(exam_name_qr)['exam_name'] if exam_name_qr else ''
+        mark_attendance_in_db(id_number, canonical_b, computer, technician,
+                              pc_status, is_present)
+
         def _save():
             try:
-                import gspread
-                from google.oauth2.service_account import Credentials
-                scopes   = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-                sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
-                sheet_id = os.getenv('EXAM_ATTENDANCE_SHEET_ID', '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM')
-                creds    = Credentials.from_service_account_file(sa_file, scopes=scopes)
-                client   = gspread.authorize(creds)
-                ws       = client.open_by_key(sheet_id).sheet1
+                target_b = resolve_exam_sheet(exam_name_qr, create=False) if exam_name_qr else None
+                if not target_b:
+                    print(f"[BEACON] no sheet for '{canonical_b}' - DB only", flush=True)
+                    return
+                ws = target_b['worksheet']
                 # חיפוש שורה קיימת לפי ת.ז → עדכון, אחרת הוספה
                 all_data = ws.get_all_values()
-
                 # חיפוש שורת headers באופן דינמי (מדלג על שורת כותרת מוזגת)
                 hdr_row = 0
                 _KNOWN = ['שם', 'תעודת', 'נוכחות', 'קוד', 'מחשב', 'id', 'name']
@@ -4009,25 +4031,45 @@ def api_exam_scan_double():
     scan_time_str = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
     technician = session.get('username', '')
 
-    # â”€â”€ איתור הגיליון של המבחן â€” אותו מסלול בדיוק שהייבוא יצר â”€â”€
+    # ── סימון נוכחות במסד קודם כל דבר ──
+    # המסד הוא מקור האמת. תקלה ב-Drive באמצע בחינה אסור
+    # שתגרום לאיבוד נוכחות — את הגיליון אפשר לסנכרן אחר כך.
     from exam_naming import parse_exam_title
     exam_info = parse_exam_title(exam_name)
     canonical_exam = exam_info['exam_name'] or exam_name
 
-    target = resolve_exam_sheet(exam_name, create=False) if exam_name else None
+    db_marked = mark_attendance_in_db(id_number, canonical_exam, computer, technician,
+                                      pc_status, is_present)
+
+    # ── איתור הגיליון — אותו מסלול בדיוק שהייבוא יצר ──
+    target = None
+    sheet_error = None
+    if exam_name:
+        try:
+            target = resolve_exam_sheet(exam_name, create=False)
+        except Exception as e_sheet:
+            sheet_error = str(e_sheet)
+            print(f"[SCAN] sheet lookup failed: {e_sheet}", flush=True)
+
     if not target:
+        msg = f"לא נמצא גיליון למבחן '{canonical_exam}'"
+        if db_marked:
+            # הנוכחות נשמרה — מדווחים הצלחה עם אזהרה
+            print(f"[SCAN] {id_number} marked in DB; sheet unavailable ({sheet_error or 'not found'})", flush=True)
+            return jsonify({
+                "success": True, "in_db": True, "sheet": False,
+                "exam": canonical_exam,
+                "warning": msg + " — הנוכחות נשמרה במערכת ותסונכרן מאוחר יותר"
+            })
         return jsonify({
-            "success": False,
-            "error": f"לא נמצא גיליון למבחן '{canonical_exam}'. יש לייבא את קובץ הנבחנים תחילה."
+            "success": False, "in_db": False, "sheet": False,
+            "error": msg + ". יש לייבא את קובץ הנבחנים תחילה."
         }), 404
 
     sheet_id = target['sheet_id']
 
-    # â”€â”€ סימון נוכחות במסד (מקור האמת של המערכת) â”€â”€
-    db_marked = mark_attendance_in_db(id_number, canonical_exam, computer, technician,
-                                      pc_status, is_present)
     if not db_marked:
-        print(f"[SCAN] {id_number} not in DB for '{canonical_exam}' — sheet only", flush=True)
+        print(f"[SCAN] {id_number} not in DB for '{canonical_exam}' - sheet only", flush=True)
 
     # שמירת מפתח הגיליון והבחינה בסשן לטובת ביטול
     session['last_exam_sheet_id'] = sheet_id
@@ -4184,12 +4226,15 @@ def undo_last_scan():
     """ביטול סריקה אחרונה וניקוי סטטוס נוכחות בגוגל שיטס"""
     global attendance_cache
     try:
-        from drive_manager import find_header_row, _col_index, _a1_col, SCAN_COLUMNS
+        from drive_manager import find_header_row, map_columns, _a1_col, SCAN_FIELDS
 
         exam_name = session.get('last_exam_name')
         last_id_number = session.get('last_id_number')
         if not last_id_number:
             return {"success": False, "error": "לא נמצאה סריקה לביטול"}
+
+        from exam_naming import parse_exam_title
+        canonical_exam = parse_exam_title(exam_name)['exam_name'] if exam_name else ''
 
         # הסרה מהמטמון
         if exam_name and exam_name in attendance_cache:
@@ -4197,14 +4242,21 @@ def undo_last_scan():
                 del attendance_cache[exam_name][last_id_number]
                 print(f"[UNDO CACHE] Removed {last_id_number} from cache for {exam_name}", flush=True)
 
-        # ביטול הנוכחות במסד
+        # ביטול הנוכחות במסד — רק במבחן הנוכחי, ובלי למחוק את מ.מחשב
+        # שהגיע מרשימת הייבוא (הסריקה מבטלת נוכחות, לא הקצאת מחשב)
         conn = get_db_connection()
         if conn:
             try:
                 cur = get_safe_cursor(conn)
-                cur.execute("""UPDATE examinees SET is_present = 0, scan_time = '',
-                                                    technician = '', computer = '', pc_status = ''
-                               WHERE id_number = %s""", (last_id_number,))
+                if canonical_exam:
+                    cur.execute("""UPDATE examinees SET is_present = 0, scan_time = '',
+                                                        technician = '', pc_status = ''
+                                   WHERE id_number = %s AND exam_name = %s""",
+                                (last_id_number, canonical_exam))
+                else:
+                    cur.execute("""UPDATE examinees SET is_present = 0, scan_time = '',
+                                                        technician = '', pc_status = ''
+                                   WHERE id_number = %s""", (last_id_number,))
                 conn.commit()
                 cur.close()
             except Exception as db_err:
@@ -4224,16 +4276,21 @@ def undo_last_scan():
             return {"success": True, "sheet": False}
 
         headers = [str(h).strip() for h in all_vals[hdr_idx]]
-        id_col = _col_index(headers, ['ת.ז', 'תעודת', 'id'])
+        mapping = map_columns(headers)
+        id_col = mapping.get('id_number')
         if id_col is None:
-            id_col = 2
+            return {"success": True, "sheet": False}
+
+        # עמודות הסריקה לפי הכותרות בפועל — לא מיקום קבוע
+        scan_cols = sorted(mapping[f] for f in SCAN_FIELDS if f in mapping)
 
         for idx, r in enumerate(all_vals[hdr_idx + 1:], start=hdr_idx + 2):
             if id_col < len(r) and str(r[id_col]).strip() == str(last_id_number).strip():
                 # מנקה רק את עמודות הסריקה — שורת הנבחן עצמה נשארת
                 blanks = [{'range': f'{_a1_col(c)}{idx}', 'values': [['']]}
-                          for c in sorted(SCAN_COLUMNS)]
-                ws.batch_update(blanks, value_input_option='USER_ENTERED')
+                          for c in scan_cols]
+                if blanks:
+                    ws.batch_update(blanks, value_input_option='USER_ENTERED')
                 print(f"[UNDO OK] Cleared scan columns on row {idx} for ID {last_id_number}", flush=True)
                 return {"success": True, "sheet": True}
 
@@ -4303,7 +4360,12 @@ def api_exam_scan():
 @app.route('/exam-attendance/delete/<int:eid>', methods=['POST'])
 @login_required
 def exam_attendance_delete(eid):
-    """מחיקת נבחן"""
+    """מחיקת נבחן — מנהל בלבד"""
+    # הראוט נגיש מהאינטרנט מאז הסרת @local_only, ומחיקה היא בלתי הפיכה.
+    # אותו שער כמו ב-exam_attendance_clear.
+    if session.get('role') != 'admin':
+        flash("אין הרשאה למחיקת נבחן", "danger")
+        return redirect(url_for('exam_attendance'))
     conn = get_db_connection()
     if not conn: return "DB Error", 500
     try:

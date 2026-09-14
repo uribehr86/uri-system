@@ -34,6 +34,8 @@ _HALL_RE = re.compile(r'(?:אולם|כיתה)\s*[\'"]?[\w֐-׿]+[\'"]?')
 _SEP_RE = re.compile(r'\s[-–—]\s')
 # סיומות רעש שנגררות משמות קבצים
 _NOISE_RE = re.compile(r'[-–—]?\s*(נוכחות|רשימת נבחנים|רשימה|final|סופי)\s*$', re.IGNORECASE)
+# סיומת קובץ בסוף המחרוזת
+_EXT_RE = re.compile(r'\.(xlsx|xlsm|xls|csv)$', re.IGNORECASE)
 # תווים שאסורים/בעייתיים בשם קובץ ב-Drive ובשאילתות
 _BAD_CHARS_RE = re.compile(r'[\\/\[\]*?:\'"|]')
 
@@ -65,7 +67,12 @@ def parse_exam_title(raw, filename=None):
     """
     source = (raw or '').strip()
     if not source and filename:
-        source = os.path.splitext(os.path.basename(filename))[0]
+        # שם קובץ אמיתי — כאן basename בטוח
+        source = os.path.basename(str(filename).strip())
+    # חיתוך סיומת תמיד, גם כשהמקור הגיע כ-raw, אחרת שם הגיליון יוצא
+    # "רופאים .xlsx_6.10.26". רגקס ולא splitext/basename: תאריך עם
+    # לוכסנים (06/10/2026) היה נחתך בטעות ע"י basename.
+    source = _EXT_RE.sub('', source)
     original = source
     source = _squash(_NOISE_RE.sub('', _squash(source)))
 
@@ -85,6 +92,13 @@ def parse_exam_title(raw, filename=None):
 
     # משרד — החלק שלפני המקף הראשון
     parts = _SEP_RE.split(source, maxsplit=1)
+    if len(parts) != 2:
+        # מקף בלי רווחים ("משרד הבריאות-רופאים") נחשב מפריד רק אם הצד
+        # השמאלי הוא צירוף של כמה מילים. כך "רב-תחומי" לא מתפצל בטעות.
+        bare = source.split('-', 1)
+        if len(bare) == 2 and len(_squash(bare[0]).split()) >= 2:
+            parts = bare
+
     if len(parts) == 2 and _clean(parts[0]) and _clean(parts[1]):
         office = _clean(parts[0])
         exam_base = _clean(parts[1])
