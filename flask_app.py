@@ -3141,6 +3141,48 @@ def mark_attendance_in_db(id_number, exam_name, computer, technician, pc_status=
         release_db_connection(conn)
 
 
+def convert_docx_to_pdf(docx_bytes, timeout=60):
+    """
+    ממיר bytes של docx ל-PDF דרך LibreOffice headless.
+    מחזיר bytes של ה-PDF, או None אם soffice לא מותקן/נכשל — כדי שהקורא
+    ייפול חזרה ל-Word במקום להחזיר שגיאה למשתמש.
+
+    שים לב: זה דורש LibreOffice מותקן בשרת. סביבת Render הרגילה (runtime:
+    python, ללא Dockerfile) בדרך כלל לא כוללת אותו — הפונקציה נכשלת בשקט
+    במקרה הזה, וזה בכוונה.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+
+    soffice = shutil.which('soffice') or shutil.which('libreoffice')
+    if not soffice:
+        print("[PDF] soffice not found — PDF conversion unavailable on this server", flush=True)
+        return None
+
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            src_path = os.path.join(tmpdir, 'input.docx')
+            with open(src_path, 'wb') as f:
+                f.write(docx_bytes)
+
+            result = subprocess.run(
+                [soffice, '--headless', '--norestore', '--convert-to', 'pdf',
+                 '--outdir', tmpdir, src_path],
+                capture_output=True, timeout=timeout
+            )
+            pdf_path = os.path.join(tmpdir, 'input.pdf')
+            if result.returncode != 0 or not os.path.exists(pdf_path):
+                print(f"[PDF] soffice conversion failed (rc={result.returncode}): "
+                      f"{result.stderr.decode(errors='replace')[:500]}", flush=True)
+                return None
+            with open(pdf_path, 'rb') as f:
+                return f.read()
+    except Exception as e:
+        print(f"[PDF] conversion error: {e}", flush=True)
+        return None
+
+
 def save_project_mapping(exam_name, sheet_id, sheet_url, office=''):
     """שומר/מעדכן את מיפוי המבחן → גיליון בטבלת projects (משמש את הסורק)."""
     conn = get_db_connection()
@@ -3716,6 +3758,20 @@ def generate_word_docs():
         final_buf = io.BytesIO()
         master_doc.save(final_buf)
         final_buf.seek(0)
+
+        wants_pdf = (request.form.get('format', 'docx') or 'docx').strip().lower() == 'pdf'
+        if wants_pdf:
+            pdf_bytes = convert_docx_to_pdf(final_buf.getvalue())
+            if pdf_bytes:
+                return send_file(
+                    io.BytesIO(pdf_bytes),
+                    as_attachment=True,
+                    download_name='טפסי_נבחנים.pdf',
+                    mimetype='application/pdf'
+                )
+            # LibreOffice לא זמין בשרת הזה — לא מפילים את הבקשה, שולחים Word במקום
+            flash("המרה ל-PDF לא זמינה בשרת הזה כרגע — נשלח קובץ Word במקום", "warning")
+            final_buf.seek(0)
 
         return send_file(
             final_buf,
