@@ -252,10 +252,11 @@ FIELD_KEYWORDS = [
     ('is_present',  ['נוכחות', 'הגיע', 'attendance']),
     ('scan_time',   ['שעת', 'זמן', 'time', 'scan']),
     ('technician',  ['טכנאי', 'technician']),
+    ('pc_status',   ['תקין', 'סטטוס', 'status', 'valid']),
 ]
 
 # השדות שהסריקה ממלאת — ייבוא רשימת נבחנים לעולם לא דורס אותם
-SCAN_FIELDS = {'computer', 'is_present', 'scan_time', 'technician'}
+SCAN_FIELDS = {'computer', 'is_present', 'scan_time', 'technician', 'pc_status'}
 
 
 def map_columns(headers):
@@ -399,6 +400,112 @@ def merge_examinees_into_sheet(ws, records, title_text=None, include_scan_column
 
     print(f"[Sheets] Merged into '{ws.title}': {len(to_append)} added, {updated} updated", flush=True)
     return len(to_append), updated
+
+
+def load_examinee_records(ws):
+    """
+    קורא את כל הנבחנים מגיליון — לשימוש כמטמון-תהליך בזיכרון (RAM בלבד,
+    לא נשמר לדיסק). המערכת הזו לא מחזיקה שום מסד נתונים לנבחנים —
+    Google Drive הוא מקור האמת היחיד, וזו רק קריאה שלו.
+
+    מחזיר dict: מפתח → dict(שדות...). מפתח הוא ת.ז, ובהיעדרה שם מלא
+    (כמו במיזוג הייבוא, כדי לא לפספס נבחן בלי ת.ז).
+    """
+    all_values = ws.get_all_values()
+    header_idx = find_header_row(all_values)
+    if header_idx == -1:
+        return {}
+
+    headers = [str(h).strip() for h in all_values[header_idx]]
+    mapping = map_columns(headers)
+    id_col = mapping.get('id_number')
+    name_col = mapping.get('full_name')
+
+    records = {}
+    for row in all_values[header_idx + 1:]:
+        def get(field):
+            idx = mapping.get(field)
+            return row[idx].strip() if idx is not None and idx < len(row) else ''
+
+        id_number = get('id_number')
+        full_name = get('full_name')
+        key = id_number or full_name
+        if not key:
+            continue
+        records[key] = {f: get(f) for f, _ in FIELD_KEYWORDS}
+    return records
+
+
+def write_examinee_scan(ws, id_number, full_name='', computer='', col='', seat='',
+                        pc_status='', scan_time='', technician='', is_present=1,
+                        username='', password=''):
+    """
+    כותב תוצאת סריקה בודדת לגיליון — פונקציה אחת לכל נקודות הסריקה
+    (סריקה כפולה, ביקון, סריקה פשוטה), כדי שלא יהיו כמה מימושים
+    שסוטים זה מזה עם הזמן.
+
+    מוצא שורה קיימת לפי ת.ז (ובהיעדרה לפי שם) ומעדכן; אם לא נמצאה —
+    מוסיף שורה חדשה. לעולם לא נוגע בעמודת 'גרסה' — זו שייכת לרשימת
+    הייבוא, לא לנתוני הסריקה.
+    """
+    all_data = ws.get_all_values()
+    header_idx = find_header_row(all_data)
+    if header_idx == -1:
+        header_idx = 0
+    headers = [str(h).strip() for h in (all_data[header_idx] if all_data else [])]
+    mapping = map_columns(headers)
+
+    id_col = mapping.get('id_number')
+    name_col = mapping.get('full_name')
+
+    target_row = None
+    for i, row in enumerate(all_data[header_idx + 1:], start=header_idx + 1):
+        if (id_number and id_col is not None and id_col < len(row)
+                and str(row[id_col]).strip() == str(id_number).strip()):
+            target_row = i
+            break
+        if (target_row is None and full_name and name_col is not None and name_col < len(row)
+                and str(row[name_col]).strip() == str(full_name).strip()):
+            target_row = i
+            break
+
+    scan_values = {
+        'computer': computer, 'is_present': str(is_present), 'scan_time': scan_time,
+        'technician': technician, 'pc_status': pc_status,
+    }
+
+    if target_row is not None:
+        sheet_row = target_row + 1
+        existing = all_data[target_row]
+        updates = []
+        for field, val in scan_values.items():
+            idx = mapping.get(field)
+            if idx is not None and val:
+                updates.append({'range': f'{_a1_col(idx)}{sheet_row}', 'values': [[val]]})
+        # username/password: רק אם התא ריק — לא דורסים מה שכבר בגיליון
+        for field, val in [('username', username), ('password', password)]:
+            idx = mapping.get(field)
+            if idx is not None and val:
+                current = existing[idx].strip() if idx < len(existing) else ''
+                if not current:
+                    updates.append({'range': f'{_a1_col(idx)}{sheet_row}', 'values': [[val]]})
+        if updates:
+            ws.batch_update(updates, value_input_option='USER_ENTERED')
+        print(f"[Sheets] Updated row {sheet_row} for {full_name or id_number} "
+              f"(present={is_present})", flush=True)
+        return 'updated'
+
+    # לא נמצאה שורה — נבחן חדש שנוצר ישירות מה-QR בסריקה
+    new_row = [''] * max(len(headers), max(mapping.values(), default=0) + 1)
+    row_values = dict(scan_values, full_name=full_name, id_number=id_number,
+                      row=col, seat=seat, username=username, password=password)
+    for field, val in row_values.items():
+        idx = mapping.get(field)
+        if idx is not None and val:
+            new_row[idx] = val
+    ws.append_row(new_row, value_input_option='USER_ENTERED')
+    print(f"[Sheets] Appended new row for {full_name or id_number}", flush=True)
+    return 'appended'
 
 
 def _a1_col(idx):
