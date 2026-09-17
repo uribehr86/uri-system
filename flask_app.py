@@ -3424,7 +3424,44 @@ def generate_word_docs():
         if not examinees:
             flash("לא נמצאו נתונים בקובץ האקסל", "warning")
             return redirect(url_for('exam_attendance'))
-            
+
+        # ── שמירה אוטומטית ל-Drive — בלי זה מי שמודפס כאן לעולם לא
+        # נמצא בסריקה, כי הסריקה מחפשת בגיליון, לא בקובץ ה-Word ──
+        from exam_naming import parse_exam_title
+        from drive_manager import get_exam_sheet, merge_examinees_into_sheet
+
+        groups = {}  # שם מבחן קנוני -> רשימת רשומות (יש תמיכה בעמודת exam_name שונה לכל שורה)
+        for e in examinees:
+            raw_title = e['exam_name'] or exam_title_from_header or 'EXAMINEE'
+            canonical = parse_exam_title(raw_title, excel_file.filename)['exam_name']
+            e['_canonical_exam'] = canonical  # אותו שם בדיוק ייכנס ל-QR בהמשך
+            groups.setdefault(canonical, []).append({
+                'full_name':   e['name'],
+                'id_number':   e['id_number'],
+                'username':    e['username'],
+                'password':    e['password'],
+                'hall':        e['location'],
+                'computer':    e['computer'],
+                'row':         e['row'],
+                'seat':        e['seat'],
+                'adaptations': e['notes'],
+            })
+
+        drive_saved = 0
+        for canonical, records in groups.items():
+            try:
+                target = get_exam_sheet(canonical, create=True)
+                if target:
+                    merge_examinees_into_sheet(target['worksheet'], records, title_text=canonical)
+                    drive_saved += len(records)
+            except Exception as e_drive:
+                print(f"[WORD-GEN] Drive save failed for '{canonical}': {e_drive}", flush=True)
+
+        if drive_saved:
+            flash(f"📁 {drive_saved} נבחנים נשמרו אוטומטית גם ב-Google Drive — הסריקה תמצא אותם", "info")
+        else:
+            flash("⚠️ השמירה האוטומטית ל-Drive נכשלה — הדפים יופקו, אך הסריקה לא תמצא אותם עד לייבוא ידני", "warning")
+
         # Load template
         if word_template and word_template.filename.endswith('.docx'):
             word_bytes = word_template.read()
@@ -3796,14 +3833,13 @@ def api_simple_scan():
     if not canonical_exam:
         return {"error": "QR לא מכיל שם מבחן"}, 400
 
-    examinee = find_examinee(canonical_exam, id_number=id_number, full_name=name)
-    if not examinee:
-        return {"error": f"נבחן עם ת.ז. {id_number} לא במערכת"}, 404
-
     technician = session.get('username', '')
-    target = resolve_exam_sheet(canonical_exam, create=False)
+    # create=True: ה-QR נושא את כל הפרטים בעצמו (הופק ע"י מחולל
+    # התבניות) — הסריקה פותחת/יוצרת את הגיליון הנכון ומכניסה את
+    # הנבחן, גם אם לא בוצע ייבוא נפרד מראש
+    target = resolve_exam_sheet(canonical_exam, create=True)
     if not target:
-        return {"error": f"לא נמצא גיליון למבחן '{canonical_exam}'"}, 404
+        return {"error": f"לא הצלחתי לפתוח/ליצור גיליון למבחן '{canonical_exam}'"}, 500
 
     try:
         from drive_manager import write_examinee_scan
@@ -3856,7 +3892,7 @@ def api_exam_scan_beacon():
                 return
             try:
                 from drive_manager import write_examinee_scan
-                target_b = resolve_exam_sheet(canonical_b, create=False)
+                target_b = resolve_exam_sheet(canonical_b, create=True)
                 if not target_b:
                     print(f"[BEACON] no sheet for '{canonical_b}'", flush=True)
                     return
@@ -3965,20 +4001,25 @@ def api_exam_scan_double():
         return jsonify({"success": False, "error": "לא זוהה שם מבחן ב-QR"}), 400
 
     # ── איתור הגיליון ב-Drive — מקור האמת היחיד ──
+    # create=True: ה-QR (מדף הנבחן שהודפס) נושא את כל הפרטים בעצמו,
+    # אז הסריקה פותחת/יוצרת את התיקייה/הגיליון הנכונים לפי שם המבחן
+    # ומכניסה את הנבחן — בלי צורך בייבוא אקסל נפרד מראש
     target = None
     sheet_error = None
     try:
-        target = resolve_exam_sheet(exam_name, create=False)
+        target = resolve_exam_sheet(exam_name, create=True)
     except Exception as e_sheet:
         sheet_error = str(e_sheet)
-        print(f"[SCAN] sheet lookup failed: {e_sheet}", flush=True)
+        print(f"[SCAN] sheet lookup/creation failed: {e_sheet}", flush=True)
 
     if not target:
-        msg = f"לא נמצא גיליון למבחן '{canonical_exam}'"
+        msg = f"לא הצלחתי לפתוח/ליצור גיליון למבחן '{canonical_exam}'"
+        if sheet_error:
+            msg += f" ({sheet_error})"
         return jsonify({
             "success": False, "in_roster": False, "sheet": False,
-            "error": msg + ". יש לייבא את קובץ הנבחנים תחילה."
-        }), 404
+            "error": msg
+        }), 500
 
     sheet_id = target['sheet_id']
 
@@ -4106,30 +4147,32 @@ def api_exam_scan():
     if not canonical_exam:
         return {"error": "QR לא מכיל שם מבחן"}, 400
 
-    examinee = find_examinee(canonical_exam, id_number=id_number)
-    if not examinee:
-        return {"error": f"נבחן עם ת.ז. {id_number} לא נמצא במערכת"}, 404
-
+    full_name = qr['full_name']
+    examinee = find_examinee(canonical_exam, id_number=id_number, full_name=full_name) or {}
     if str(examinee.get('is_present', '')) in ('1', 'True', 'true'):
         return {"success": True, "already": True, "examinee": examinee}
 
     technician = session.get('username', '')
-    target = resolve_exam_sheet(canonical_exam, create=False)
+    # create=True: ה-QR נושא את כל הפרטים בעצמו — הסריקה פותחת/יוצרת
+    # את הגיליון הנכון גם בלי ייבוא אקסל קודם
+    target = resolve_exam_sheet(canonical_exam, create=True)
     if not target:
-        return {"error": f"לא נמצא גיליון למבחן '{canonical_exam}'"}, 404
+        return {"error": f"לא הצלחתי לפתוח/ליצור גיליון למבחן '{canonical_exam}'"}, 500
 
     try:
         from drive_manager import write_examinee_scan
         write_examinee_scan(target['worksheet'], id_number,
-                            full_name=examinee.get('full_name', ''), technician=technician,
-                            is_present=1)
-        mark_examinee_scanned(canonical_exam, id_number, examinee.get('full_name', ''),
+                            full_name=examinee.get('full_name') or full_name,
+                            technician=technician, is_present=1)
+        mark_examinee_scanned(canonical_exam, id_number, examinee.get('full_name') or full_name,
                               '', technician, is_present=1)
     except Exception as e:
         return {"error": str(e)}, 500
 
     examinee['is_present'] = True
     examinee['attend_time'] = datetime.now().strftime("%H:%M:%S")
+    examinee.setdefault('full_name', full_name)
+    examinee.setdefault('id_number', id_number)
     return {"success": True, "already": False, "examinee": examinee}
 
 @app.route('/exam-attendance/delete/<int:eid>', methods=['POST'])
