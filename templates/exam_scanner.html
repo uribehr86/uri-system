@@ -246,7 +246,24 @@
     scanner = new Html5Qrcode("reader");
     const config = {
       fps: 10,
-      qrbox: { width: 250, height: 250 }
+      // תיבה רחבה ונמוכה, לא ריבוע — ברקודי מחשב (Code128/EAN) רחבים
+      // ונמוכים, וריבוע צר מדי היה חותך אותם ומונע זיהוי, בעוד ה-QR
+      // של הנבחן נכנס בקלות גם בתיבה רחבה
+      qrbox: { width: 280, height: 140 },
+      // תמיכה מפורשת גם בברקודים לינאריים, לא רק QR — כדי שאם
+      // הדפדפן/הספרייה משתמשים בזיהוי מצומצם כברירת מחדל זה לא ייחסם
+      formatsToSupport: window.Html5QrcodeSupportedFormats ? [
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.CODE_93,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.CODABAR,
+      ] : undefined
     };
     return scanner.start(
       { facingMode: "environment" },
