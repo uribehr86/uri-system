@@ -26,7 +26,10 @@ load_dotenv()
 
 from exam_naming import parse_exam_title
 
-PARENT_FOLDER_ID = os.getenv('PARENT_FOLDER_ID', '18-VtXbYxvT8EqVzJgdAZv54aDnRWhNvM')
+# ברירת המחדל היא ה-ID של תיקיית "מערכת בחינות" עצמה (לא התיקייה
+# הכללית שמכילה אותה) — כדי שגם בלי PARENT_FOLDER_ID מוגדר ב-Render,
+# תיקיות המשרדים ייווצרו בפנים ולא יתפזרו החוצה
+PARENT_FOLDER_ID = os.getenv('PARENT_FOLDER_ID', '1bmoF9oe2O6hB4v2MCJEtWRWI7nnO8llv')
 SA_FILE          = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
 
 SCOPES = [
