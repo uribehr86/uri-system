@@ -587,17 +587,23 @@
       body: body
     })
     .then(function(r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
       var ct = r.headers.get('content-type') || '';
       if (r.url.includes('/login') || !ct.includes('json')) {
         window.location.href = '/login';
         throw new Error('הסשן פג — נא להתחבר מחדש');
       }
-      return r.json();
+      // קוראים את ה-JSON גם על תשובת שגיאה (404/400 וכו') — השרת
+      // תמיד שולח שם הודעה מפורטת, ולא רוצים "HTTP 404" גנרי במקומה
+      return r.json().then(function(data) {
+        return { ok: r.ok, status: r.status, data: data };
+      });
     })
-    .then(function(data) {
+    .then(function(result) {
+      var data = result.data;
       if (data.error) {
         showScanResult(false, data.error);
+      } else if (!result.ok) {
+        showScanResult(false, 'שגיאת שרת (' + result.status + ')');
       } else {
         attendCount++;
         document.getElementById('attend-count').textContent = attendCount;
