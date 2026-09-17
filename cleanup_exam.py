@@ -1,10 +1,10 @@
 import gspread, os
-from google.oauth2.service_account import Credentials
 from dotenv import load_dotenv
+from drive_manager import get_google_credentials
 
 load_dotenv()
 scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-creds = Credentials.from_service_account_file(os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json'), scopes=scopes)
+creds = get_google_credentials(scopes)
 client = gspread.authorize(creds)
 sh = client.open_by_key(os.getenv('GOOGLE_SHEETS_ID'))
 

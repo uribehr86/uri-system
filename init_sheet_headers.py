@@ -1,11 +1,10 @@
 import gspread, os
-from google.oauth2.service_account import Credentials
+from drive_manager import get_google_credentials
 
 scopes   = ['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/drive']
-sa_file  = 'service_account.json'
 sheet_id = '1YWLJA5T8Uq7IGzlzXSA1PPwrdSIPx9eazEcwWXwh3uM'
 
-creds  = Credentials.from_service_account_file(sa_file, scopes=scopes)
+creds  = get_google_credentials(scopes)
 client = gspread.authorize(creds)
 ws     = client.open_by_key(sheet_id).sheet1
 

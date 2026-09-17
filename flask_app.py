@@ -598,19 +598,13 @@ _migration_thread = threading.Thread(target=_run_migrations_background, daemon=T
 _migration_thread.start()
 
 def get_google_creds(scopes):
-    """Load Google credentials from env var (Render) or local file."""
-    from google.oauth2.service_account import Credentials
-    import json as _json
-    sa_json = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
-    if sa_json:
-        try:
-            return Credentials.from_service_account_info(_json.loads(sa_json), scopes=scopes)
-        except Exception as e:
-            print(f"[CREDS] GOOGLE_SERVICE_ACCOUNT_JSON error: {e}")
-    sa_file = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
-    if os.path.exists(sa_file):
-        return Credentials.from_service_account_file(sa_file, scopes=scopes)
-    raise FileNotFoundError(f"Google credentials not found. Set GOOGLE_SERVICE_ACCOUNT_JSON on Render.")
+    """
+    Load Google credentials — delegates to drive_manager.get_google_credentials,
+    שהוא עכשיו המקור היחיד (תומך גם ב-OAuth של חשבון אישי, לא רק
+    service account שאין לו מכסת אחסון משלו).
+    """
+    from drive_manager import get_google_credentials
+    return get_google_credentials(scopes)
 
 # ── מיפוי טווחי ברקוד לדגמים — מקור אמת יחיד ──────────────────────────────
 # עד 10/09/2026 הכלל הזה היה משוכפל בארבעה מקומות שלא הסכימו ביניהם:
@@ -4414,14 +4408,12 @@ def api_submit_fault():
         print(f"[FAULT] â–¶ï¸ שומר תקלה: מחשב {barcode} | {fault_type}", flush=True)
         try:
             import gspread
-            from google.oauth2.service_account import Credentials
             scopes   = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-            sa_file  = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
             sheet_id = os.getenv('GOOGLE_SHEETS_ID')
             if not sheet_id:
                 print("[FAULT] âš ï¸ GOOGLE_SHEETS_ID לא מוגדר", flush=True)
                 return
-            creds  = Credentials.from_service_account_file(sa_file, scopes=scopes)
+            creds  = get_google_creds(scopes)
             client = gspread.authorize(creds)
             sh     = client.open_by_key(sheet_id)
             # פתח/צור גיליון 'תקלות'

@@ -48,17 +48,48 @@ DEFAULT_HEADERS = [
 HEADER_ROWS = 2
 
 
+def get_google_credentials(scopes=None):
+    """
+    מקור אחד לאישורי גוגל בכל המערכת — כל שאר הקבצים (flask_app,
+    sync_attendance_drive, google_sheets_sync, סקריפטים עצמאיים)
+    אמורים לקרוא לפונקציה הזו במקום לבנות Credentials בעצמם.
+
+    סדר עדיפות:
+      1. OAuth של המשתמש עצמו (refresh token) — כשחשבון Gmail רגיל,
+         כי ל-service account אין מכסת אחסון משלו (0GB), אז הוא לא
+         יכול ליצור תיקיות/גיליונות חדשים, רק לערוך קיימים
+      2. Service account מ-JSON (משתנה סביבה) — לתאימות לאחור
+      3. Service account מקובץ מקומי — לפיתוח מקומי
+    """
+    scopes = scopes or SCOPES
+
+    client_id     = os.getenv('GOOGLE_OAUTH_CLIENT_ID')
+    client_secret = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET')
+    refresh_token = os.getenv('GOOGLE_OAUTH_REFRESH_TOKEN')
+    if client_id and client_secret and refresh_token:
+        from google.oauth2.credentials import Credentials as UserCredentials
+        return UserCredentials(
+            token=None,
+            refresh_token=refresh_token,
+            client_id=client_id,
+            client_secret=client_secret,
+            token_uri='https://oauth2.googleapis.com/token',
+            scopes=scopes,
+        )
+
+    from google.oauth2.service_account import Credentials as ServiceCredentials
+    sa_json_str = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
+    if sa_json_str:
+        return ServiceCredentials.from_service_account_info(json.loads(sa_json_str), scopes=scopes)
+    return ServiceCredentials.from_service_account_file(SA_FILE, scopes=scopes)
+
+
 def _get_clients():
     """מחזיר (gspread_client, drive_service)"""
-    from google.oauth2.service_account import Credentials
     from googleapiclient.discovery import build
     import gspread
 
-    sa_json_str = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
-    if sa_json_str:
-        creds = Credentials.from_service_account_info(json.loads(sa_json_str), scopes=SCOPES)
-    else:
-        creds = Credentials.from_service_account_file(SA_FILE, scopes=SCOPES)
+    creds = get_google_credentials(SCOPES)
     gs    = gspread.authorize(creds)
     drive = build('drive', 'v3', credentials=creds)
     return gs, drive
