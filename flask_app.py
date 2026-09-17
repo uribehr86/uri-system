@@ -720,6 +720,23 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def scan1_only(f):
+    """
+    מגביל גישה למשתמש 'scan1' בדיוק — כולל admin. לפי בקשה מפורשת:
+    רק חשבון הסריקה הייעודי יכול לסרוק נוכחות, אף אחד אחר.
+    שים לב: אין כאן חריגת מנהל — אם scan1 ננעל בחוץ (סיסמה נשכחה
+    וכו') צריך לאפס את הסיסמה שלו דרך ניהול משתמשים, לא לעקוף כאן.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if session.get('username') != 'scan1':
+            if request.path.startswith('/api/'):
+                return jsonify({"error": "גישה לסריקה מוגבלת למשתמש scan1 בלבד"}), 403
+            flash("גישה לסריקת נוכחות מוגבלת למשתמש scan1 בלבד", "danger")
+            return redirect(url_for('exam_attendance'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 def local_only(f):
     """חוסם גישה ל-route כאשר רצים על Render (אינטרנט) — רק לשימוש מקומי"""
     @wraps(f)
@@ -3822,6 +3839,7 @@ def simple_scanner():
 
 @app.route('/api/simple-scan', methods=['POST'])
 @login_required
+@scan1_only
 def api_simple_scan():
     data = request.json
     qr_text = data.get('qr', '').strip()
@@ -3862,6 +3880,7 @@ def api_simple_scan():
 # â”€â”€ BEACON: GET endpoint לסריקות מהטלפון (עוקף בעיות SSL בכרום) â”€â”€â”€â”€â”€â”€
 @app.route('/api/exam-scan-beacon', methods=['GET'])
 @login_required
+@scan1_only
 def api_exam_scan_beacon():
     """
     מקבל נתוני סריקה דרך GET params ומחזיר pixel שקוף.
@@ -3923,6 +3942,7 @@ def api_exam_scan_beacon():
 
 @app.route('/api/check-computer-used', methods=['POST'])
 @login_required
+@scan1_only
 def api_check_computer_used():
     """בדיקה אם מחשב כבר שויך לנבחן אחר בגיליון הנוכחי"""
     data = request.json or {}
@@ -3966,6 +3986,7 @@ def api_check_computer_used():
 
 @app.route('/api/exam-scan-double', methods=['POST'])
 @login_required
+@scan1_only
 def api_exam_scan_double():
     """סריקה כפולה: נבחן + מחשב + סטטוסים — מקבל JSON או form data"""
     if request.is_json:
@@ -4075,6 +4096,7 @@ def api_exam_scan_double():
 
 @app.route('/api/undo-last-scan', methods=['POST'])
 @login_required
+@scan1_only
 def undo_last_scan():
     """ביטול סריקה אחרונה וניקוי סטטוס נוכחות בגיליון ב-Drive"""
     try:
@@ -4139,6 +4161,7 @@ def undo_last_scan():
 
 @app.route('/api/exam-scan', methods=['POST'])
 @login_required
+@scan1_only
 def api_exam_scan():
     """סריקת QR לנוכחות"""
     data = request.json
@@ -4276,6 +4299,7 @@ def exam_attendance_clear():
 
 @app.route('/exam-attendance/scanner')
 @login_required
+@scan1_only
 def exam_attendance_scanner():
     """עמוד סריקת נוכחות"""
     return render_template('exam_scanner.html')
