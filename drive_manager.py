@@ -159,13 +159,17 @@ def _create_sheet_with_headers(gs, drive, name, parent_id, title_text=None):
     return sheet_id
 
 
-def get_exam_sheet(exam_title, filename=None, create=True):
+def get_exam_sheet(exam_title, filename=None, create=True, raise_errors=False):
     """
     הפונקציה הראשית — מחזירה את הגיליון של מבחן מסוים.
 
     exam_title: הכותרת הגולמית (שורה 1 באקסל / parts[0] של ה-QR)
     filename:   שם קובץ, משמש כ-fallback אם אין כותרת
     create:     True — יוצר תיקייה/גיליון אם חסרים. False — רק מאתר.
+    raise_errors: False (ברירת מחדל) — כשל מוחזר כ-None, כמו תמיד.
+                  True — כשל אמיתי מול Drive (לא "לא נמצא") נזרק החוצה,
+                  כדי שהקורא (למשל מסך הסריקה) יוכל להציג את הסיבה
+                  האמיתית למשתמש במקום "נכשל" גנרי.
 
     מחזיר dict:
       {'sheet_id', 'worksheet', 'spreadsheet', 'folder_id', 'created',
@@ -215,6 +219,8 @@ def get_exam_sheet(exam_title, filename=None, create=True):
         import traceback
         print(f"[Drive ERROR] {ex}", flush=True)
         traceback.print_exc()
+        if raise_errors:
+            raise
         return None
 
 

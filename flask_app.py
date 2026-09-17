@@ -2992,7 +2992,11 @@ def load_examinee_cache(exam_name, force=False):
         return examinee_cache[canonical]
 
     from drive_manager import load_examinee_records
-    target = resolve_exam_sheet(exam_name, create=False)
+    try:
+        target = resolve_exam_sheet(exam_name, create=False)
+    except Exception as e:
+        print(f"[CACHE] sheet lookup failed for '{canonical}': {e}", flush=True)
+        target = None
     if not target:
         examinee_cache[canonical] = {}
         return {}
@@ -3094,8 +3098,10 @@ def resolve_exam_sheet(raw_exam_title, create=False):
         except Exception as e:
             print(f"[SCAN] stored sheet {sheet_id} unusable ({e}) — falling back to Drive", flush=True)
 
-    # 2. חיפוש/יצירה ב-Drive
-    return get_exam_sheet(raw_exam_title, create=create)
+    # 2. חיפוש/יצירה ב-Drive. raise_errors=True: כשל אמיתי (לא "לא
+    # נמצא") נזרק החוצה כדי שהקורא יציג את הסיבה האמיתית למשתמש,
+    # ולא רק "לא הצלחתי לפתוח/ליצור גיליון" בלי שום הסבר
+    return get_exam_sheet(raw_exam_title, create=create, raise_errors=True)
 
 
 def convert_docx_to_pdf(docx_bytes, timeout=60):
@@ -3837,7 +3843,10 @@ def api_simple_scan():
     # create=True: ה-QR נושא את כל הפרטים בעצמו (הופק ע"י מחולל
     # התבניות) — הסריקה פותחת/יוצרת את הגיליון הנכון ומכניסה את
     # הנבחן, גם אם לא בוצע ייבוא נפרד מראש
-    target = resolve_exam_sheet(canonical_exam, create=True)
+    try:
+        target = resolve_exam_sheet(canonical_exam, create=True)
+    except Exception as e_sheet:
+        return {"error": f"שגיאה בפתיחת/יצירת גיליון למבחן '{canonical_exam}': {e_sheet}"}, 500
     if not target:
         return {"error": f"לא הצלחתי לפתוח/ליצור גיליון למבחן '{canonical_exam}'"}, 500
 
@@ -4155,7 +4164,10 @@ def api_exam_scan():
     technician = session.get('username', '')
     # create=True: ה-QR נושא את כל הפרטים בעצמו — הסריקה פותחת/יוצרת
     # את הגיליון הנכון גם בלי ייבוא אקסל קודם
-    target = resolve_exam_sheet(canonical_exam, create=True)
+    try:
+        target = resolve_exam_sheet(canonical_exam, create=True)
+    except Exception as e_sheet:
+        return {"error": f"שגיאה בפתיחת/יצירת גיליון למבחן '{canonical_exam}': {e_sheet}"}, 500
     if not target:
         return {"error": f"לא הצלחתי לפתוח/ליצור גיליון למבחן '{canonical_exam}'"}, 500
 
