@@ -263,7 +263,12 @@
         Html5QrcodeSupportedFormats.UPC_E,
         Html5QrcodeSupportedFormats.ITF,
         Html5QrcodeSupportedFormats.CODABAR,
-      ] : undefined
+      ] : undefined,
+      // אם הדפדפן תומך בזיהוי ברקודים מובנה (BarcodeDetector) — משתמשים
+      // בו. הוא הרבה יותר אמין לברקודים לינאריים מהספרייה החיצונית
+      // לבדה. אם לא נתמך, html5-qrcode נופל חזרה לזיהוי הרגיל שלו —
+      // לא שובר כלום בדפדפנים שלא תומכים
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true }
     };
     return scanner.start(
       { facingMode: "environment" },
