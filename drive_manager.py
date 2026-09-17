@@ -41,8 +41,17 @@ SCOPES = [
 DEFAULT_HEADERS = [
     'שם פרטי', 'שם משפחה', 'ת.ז', 'התאמות', 'סיסמה',
     'שם משתמש', 'גרסה', 'אולם/כיתה', 'טור', 'כסא',
-    'מ.מחשב', 'נוכחות', 'שעת סריקה', 'טכנאי'
+    'מ.מחשב', 'סטטוס', 'נוכחות', 'שעת סריקה', 'טכנאי'
 ]
+
+# עמודות שהסריקה כותבת אליהן ושחייבות להתקיים בגיליון. 'סטטוס' נוסף
+# מאוחר: גיליונות שנוצרו לפניו אין להם עמודה כזו, והסריקה כתבה את
+# תקין/תקול לשום מקום — map_columns לא מצא יעד, והערך נזרק בשקט.
+# ensure_scan_columns מוסיף את החסרות, כדי שגם מבחנים קיימים יתוקנו.
+#
+# השם 'סטטוס' ולא 'מחשב תקין' בכוונה: map_columns עושה סבב התאמה
+# חלקית, ו-'מחשב' בשם היה נתפס קודם על ידי השדה computer.
+REQUIRED_SCAN_COLUMNS = [('pc_status', 'סטטוס')]
 
 # מספר השורות שאינן נתונים: [1] כותרת ממוזגת, [2] כותרות עמודות
 HEADER_ROWS = 2
@@ -268,6 +277,44 @@ def find_header_row(all_values):
     return -1
 
 
+def ensure_scan_columns(ws, headers, header_idx):
+    """
+    מוסיף לשורת הכותרות עמודות סריקה שחסרות, ומחזיר את הכותרות המעודכנות.
+
+    נקרא לפני map_columns בכל נקודה שכותבת לגיליון, כך שגיליון ותיק
+    מקבל את העמודה בפעם הראשונה שנוגעים בו — בלי מיגרציה נפרדת.
+
+    כשל בהוספה לא מפיל את הסריקה: מחזירים את הכותרות המקוריות, והערך
+    פשוט לא נכתב — בדיוק ההתנהגות שהייתה קודם, לא יותר גרוע.
+    """
+    mapping = map_columns(headers)
+    missing = [title for field, title in REQUIRED_SCAN_COLUMNS if field not in mapping]
+    if not missing:
+        return headers
+
+    # get_all_values מרפד שורות לרוחב הגיליון, אז לשורת הכותרות יכולים
+    # להיות תאים ריקים בסוף. כותבים אחרי הכותרת האמיתית האחרונה, לא
+    # אחרי הריפוד, אחרת העמודה נוחתת רחוק מהנתונים.
+    last = len(headers)
+    while last > 0 and not str(headers[last - 1]).strip():
+        last -= 1
+
+    sheet_row = header_idx + 1
+    try:
+        needed = last + len(missing)
+        if getattr(ws, 'col_count', needed) < needed:
+            ws.add_cols(needed - ws.col_count)
+        ws.update(values=[missing],
+                  range_name=f'{_a1_col(last)}{sheet_row}:{_a1_col(needed - 1)}{sheet_row}',
+                  value_input_option='USER_ENTERED')
+    except Exception as e:
+        print(f"[Sheets] לא ניתן להוסיף עמודות {missing}: {e}", flush=True)
+        return headers
+
+    print(f"[Sheets] נוספו עמודות חסרות: {missing}", flush=True)
+    return headers[:last] + missing
+
+
 def _col_index(headers, keywords):
     for k in keywords:
         for i, h in enumerate(headers):
@@ -373,6 +420,7 @@ def merge_examinees_into_sheet(ws, records, title_text=None, include_scan_column
             header_idx = HEADER_ROWS - 1
 
     headers = [str(h).strip() for h in all_values[header_idx]]
+    headers = ensure_scan_columns(ws, headers, header_idx)
     mapping = map_columns(headers)
     id_col = mapping.get('id_number')
     name_col = mapping.get('full_name')
@@ -493,6 +541,7 @@ def write_examinee_scan(ws, id_number, full_name='', computer='', col='', seat='
     if header_idx == -1:
         header_idx = 0
     headers = [str(h).strip() for h in (all_data[header_idx] if all_data else [])]
+    headers = ensure_scan_columns(ws, headers, header_idx)
     mapping = map_columns(headers)
 
     id_col = mapping.get('id_number')
