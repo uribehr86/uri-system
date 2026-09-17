@@ -245,11 +245,17 @@
   function startScanner() {
     scanner = new Html5Qrcode("reader");
     const config = {
-      fps: 10,
-      // תיבה רחבה ונמוכה, לא ריבוע — ברקודי מחשב (Code128/EAN) רחבים
-      // ונמוכים, וריבוע צר מדי היה חותך אותם ומונע זיהוי, בעוד ה-QR
-      // של הנבחן נכנס בקלות גם בתיבה רחבה
-      qrbox: { width: 280, height: 140 },
+      fps: 15,
+      // תיבה כפונקציה של גודל התצוגה בפועל, לא מספרים קבועים — בגודל
+      // קבוע (280x140) הברקוד תפס רק חלק קטן מהפיקסלים של התיבה על
+      // מסכים גדולים, וה-decoder חותך את הזיהוי לתיבה הזו בדיוק. ככל
+      // שהתיבה גדולה יותר יחסית למסך, הברקוד "ממלא" יותר פיקסלים
+      // וקל יותר לזהות אותו — במיוחד ברקוד לינארי שצריך רוחב טוב
+      qrbox: function (viewfinderWidth, viewfinderHeight) {
+        const width  = Math.floor(Math.min(viewfinderWidth * 0.9, 400));
+        const height = Math.floor(Math.min(viewfinderHeight * 0.45, 220));
+        return { width: width, height: height };
+      },
       // תמיכה מפורשת גם בברקודים לינאריים, לא רק QR — כדי שאם
       // הדפדפן/הספרייה משתמשים בזיהוי מצומצם כברירת מחדל זה לא ייחסם
       formatsToSupport: window.Html5QrcodeSupportedFormats ? [
