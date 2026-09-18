@@ -547,16 +547,35 @@ def write_examinee_scan(ws, id_number, full_name='', computer='', col='', seat='
     id_col = mapping.get('id_number')
     name_col = mapping.get('full_name')
 
+    # ת.ז מזהה נבחן באופן חד-ערכי; 'שם פרטי' לא. לכן סורקים את כל
+    # הגיליון לחיפוש ת.ז, ורק אם אין התאמה נופלים לשם.
+    #
+    # קודם שתי הבדיקות רצו יחד באותה לולאה, וההתאמה הראשונה ניצחה —
+    # כך ששתי נבחנות בשם 'יעל' באותו מבחן גרמו לסריקה של השנייה
+    # לסמן את הראשונה כנוכחת, כי השם שלה הופיע בשורה מוקדמת יותר.
     target_row = None
-    for i, row in enumerate(all_data[header_idx + 1:], start=header_idx + 1):
-        if (id_number and id_col is not None and id_col < len(row)
-                and str(row[id_col]).strip() == str(id_number).strip()):
-            target_row = i
-            break
-        if (target_row is None and full_name and name_col is not None and name_col < len(row)
-                and str(row[name_col]).strip() == str(full_name).strip()):
-            target_row = i
-            break
+    rows = list(enumerate(all_data[header_idx + 1:], start=header_idx + 1))
+
+    def _cell(row, col):
+        return str(row[col]).strip() if col is not None and col < len(row) else ''
+
+    if id_number and id_col is not None:
+        wanted = str(id_number).strip()
+        for i, row in rows:
+            if _cell(row, id_col) == wanted:
+                target_row = i
+                break
+
+    if target_row is None and full_name and name_col is not None:
+        wanted = str(full_name).strip()
+        matches = [i for i, row in rows if _cell(row, name_col) == wanted]
+        if len(matches) == 1:
+            target_row = matches[0]
+        elif len(matches) > 1:
+            # כמה נבחנים באותו שם ואין ת.ז להכריע — עדיף להוסיף שורה
+            # חדשה שתיראה חריגה מאשר לסמן בשקט את האדם הלא נכון.
+            print(f"[Sheets] '{wanted}' מופיע ב-{len(matches)} שורות ואין ת.ז "
+                  f"להכרעה — לא מסמנים אף אחת מהן", flush=True)
 
     scan_values = {
         'computer': computer, 'is_present': str(is_present), 'scan_time': scan_time,
