@@ -212,6 +212,25 @@ except Exception as _tz_err:
     print(f"[WARNING] Asia/Jerusalem timezone unavailable ({_tz_err}); falling back to fixed UTC+3.", flush=True)
     _ISRAEL_TZ = None
 
+
+def israel_now():
+    """
+    השעה הנוכחית בשעון ישראל.
+
+    datetime.now() מחזיר את שעון השרת, ו-Render רץ ב-UTC — כך ששעת
+    סריקה שנכתבה לגיליון הראתה 18:50 על סריקה שבוצעה ב-21:50. כל מקום
+    שכותב שעה שאדם יקרא (גיליון, דיווח תקלה, מסך הנוכחות) חייב לעבור
+    דרך כאן.
+
+    לא להחליף בזה השוואות זמן מול מסד הנתונים — שם הזמנים ב-UTC,
+    ושעון ישראל היה שובר אותן.
+    """
+    now = datetime.now(timezone.utc)
+    if _ISRAEL_TZ is not None:
+        return now.astimezone(_ISRAEL_TZ)
+    return now.astimezone(timezone(timedelta(hours=3)))
+
+
 def is_test_env():
     """סביבת טסט — מסומנת בכותרת כדי שלא יתבלבלו בינה לבין הפרודקשן.
     מזוהה לפי APP_ENV=test, ואם לא הוגדר — לפי 'test' בכתובת האתר."""
@@ -3180,7 +3199,7 @@ def mark_examinee_scanned(exam_name, id_number, full_name, computer, technician,
         return False
     rec = records[key]
     rec['is_present'] = str(is_present)
-    rec['scan_time'] = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+    rec['scan_time'] = israel_now().strftime('%d/%m/%Y %H:%M:%S')
     rec['technician'] = technician
     rec['pc_status'] = pc_status
     if computer:
@@ -4030,7 +4049,7 @@ def api_exam_scan_beacon():
             col = qr['row']
         if not seat and qr['seat']:
             seat = qr['seat']
-        scan_time_str = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        scan_time_str = israel_now().strftime('%d/%m/%Y %H:%M:%S')
 
         # שם המבחן חייב להגיע מה-QR — אין מסד לחפש בו ת.ז חוצה-מבחנים
         from exam_naming import parse_exam_title
@@ -4142,7 +4161,7 @@ def api_exam_scan_double():
     # (exam_naming.parse_examinee_qr דואג לזה בשני הפורמטים).
     exam_name = (data.get('exam_name', '') or '').strip() or qr['exam_title']
 
-    scan_time_str = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+    scan_time_str = israel_now().strftime('%d/%m/%Y %H:%M:%S')
     technician = session.get('username', '')
 
     from exam_naming import parse_exam_title
@@ -4327,7 +4346,7 @@ def api_exam_scan():
         return {"error": str(e)}, 500
 
     examinee['is_present'] = True
-    examinee['attend_time'] = datetime.now().strftime("%H:%M:%S")
+    examinee['attend_time'] = israel_now().strftime("%H:%M:%S")
     examinee.setdefault('full_name', full_name)
     examinee.setdefault('id_number', id_number)
     return {"success": True, "already": False, "examinee": examinee}
@@ -4523,7 +4542,7 @@ def api_submit_fault():
     description = (data.get('description', '') or '').strip()
     location    = (data.get('location', '') or '').strip()
     technician  = session.get('username', '')
-    report_time = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+    report_time = israel_now().strftime('%d/%m/%Y %H:%M:%S')
 
     if not barcode:
         return jsonify({"success": False, "error": "חובה להזין מספר מחשב"}), 400
