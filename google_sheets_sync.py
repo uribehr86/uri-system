@@ -1,5 +1,4 @@
 import gspread
-from google.oauth2.service_account import Credentials
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
@@ -74,24 +73,20 @@ def update_worksheet(sh, name, header, rows):
 
 def _get_sh_client():
     spreadsheet_id = os.getenv('GOOGLE_SHEETS_ID') or "1MZutvAu3OcKyIg7DKh3U-caHDKJXtJkUy1Z-en1PZVM"
-    service_account_file = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
-    
+
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
-    
-    sa_json_str = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
-    if sa_json_str:
-        creds = Credentials.from_service_account_info(json.loads(sa_json_str), scopes=scopes)
-    elif os.path.exists(service_account_file):
-        creds = Credentials.from_service_account_file(service_account_file, scopes=scopes)
-    else:
-        # Base64 encoded JSON to bypass GitHub Secret Scanning
-        b64_str = "ewogICJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIsCiAgInByb2plY3RfaWQiOiAidXJpLXN5c3RlbS1zaGVldHMiLAogICJwcml2YXRlX2tleV9pZCI6ICIzYmVmMWFkMmI2YzlhNDc1OGE0YjY4NTZkODhlOGZhNTFjNjA2MWNjIiwKICAicHJpdmF0ZV9rZXkiOiAiLS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tXG5NSUlFdndJQkFEQU5CZ2txaGtpRzl3MEJBUUVGQUFTQ0JLa3dnZ1NsQWdFQUFvSUJBUURDVXdYaHU0NW9Bbi85XG4zTmk5MGtuNzAzM0VEcXNVdE1zU2wveGcvMFRZWEJRbDBKTnZUd3lhdWRpWEZCVUx3a1dKQ0JmZWpFZjc4T1EyXG5RbndEODd4aE5iamJTc1FPR3E5d3JvczJINUtvRHE3TThFeFVOODE3QWcxZnNmWGc5dHUrb2xsWmMyNjIraFBSXG5CdFBGWmZUL3MrWVc1ajd5MUJESVZFbyt1NG81M3JUeWlaKzNaR1d5RThkUFYyVy91YWhoQjI2ZW01dTdjZjR6XG5wM1pZYmthZ2g2QlU4T3MyTDU0cXRETEw3cCt6SXV0YnJrcUFleXNqQmNCWnNFOXgrTXRzeFZ2b3ZEdGc4SDQvXG5LWTZ6MFliMHhWVm9UQXkwTzNscU9HZXlCVVYralE5ek5Ia1RnMU1Td0x6QUdKS2pQelBaR3plTHIvYzZkdmFjXG5NLzBubXRaRkFnTUJBQUVDZ2dFQUkzcWdDTXBESWxkT2dnMlgzdlJ0Z0pacEVHb3pMeWtoS0locVVsVlkvdjIwXG55Z0N1WW5TMjB1c2FrZDdmUnRIViswSm9oVC9zaHFIQk1PenJrcGNtTGtOdU9FK0t3eDU1S0tRZGs2aXBFSmo1XG5yajR6V1c4RXk3QWd1L2VVY2xudjNmcnJRRXMwakNEVmpHVG9ObEs2ckJMdThBQml2dGdjSms5SmJQRzF0NEhSXG42a2ZEUzBzYWVHSE04T1RRL3pFZ29vWG8wS25OYyttUXo0SXFCcFF0OW9QWkliK3MwdVRDaXJaZEE5cnU2eGdLXG5BY1JVOE5Ebjg5djhreTRuUkxmRDlKVldtZmg0QnlWbVlha1JVOTRRZGFYMHpvNEhIdWhXbWdzZmpaMzRIN29aXG5UT1hWdzdjSEJ3ejdHTmJsYjZhTTlFN2RYZGlud05sdG9NL0xrZ3QyVVFLQmdRRGdtQnFJb2w0L0VVZlU4MW5EXG44dnllaVFwM3JOclFsYkRQVzhvRktScUt5M2hvSm5NZ3RJZ0xoWTJ6T0JWaCtZMUVacHgranI5dGI1amc3Nmo2XG5YK1VybEdCKzMyeU5Gdyt0SWpRNEV2MHdSSnA2VWttNnVEWlkvR05rSldEY2p6UEIvSmZnNzUxR0hHMGtNaUV1XG5oVkpnQ0l2eDB6ZGY1SmlIaTh4MWRQay9IUUtCZ1FEZGYxWVQ5ODBGWVg2RnhyN1o2RlhLWjU4WkpIZVJOS1VoXG5LNXJmRUVkZDJldU5GY0NiQjZOVHpHRStaTHBCYWp0bFYrMkhLQnlVTzJRTWVwVlhlRGNFdWFkdDlWdnJMOEd5XG5qSjUvT2ZHblBEV0xJaG5HcENiNzIybGlrY2JKU0UzSDUvVnNGbEUraXdmK2U4SnUxYStLSlFKTVNNZGdJdm8wXG5iK1FvVld5RFNRS0JnUUNMRE1ESXZUWDZkL2x3RjJZSkVpUmpCdGRyTnFLV3AwYTdhc25ObmlBbnRFZU11OWxsXG5jMEFUV2hGYjF5b3Q2WElUMmkramp6OW5Rc04wNkF4SFR4MjBlSDJ4cnlRbXloTlRqcXlqMXVYWWYzRGdzSmVqXG5PYSswTWpaYTUyVnJ5R0UwQmU0R1BuT3gxNkdlMmtaKzVkNFZSTlZYMS93ZHE0cmZ5S2JDUmJTVzVRS0JnUUNXXG5CUHprSVY0M1dzVTdEbFdOZVpOQnQ5VkdUakM5cEk2RFhPbFVVODVDZnFyUHIvLzRBTUJhclg3ZnA1R1BaTWc5XG41OFAxV3ZHZ1pHbHJHa3UwSnJQOCsxR3ZaQk9SdzVMSnYveEo1NUVJMS9yYjlZakh4YjZ4cnZZOTBNWjI1Z1hvXG5jKzhCK2t1a3RMNEJXd2xoMEZGSW03Qm13cFJuUk1sNllwNkJ3dm53SVFLQmdRQ21YOEdJN1RFQzZDQ2RGOEJSXG5EN2ZPSkxFWDh0TUhDTjFmMFd6NnIvdzl0YkNNaHhaWXU4Z3I4TDlkTlozQXZDdzJTZTQ1VnpZcW9WdkZRSE92XG5PTGNaVXYrSm1kSVk3czNZVGR0SmUrTXgzdTlSUU5KRVhmWEFRckJVQzdxQytJaGk4My81WmxSYW1odnJ3bk9XXG5aRDVEVDA2WTZYdGN3K0U1L2U1WXh3Y1F0Zz09XG4tLS0tLUVORCBQUklWQVRFIEtFWS0tLS0tXG4iLAogICJjbGllbnRfZW1haWwiOiAic2hlZXRzLXVyaUB1cmktc3lzdGVtLXNoZWV0cy5pYW0uZ3NlcnZpY2VhY2NvdW50LmNvbSIsCiAgImNsaWVudF9pZCI6ICIxMTIwMDQwNTAyMjk0OTA2MzAxNTQiLAogICJhdXRoX3VyaSI6ICJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20vby9vYXV0aDIvYXV0aCIsCiAgInRva2VuX3VyaSI6ICJodHRwczovL29hdXRoMi5nb29nbGVhcGlzLmNvbS90b2tlbiIsCiAgImF1dGhfcHJvdmlkZXJfeDUwOV9jZXJ0X3VybCI6ICJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9vYXV0aDIvdjEvY2VydHMiLAogICJjbGllbnRfeDUwOV9jZXJ0X3VybCI6ICJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9yb2JvdC92MS9tZXRhZGF0YS94NTA5L3NoZWV0cy11cmklNDB1cmktc3lzdGVtLXNoZWV0cy5pYW0uZ3NlcnZpY2VhY2NvdW50LmNvbSIsCiAgInVuaXZlcnNlX2RvbWFpbiI6ICJnb29nbGVhcGlzLmNvbSIKfQo="
-        decoded_json = base64.b64decode(b64_str).decode('utf-8')
-        creds = Credentials.from_service_account_info(json.loads(decoded_json), scopes=scopes)
-    
+
+    # מקור אחד לאישורים — לא בונים Credentials כאן בעצמנו יותר.
+    # שים לב: קודם הייתה כאן נפילה למפתח service account מוטמע בקוד,
+    # בקידוד base64, במפורש כדי לעקוף סריקת סודות של GitHub. הוסר —
+    # מפתח כזה חייב תחלופה (Rotate) ב-Google Cloud Console, כי הוא
+    # כבר קיים לצמיתות בהיסטוריית ה-git גם אחרי המחיקה מהקובץ.
+    from drive_manager import get_google_credentials
+    creds = get_google_credentials(scopes)
+
     client = gspread.authorize(creds)
     sh = client.open_by_key(spreadsheet_id)
     return sh

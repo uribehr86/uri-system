@@ -71,6 +71,7 @@
             <div id="dictation-status" style="display: none; color: #ef4444; font-weight: bold; margin-top: 10px; text-align: center; animation: pulse 1.5s infinite;">
                 🔴 מקשיב... תגיד את המספר ואז 'פסיק' בסוף
             </div>
+            <div id="wakelock-status" style="display: none; margin-top: 8px; text-align: center; font-size: 0.95rem; font-weight: 700; padding: 8px; border-radius: 8px;"></div>
             <style>
                 @keyframes pulse {
                     0% { opacity: 1; }
@@ -262,11 +263,33 @@
     let dictationActive = false;
     let recognition = null;
 
+    function showWakeStatus(state, detail) {
+        const el = document.getElementById('wakelock-status');
+        if (!el) return;
+        el.style.display = 'block';
+        if (state === 'on') {
+            el.style.background = 'rgba(34,197,94,0.15)';
+            el.style.color = '#22c55e';
+            el.innerText = '🔒 המסך יישאר דלוק';
+        } else if (state === 'denied') {
+            el.style.background = 'rgba(239,68,68,0.15)';
+            el.style.color = '#ef4444';
+            el.innerText = '⚠️ המכשיר לא נתן להשאיר את המסך דלוק (' + detail + ')';
+        } else {
+            el.style.background = 'rgba(245,158,11,0.15)';
+            el.style.color = '#f59e0b';
+            el.innerText = '❌ הדפדפן הזה לא תומך בהשארת מסך דלוק';
+        }
+    }
+
     function toggleDictation() {
         if (dictationActive) {
             stopDictation();
             return;
         }
+
+        // חייב לצאת מתוך הלחיצה עצמה - אחרת אייפון דוחה את הבקשה
+        if (window.KeepAwake) window.KeepAwake.on(showWakeStatus);
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
@@ -356,6 +379,9 @@
         if (recognition) {
             recognition.stop();
         }
+        if (window.KeepAwake) window.KeepAwake.off();
+        const wakeEl = document.getElementById('wakelock-status');
+        if (wakeEl) wakeEl.style.display = 'none';
         document.getElementById('btn-dictation').classList.remove('dictation-active');
         document.getElementById('dictation-status').style.display = 'none';
         

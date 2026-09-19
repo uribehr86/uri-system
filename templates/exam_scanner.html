@@ -245,8 +245,34 @@
   function startScanner() {
     scanner = new Html5Qrcode("reader");
     const config = {
-      fps: 10,
-      qrbox: { width: 250, height: 250 }
+      fps: 15,
+      // תיבה כפונקציה של גודל התצוגה בפועל, לא מספרים קבועים — בגודל
+      // קבוע (280x140) הברקוד תפס רק חלק קטן מהפיקסלים של התיבה על
+      // מסכים גדולים, וה-decoder חותך את הזיהוי לתיבה הזו בדיוק. ככל
+      // שהתיבה גדולה יותר יחסית למסך, הברקוד "ממלא" יותר פיקסלים
+      // וקל יותר לזהות אותו — במיוחד ברקוד לינארי שצריך רוחב טוב
+      qrbox: function (viewfinderWidth, viewfinderHeight) {
+        const width  = Math.floor(Math.min(viewfinderWidth * 0.9, 400));
+        const height = Math.floor(Math.min(viewfinderHeight * 0.45, 220));
+        return { width: width, height: height };
+      },
+      // תמיכה מפורשת גם בברקודים לינאריים, לא רק QR — כדי שאם
+      // הדפדפן/הספרייה משתמשים בזיהוי מצומצם כברירת מחדל זה לא ייחסם
+      formatsToSupport: window.Html5QrcodeSupportedFormats ? [
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.CODE_93,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.CODABAR,
+      ] : undefined
+      // experimentalFeatures.useBarCodeDetectorIfSupported הוסר —
+      // גרם למסך להחשיך ולזיהוי לא לעבוד בכלל אצל המשתמש. לא ברור
+      // מה בדיוק הקונפליקט, אבל אין ערך שמצדיק את הסיכון
     };
     return scanner.start(
       { facingMode: "environment" },
@@ -570,23 +596,29 @@
       body: body
     })
     .then(function(r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
       var ct = r.headers.get('content-type') || '';
       if (r.url.includes('/login') || !ct.includes('json')) {
         window.location.href = '/login';
         throw new Error('הסשן פג — נא להתחבר מחדש');
       }
-      return r.json();
+      // קוראים את ה-JSON גם על תשובת שגיאה (404/400 וכו') — השרת
+      // תמיד שולח שם הודעה מפורטת, ולא רוצים "HTTP 404" גנרי במקומה
+      return r.json().then(function(data) {
+        return { ok: r.ok, status: r.status, data: data };
+      });
     })
-    .then(function(data) {
+    .then(function(result) {
+      var data = result.data;
       if (data.error) {
         showScanResult(false, data.error);
+      } else if (!result.ok) {
+        showScanResult(false, 'שגיאת שרת (' + result.status + ')');
       } else {
         attendCount++;
         document.getElementById('attend-count').textContent = attendCount;
         var total = attendTotal > 0 ? ' / ' + attendTotal : '';
         document.getElementById('attend-total-display').textContent = total;
-        showScanResult(true, savedName + ' (מחשב ' + computerVal + ')');
+        showScanResult(true, savedName, computerVal);
         
         // Setup undo
         lastSavedSheetRow = { name: savedName, id: savedId };
@@ -602,7 +634,7 @@
     });
   }
 
-  function showScanResult(success, name) {
+  function showScanResult(success, name, computer) {
     var existing = document.getElementById('scan-result-banner');
     if (existing) existing.remove();
     var banner = document.createElement('div');
@@ -619,7 +651,8 @@
         : 'background:#dc2626;color:#fff;'
     ].join(';');
     banner.innerHTML = success
-      ? '&#x2705; נסרק!<br><span style="font-size:1.1rem">' + name + '</span>'
+      ? '<div style="font-size:1rem;text-align:right">שם הנבחן: ' + name + '<br>מספר מחשב: ' + computer + '</div>'
+        + '<div style="font-size:0.95rem;margin-top:10px">נא לעבור לדף סריקה הבאה</div>'
       : '&#x274c; לא נסרק!<br><span style="font-size:1rem">' + name + '</span>';
     document.body.appendChild(banner);
     setTimeout(function() { banner.remove(); }, 3000);

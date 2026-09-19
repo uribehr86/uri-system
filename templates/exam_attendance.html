@@ -35,6 +35,14 @@
                 <label style="color:var(--text-color); font-weight:bold; font-size:0.9rem;">2. עיצוב דף נבחן (וורד) [אופציונלי]</label>
                 <input type="file" name="word_template" accept=".docx" class="form-control" style="margin-top:5px;">
             </div>
+            <div>
+                <label style="color:var(--text-color); font-weight:bold; font-size:0.9rem;">3. פורמט קובץ</label>
+                <select name="format" class="form-control" style="margin-top:5px; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; padding:10px 14px; border-radius:10px; font-family:inherit;">
+                    <option value="docx">Word (.docx)</option>
+                    <option value="pdf">PDF</option>
+                </select>
+                <span style="color:var(--muted); font-size:0.78rem;">אם PDF לא זמין בשרת, יישלח קובץ Word במקום.</span>
+            </div>
             <button type="submit" style="padding:10px 20px; background:rgba(163,113,247,0.2); border:1px solid #a371f7; color:#a371f7; border-radius:10px; cursor:pointer; font-weight:700; font-family:inherit; margin-top:5px;">✨ הפק מסמך להדפסה</button>
         </form>
     </div>
