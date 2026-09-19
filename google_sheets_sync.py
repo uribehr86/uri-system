@@ -1,5 +1,4 @@
 import gspread
-from google.oauth2.service_account import Credentials
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
