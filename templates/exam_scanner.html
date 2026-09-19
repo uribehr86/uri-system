@@ -618,7 +618,7 @@
         document.getElementById('attend-count').textContent = attendCount;
         var total = attendTotal > 0 ? ' / ' + attendTotal : '';
         document.getElementById('attend-total-display').textContent = total;
-        showScanResult(true, savedName + ' (מחשב ' + computerVal + ')');
+        showScanResult(true, savedName, computerVal);
         
         // Setup undo
         lastSavedSheetRow = { name: savedName, id: savedId };
@@ -634,7 +634,7 @@
     });
   }
 
-  function showScanResult(success, name) {
+  function showScanResult(success, name, computer) {
     var existing = document.getElementById('scan-result-banner');
     if (existing) existing.remove();
     var banner = document.createElement('div');
@@ -651,7 +651,8 @@
         : 'background:#dc2626;color:#fff;'
     ].join(';');
     banner.innerHTML = success
-      ? '&#x2705; נסרק!<br><span style="font-size:1.1rem">' + name + '</span>'
+      ? '<div style="font-size:1rem;text-align:right">שם הנבחן: ' + name + '<br>מספר מחשב: ' + computer + '</div>'
+        + '<div style="font-size:0.95rem;margin-top:10px">נא לעבור לדף סריקה הבאה</div>'
       : '&#x274c; לא נסרק!<br><span style="font-size:1rem">' + name + '</span>';
     document.body.appendChild(banner);
     setTimeout(function() { banner.remove(); }, 3000);
